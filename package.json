@@ -1,0 +1,29 @@
+{
+  "name": "codex-forge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-ui.mjs",
+    "test": "node --test tests/*.test.cjs",
+    "build:client": "node scripts/build-client.mjs",
+    "forge": "node cli/forge.mjs"
+  },
+  "dependencies": {
+    "@xyflow/react": "12.12.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@electron/asar": "4.3.1",
+    "esbuild": "0.28.2"
+  },
+  "description": "A versioned extension host and native UI SDK for Codex desktop",
+  "bin": {
+    "codex-forge": "cli/forge.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HOMEFTW/codex-forge.git"
+  }
+}

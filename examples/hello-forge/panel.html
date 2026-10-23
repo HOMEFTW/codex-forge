@@ -1,0 +1,10 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><style>
+:root{color-scheme:light dark}body{font:14px/1.6 system-ui;padding:22px}button,input{font:inherit;padding:7px 12px;margin:5px;border:1px solid #8886;border-radius:7px}pre{white-space:pre-wrap;overflow-wrap:anywhere}
+</style></head><body><h1>Hello Forge</h1><p>这是运行在原生右侧标签页中的隔离插件。</p><button id="context">读取上下文</button><button id="output">输出问候</button><button id="browser">打开项目网页</button><label>会话标题<input id="title" maxlength="300"></label><button id="rename">修改当前会话标题</button><pre id="result" role="status"></pre><script>
+const api=window.CodexForge,result=document.getElementById('result');
+function bind(id,fn){document.getElementById(id).onclick=async()=>{try{result.textContent=JSON.stringify(await fn(),null,2);}catch(e){result.textContent=e.message;}};}
+bind('context',()=>api.context.get());
+bind('output',async()=>{const s=await api.settings.get();await api.output.append(s.greeting,{title:'面板问候'});return '已输出到当前对话，可折叠查看';});
+bind('browser',()=>api.browser.open('https://github.com/HOMEFTW/codex-forge'));
+bind('rename',()=>api.conversations.setTitle(document.getElementById('title').value));
+</script></body></html>

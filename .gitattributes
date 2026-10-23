@@ -1,0 +1,5 @@
+* text=auto eol=lf
+# Preserve upstream skill bytes: catalog.json records exact SHA-256 digests.
+bundled-skills/** -text
+*.ico binary
+*.png binary

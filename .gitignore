@@ -1,0 +1,13 @@
+node_modules/
+dist/
+release/
+output/
+.playwright-cli/
+*.log
+*.tmp
+.forge-local.json
+__pycache__/
+
+# Local execution history, never part of the source release
+DELIVERY.md
+PLAN.md

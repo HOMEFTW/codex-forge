@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "apiVersion": 1,
+  "version": "0.1.0",
+  "compatibility": {
+    "codex": [
+      "26.1016.8622.0"
+    ],
+    "forge": [
+      ">=0.1.0 <0.2.0"
+    ]
+  },
+  "permissions": [
+    "panels",
+    "settings",
+    "conversation.read",
+    "sidebar"
+  ],
+  "changelog": [
+    {
+      "version": "0.1.0",
+      "date": "2026-10-23",
+      "items": [
+        "作为 Codex Forge 内置插件提供，继承 r4 修订3 已有能力。"
+      ]
+    }
+  ],
+  "id": "forge.collaboration",
+  "name": "智能体协作",
+  "description": "按用户要求启用 Claude Code、Grok Build、DSH，模型与思考档位、直发、结果读取和三级审批。",
+  "contributes": {
+    "panels": [
+      {
+        "id": "main",
+        "title": "智能体协作",
+        "builtinPage": "collaboration"
+      }
+    ],
+    "sidebar": [
+      {
+        "id": "open",
+        "title": "智能体协作",
+        "panel": "main"
+      }
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {spawnSync} from 'node:child_process';
+const root=path.resolve(import.meta.dirname,'..'),config=JSON.parse(fs.readFileSync(path.join(root,'forge.config.json'),'utf8'));
+const release=path.join(root,'release','forge-only'),payload=path.join(release,'payload');
+if(fs.existsSync(release))fs.rmSync(release,{recursive:true,force:true});fs.mkdirSync(payload,{recursive:true});
+const copy=(from,to=from)=>{const source=path.join(root,from),target=path.join(payload,to);fs.mkdirSync(path.dirname(target),{recursive:true});fs.cpSync(source,target,{recursive:true});};
+for(const item of ['forge.config.json','adapters','runtime','assets/codex-forge.ico','dist/fast-extension','dist/CodexForge.exe','dist/CodexForge.exe.config','scripts/build-client.mjs','scripts/native-tabs-patch.mjs','scripts/native-fast-patch.mjs','scripts/native-settings-patch.mjs','scripts/Launch-Codex-Forge.ps1','scripts/verify-official.ps1','README.md','LICENSE','docs','sdk','examples','CODEG-SKILLS-NOTICES.md'])copy(item);
+copy('dist/CodexForgeBootstrap.exe','CodexForgeBootstrap.exe');
+copy('dist/CodexForgeBootstrap.exe.config','CodexForgeBootstrap.exe.config');
+const files=[];function walk(dir){for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const full=path.join(dir,entry.name);if(entry.isSymbolicLink())throw Error('Unexpected link in Forge payload');if(entry.isDirectory())walk(full);else{const relative=path.relative(payload,full).replaceAll('\\','/');if(/(?:^|\/)(?:ChatGPT\.exe|Codex\.exe|app\.asar|node\.exe)$|\.(?:msix|msixbundle)$/i.test(relative))throw Error('Official client file in Forge installer: '+relative);const buffer=fs.readFileSync(full);files.push({path:relative,bytes:buffer.length,sha256:crypto.createHash('sha256').update(buffer).digest('hex')});}}}walk(payload);
+fs.writeFileSync(path.join(payload,'forge-payload.json'),JSON.stringify({schemaVersion:1,product:'Codex Forge',forgeVersion:config.version,apiVersion:config.apiVersion,containsOfficialClient:false,files},null,2));
+fs.writeFileSync(path.join(release,'bootstrap.json'),JSON.stringify({directory:'forge/'+config.version}));
+const compiler=process.env.INNO_ISCC||'D:/Code/.tools/InnoSetup/ISCC.exe';
+const result=spawnSync(compiler,['/DForgeVersion='+config.version,'/DForgeRoot='+root,path.join(root,'installer','CodexForge.iss')],{cwd:root,encoding:'utf8',windowsHide:true});
+if(result.status!==0){console.error(result.stdout,result.stderr);process.exit(result.status||1);}
+const name='Codex-Forge-'+config.version+'-Setup-x64.exe',exe=path.join(root,'release','dist',name),bytes=fs.readFileSync(exe),sha256=crypto.createHash('sha256').update(bytes).digest('hex');
+const manifest={schemaVersion:2,platform:'win32-x64',apiVersion:config.apiVersion,forgeVersion:config.version,codexVersion:config.codexVersion,repository:config.githubRepository,distribution:'forge-bootstrap',containsOfficialClient:false,url:`https://github.com/${config.githubRepository}/releases/download/v${config.version}/${name}`,sha256,bytes:bytes.length};
+fs.writeFileSync(path.join(root,'release','dist','codex-forge-release.json'),JSON.stringify(manifest,null,2)+'\n');
+fs.writeFileSync(path.join(root,'release','dist','SHA256SUMS.txt'),sha256+'  '+name+'\n');
+fs.writeFileSync(path.join(root,'output','installer-audit.json'),JSON.stringify({installer:name,sha256,installerBytes:bytes.length,payloadFiles:files.length,payloadBytes:files.reduce((sum,f)=>sum+f.bytes,0),officialClientFiles:0,forgeVersion:config.version,codexVersion:config.codexVersion,checkedAt:new Date().toISOString()},null,2));
+console.log(JSON.stringify({installer:exe,sha256,bytes:bytes.length,payloadFiles:files.length,officialClientFiles:0},null,2));

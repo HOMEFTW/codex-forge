@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "forgeVersion": "0.1.0",
+  "apiVersion": 1,
+  "codexVersion": "26.1016.8622.0",
+  "architecture": "x64",
+  "packageIdentity": "OpenAI.Codex",
+  "publisher": "CN=50BDFD77-8903-4850-9FFE-6E8522F64D5B",
+  "downloadUrl": "https://persistent.oaistatic.com/codex-app-prod/releases/26.1016.8622.0/ChatGPT-x64.msix",
+  "packageBytes": 968540851,
+  "packageSHA256": "9085cf2e2eb5081f894a2cf334e1f36dbb9438ecb409d20195aa2fe1ecfcb4c8",
+  "baseASARSHA256": "a05dfd86ca508148c83c25590639cf91a52c6647733cdf200723d85357052b49",
+  "baseExecutableSHA256": "f7f605cceb2e75dca52e03362329a889f917cc1f8d1036cd26386727a2319415"
+}

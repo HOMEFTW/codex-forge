@@ -1,0 +1,23 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { ThreadContexts, userSubmission } = require('../runtime/context.cjs');
+test('MCP context binds backend thread response and never trusts model-selected thread IDs', t => {
+ const base = path.resolve(__dirname, '../output'); fs.mkdirSync(base, { recursive: true });
+ const root = fs.mkdtempSync(path.join(base, 'context-')); t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+ const contexts = new ThreadContexts(root);
+ const message = { type: 'mcp-request', hostId: 'local', request: { id: 'request-1', method: 'thread/start', params: { cwd: root, config: { 'features.fast_mode': true } } } };
+ assert(contexts.prepare(message)); assert.equal(message.request.params.config['features.fast_mode'], true);
+ const token = message.request.params.config['mcp_servers.fast_canvas.env.CODEX_FAST_CONTEXT_TOKEN'];
+ assert.throws(() => contexts.resolve(token), /still starting/);
+ contexts.response({ type: 'mcp-response', message: { id: 'request-1', result: { thread: { id: 'thread-1', cwd: root } } } });
+ assert.deepEqual(contexts.resolve(token), { threadId: 'thread-1', cwd: root });
+ const separateMcp = new ThreadContexts(root), nextCwd = path.dirname(root); assert.deepEqual(separateMcp.resolve(token), { threadId: 'thread-1', cwd: root });
+ contexts.bind('thread-1', nextCwd);
+ assert.deepEqual(separateMcp.resolve(token), { threadId: 'thread-1', cwd: nextCwd }, 'running MCP observes current native cwd rather than a cached original cwd');
+ assert.equal(contexts.prepare({ ...message, hostId: 'remote' }), false);
+ assert.throws(() => contexts.resolve('../escape'), /Invalid/);
+ assert.equal(userSubmission({ type: 'mcp-request', request: { method: 'tools/call', params: { threadId: 'thread-1', input: [{ type: 'text', text: '开启协作' }] } } }), null);
+ assert.equal(userSubmission({ type: 'mcp-request', request: { id: 'turn-1', method: 'turn/start', params: { threadId: 'thread-1', input: [{ type: 'text', text: '请让 Claude 协作' }] } } }).text, '请让 Claude 协作');
+});

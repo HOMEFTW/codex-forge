@@ -1,0 +1,22 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { TodoStore, callTool } = require('../runtime/todos.cjs');
+test('todos preserve unrelated items, reject stale writes and roll back invalid batches', async t => {
+  const base = path.resolve(__dirname, '../output'); fs.mkdirSync(base, { recursive: true });
+  const root = fs.mkdtempSync(path.join(base, 'todos-')); t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const store = new TodoStore(root);
+  const created = await store.apply('thread-1', 0, [{ op: 'add', id: 'a', title: '设计' }, { op: 'add', id: 'b', title: '验证' }]);
+  assert.equal(created.items.length, 2);
+  await assert.rejects(store.apply('thread-1', 0, [{ op: 'remove', id: 'a' }]), /Revision conflict/);
+  await assert.rejects(store.apply('thread-1', 1, [{ op: 'update', id: 'a', status: 'completed' }, { op: 'update', id: 'b', status: 'bad' }]), /Invalid todo status/);
+  assert.equal(store.read('thread-1').items[0].status, 'pending');
+  const changed = await store.apply('thread-1', 1, [{ op: 'remove', id: 'a' }, { op: 'update', id: 'b', status: 'in_progress' }]);
+  assert.deepEqual(changed.items.map(x => x.id), ['b']);
+  assert.equal(new TodoStore(root).read('thread-1').items[0].status, 'in_progress');
+  assert.equal(store.read('thread-2').items.length, 0);
+  await assert.rejects(callTool(store, 'todo_apply', { expectedRevision: 0, operations: [{ op: 'add', title: 'oops' }] }, {}), /resume a conversation/);
+  await callTool(store, 'todo_apply', { expectedRevision: 0, operations: [{ op: 'add', title: '模型任务' }] }, { threadId: 'thread-2' });
+  assert.equal(store.read('thread-2').items[0].title, '模型任务');
+});

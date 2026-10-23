@@ -1,0 +1,52 @@
+import React, {useEffect,useState} from 'react';
+import CollaborationPanel from './collaboration.jsx';
+import SkillsPanel from './skills.jsx';
+import './forge.css';
+const titles={'forge-plugins':'插件管理','forge-settings':'Codex Forge 插件设置','forge-updates':'版本更新','forge-features':'功能介绍','forge-changelog':'升级日志','forge-extension-info':'扩展插件介绍与日志','forge-output':'插件输出'};
+function Settings({plugin,call,api,threadId}) {
+  const [value,setValue]=useState(null),[notice,setNotice]=useState(''),[error,setError]=useState('');
+  useEffect(()=>{let live=true;call('settings',{id:plugin.id}).then(v=>{if(live)setValue(v);}).catch(e=>live&&setError(e.message));return()=>{live=false;};},[plugin.id]);
+  const fields=plugin.contributes?.settings?.properties||{};
+  return <div className="forge-settings-form">
+    {error&&<p role="alert">{error}</p>}
+    {Object.entries(fields).map(([key,field])=><label key={key}>{field.title}{field.type==='boolean'?<input type="checkbox" checked={!!value?.[key]} onChange={e=>setValue({...value,[key]:e.target.checked})}/>:field.enum?<select value={value?.[key]??''} onChange={e=>setValue({...value,[key]:field.type==='number'?Number(e.target.value):e.target.value})}>{field.enum.map(v=><option key={String(v)} value={v}>{String(v)}</option>)}</select>:<input type={field.type==='number'?'number':'text'} min={field.minimum} max={field.maximum} value={value?.[key]??''} onChange={e=>setValue({...value,[key]:field.type==='number'?Number(e.target.value):e.target.value})}/>}</label>)}
+    {Object.keys(fields).length>0&&<button disabled={!value} onClick={async()=>{try{await call('saveSettings',{id:plugin.id,value});setNotice(plugin.restartRequired?'已保存，下次启动生效':'已保存');setError('');}catch(e){setError(e.message);}}}>保存设置</button>}
+    {notice&&<p role="status">{notice}</p>}
+    {plugin.id==='forge.collaboration'&&plugin.enabled?<CollaborationPanel api={api} threadId={threadId} settingsOnly/>:plugin.id==='forge.skills'&&plugin.enabled?<SkillsPanel api={api}/>:!Object.keys(fields).length&&<p className="forge-muted">{plugin.enabled?'此插件没有额外的全局设置。':'插件已停用；启用后可使用其功能。'}</p>}
+  </div>;
+}
+export default function ForgePanel({api,page,onClose}) {
+  const [data,setData]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(''),[notice,setNotice]=useState(''),[selected,setSelected]=useState(''),[repository,setRepository]=useState(''),[remove,setRemove]=useState('');
+  const call=(method,args={})=>api.request('forge',{method,args});
+  const refresh=async()=>{const value=await call('snapshot');setData(value);setRepository(current=>current||value.config.githubRepository||'');if(page==='forge-settings'&&value.settingsPlugin)setSelected(value.settingsPlugin);};
+  useEffect(()=>{refresh().catch(e=>setError(e.message));return api.subscribe(event=>{if(['forge-refresh','refresh','context','forge-settings-focus'].includes(event.type))refresh().catch(e=>setError(e.message));});},[page]);
+  useEffect(()=>{if(page==='forge-settings'&&selected&&data){const target=document.getElementById('forge-settings-'+selected);target?.scrollIntoView({block:'start',behavior:'smooth'});target?.focus({preventScroll:true});}},[selected,data?.plugins.length,page]);
+  async function action(name,args={}){setBusy(name);setError('');try{const result=await call(name,args);await refresh();if(name==='install'&&result)setNotice('已安装 '+result.id+'，请审阅权限后启用。');if(['stagePluginUpdate','applyUpdate'].includes(name)&&result)setNotice(result.message);if(name==='uninstall'){setRemove('');setNotice('插件已卸载，设置已保留。');}return result;}catch(e){setError(e.message);}finally{setBusy('');}}
+  const open=page=>action('openPage',{page});
+  const plugins=data?.plugins||[];
+  return <main className="forge-page"><header><div><small>CODEX FORGE · {data?.versions.forge||'0.1.0'}</small><h1>{titles[page]}</h1></div>{page!=='forge-settings'&&<button aria-label="关闭 Forge 面板" onClick={onClose}>×</button>}</header>
+    {error&&<p className="forge-error" role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
+    {!data?<p>正在读取…</p>:<>
+    {page==='forge-plugins'&&<><p>安装和管理插件。每个插件的设置统一位于客户端设置。</p><div className="forge-actions"><button disabled={!!busy} onClick={()=>action('install')}>安装插件…</button><button disabled={!!busy} onClick={()=>action('reload')}>重新加载插件</button></div>
+      {data.errors.map((e,i)=><p className="forge-error" key={i}>{e.directory}：{e.message}</p>)}
+      {plugins.map(p=><article className="forge-card" key={p.id}><div className="forge-card-title"><h2>{p.name}</h2><span>{p.builtin?'内置':'扩展'} · {p.version}</span></div><p>{p.description}</p><code>{p.id}</code><p className="forge-muted">Codex {p.compatibility.codex.join(' / ')} · Forge {p.compatibility.forge.join(' / ')}</p><details><summary>权限（{p.permissions.length}）</summary><p>{p.permissions.join('、')||'无额外权限'}</p></details>{p.reasons.map(r=><p key={r} className="forge-error">{r}</p>)}
+        <div className="forge-actions"><button aria-pressed={p.enabled} disabled={!!busy} onClick={()=>action('enable',{id:p.id,enabled:!p.enabled})}>{p.enabled?'停用':'启用'}</button><button aria-label={p.name+' 设置'} disabled={!!busy} onClick={()=>action('openSettings',{id:p.id})}>设置</button>{p.enabled&&(p.contributes?.panels||[]).map(v=><button key={v.id} onClick={()=>action('openPanel',{id:p.id,view:v.id})}>打开{v.title}</button>)}{!p.builtin&&p.update&&<button disabled={!!busy} onClick={()=>action('checkPluginUpdate',{id:p.id})}>检查更新</button>}{!p.builtin&&<button className="forge-danger" onClick={()=>setRemove(p.id)}>卸载</button>}</div>
+        {data.pluginUpdates?.[p.id]?.status==='up_to_date'&&<p>当前已是最新版本。</p>}
+        {data.pluginUpdates?.[p.id]?.status==='available'&&<div><p>发现 {data.pluginUpdates[p.id].release.version}</p>{data.pluginUpdates[p.id].compatible?<button disabled={!!busy||!!data.pendingUpdates?.[p.id]} onClick={()=>action('stagePluginUpdate',{id:p.id})}>下载更新 · 重启后生效</button>:<p className="forge-error">无法安装：{data.pluginUpdates[p.id].reasons.join('；')}</p>}</div>}
+        {data.pendingUpdates?.[p.id]&&<p role="status">{data.pendingUpdates[p.id].version} 已准备好，请重启客户端生效。{data.pendingUpdates[p.id].permissionsChanged&&'新权限需要重新启用。'}</p>}
+        {data.pluginUpdateResults?.filter(r=>r.id===p.id).map(r=><p key={r.id} role="status">{r.status==='installed'?'已更新至 '+r.version:'上次更新失败：'+r.error}</p>)}
+        {remove===p.id&&<div role="alertdialog" aria-label={'卸载 '+p.name}><p>卸载“{p.name}”？插件文件会被移除，设置保留供重新安装使用。</p><button disabled={!!busy} onClick={()=>action('uninstall',{id:p.id})}>确认卸载</button><button onClick={()=>setRemove('')}>取消</button></div>}
+      </article>)}
+    </>}
+    {page==='forge-settings'&&<><p>所有 Forge 插件的设置集中在这里。<button onClick={()=>open('forge-plugins')}>管理插件</button></p><nav className="forge-settings-index">{plugins.map(p=><button key={p.id} onClick={()=>setSelected(p.id)}>{p.name}</button>)}</nav>{plugins.filter(p=>p.id===(selected||plugins[0]?.id)).map(p=><section tabIndex={-1} id={'forge-settings-'+p.id} className={'forge-card '+(selected===p.id?'forge-selected':'')} key={p.id}><h2>{p.name}</h2><Settings plugin={p} call={call} api={api} threadId={data.context.threadId}/></section>)}</>}
+    {page==='forge-updates'&&<><p>当前 Codex {data.versions.codex} · Forge {data.versions.forge}</p><label className="forge-repository">Forge 更新仓库<input value={repository} placeholder="owner/repository" onChange={e=>setRepository(e.target.value)}/></label><div className="forge-actions"><button disabled={!!busy} onClick={()=>action('updateRepository',{repository})}>保存仓库</button><button disabled={!!busy} onClick={()=>action('checkUpdates')}>{busy==='checkUpdates'?'正在检查…':'检查 Codex 与 Forge 更新'}</button></div>
+      {data.update&&<article className="forge-card"><p>检查时间：{new Date(data.update.checkedAt).toLocaleString()}</p><p>Codex：{data.update.native.version||data.update.native.error} {data.update.native.status==='available'?'（发现新版，等待匹配适配器）':data.update.native.status==='up_to_date'?'（当前版本已是最新）':''}</p><p>Forge：{data.update.forge.error|| (data.update.forge.status==='no_release'?'仓库尚未发布版本':'已读取发布列表')}</p>{data.update.plan?<><p>匹配更新：Codex {data.update.plan.codexVersion} / Forge {data.update.plan.forgeVersion}</p><button disabled={!!busy} onClick={()=>action('stageUpdate')}>下载并校验</button>{data.update.staged&&<button disabled={!!busy} onClick={()=>action('applyUpdate')}>安装已验证版本</button>}</>:<p>暂无可应用的匹配更新。</p>}{data.update.candidates.filter(c=>!c.compatible).map(c=><details key={c.forgeVersion+c.codexVersion}><summary>未匹配：{c.forgeVersion} / {c.codexVersion}</summary><p>{c.reasons.join('；')}</p></details>)}</article>}
+      <p className="forge-muted">仅安装同时匹配客户端、Forge 和已启用扩展插件的版本。r 系列需完整重新安装。</p><div className="forge-info-buttons"><button onClick={()=>open('forge-extension-info')}>扩展插件功能与升级日志</button><button onClick={()=>open('forge-features')}>Forge 功能介绍</button><button onClick={()=>open('forge-changelog')}>Forge 升级日志</button></div>
+    </>}
+    {page==='forge-features'&&<><p>Codex Forge 为客户端提供有版本约束的插件宿主。插件面板默认使用原生右侧标签页，设置统一集中。</p>{plugins.filter(p=>p.builtin).map(p=><article className="forge-card" key={p.id}><h2>{p.name}</h2><p>{p.description}</p></article>)}<article className="forge-card"><h2>开发 API 与插件管理</h2><p>支持左栏、工具栏、输入框、会话标题、输出、内置浏览器、命令、事件与独立存储。插件需声明权限和 Codex / Forge 兼容版本。</p></article></>}
+    {page==='forge-changelog'&&<article className="forge-card"><h2>0.1.0 · 2026-10-23</h2><p>创建独立 Forge 宿主及 API 1；继承 r4-p3 的画布、待办、协作、技能、Fast 和浏览器能力。</p><p>新增插件安装、卸载、启停、兼容校验、统一设置及精确定位。工具栏改为帮助、升级、插件管理。</p><p>分别检查原生 Codex 和 Forge 更新，按适配器及插件兼容范围匹配。</p></article>}
+    {page==='forge-extension-info'&&<>{plugins.filter(p=>!p.builtin).length===0&&<p>尚未安装扩展插件。开发者可在插件清单中声明功能介绍和升级日志。</p>}{plugins.filter(p=>!p.builtin).map(p=><article className="forge-card" key={p.id}><h2>{p.name}</h2><p>{p.description||'开发者未提供功能说明。'}</p>{(p.changelog||[]).map((c,i)=><details key={i}><summary>{c.version} · {c.date}</summary><ul>{(c.items||[]).map((item,j)=><li key={j}>{item}</li>)}</ul></details>)}</article>)}</>}
+    {page==='forge-output'&&<>{!data.output.length&&<p>本对话暂无插件输出。</p>}{data.output.map((o,i)=><details className="forge-card" key={i}><summary>{o.pluginName} · {o.title}</summary><pre>{o.text}</pre></details>)}</>}
+    </>}
+  </main>;
+}
