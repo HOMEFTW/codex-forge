@@ -4,7 +4,9 @@ const { createHash } = require('node:crypto');
 const { clean, createParser } = require('./agent-cli.cjs');
 
 // Protocol sources: Claude Agent SDK 0.3.303 sdk.d.ts (CanUseTool,
-// SDKControlPermissionRequest/Response) and sdk.mjs's --permission-prompt-tool=stdio.
+// SDKControlPermissionRequest/Response) and Claude Code print/stream host
+// permission routing. The CLI's --permission-prompt-tool flag names an MCP
+// tool; it is intentionally not used for this stdio SDK-host bridge.
 // Grok 1.0.62's bundled 15-agent-mode/22-permissions-and-safety documentation;
 // Codeg src-tauri/src/acp/connection.rs:2127,5457,8107 (launch, effort, ACP v1).
 // No approval writes a persistent rule, changes the requested input, or retries a deny.
@@ -103,6 +105,10 @@ function attachApprovalSession({ agent, child, task, cwd, config = {}, sessionId
         : { behavior: 'deny', message: reason || '工具请求未获批准', toolUseID: request.tool_use_id } } }));
       return;
     }
+    // Claude Code 2.1.x can report a host-less denial as a normal result when
+    // it cannot route the prompt to an SDK host. Preserve that denial as a
+    // failed collaboration instead of allowing the worker to report success.
+    if (nativeDenial(value) || nativeDenial(value.result) || nativeDenial(value.message)) denied('工具请求被原生权限规则拒绝，任务未完整执行');
     parser.write(Buffer.from(JSON.stringify(value) + '\n'));
     if (value.type === 'result') finish();
   }
@@ -111,8 +117,8 @@ function attachApprovalSession({ agent, child, task, cwd, config = {}, sessionId
       const code = output.code || output.kind || output.type || output.error?.code || output.error?.kind;
       if (['permission_denied', 'PERMISSION_DENIED', 'auto_mode_blocked'].includes(code)) return true;
     }
-    const text = typeof output === 'string' ? output : typeof output?.error === 'string' ? output.error : output?.error?.message || output?.message || '';
-    return /^(?:Denied by permission policy:|Auto mode blocked this action|Permission denied(?:[.:]|$))/i.test(text.trim());
+    const text = typeof output === 'string' ? output : typeof output?.error === 'string' ? output.error : output?.error?.message || output?.message || output?.result || '';
+    return /(?:Denied by permission policy:|Auto mode blocked this action|Permission denied(?:[.:]|$)|Permission for this tool use was denied|this session has no approval surface|action was NOT performed)/i.test(String(text).trim());
   }
   function acp(value) {
     if (value.method === '$/cancel_request') { cancelPermission(value.params?.requestId ?? value.params?.id); return; }

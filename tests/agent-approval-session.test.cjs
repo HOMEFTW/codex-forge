@@ -38,7 +38,7 @@ test('invocation selects bidirectional permission protocols, keeps native defaul
     const config = validateAgentConfig({ command: process.execPath, approvalMode, model: 'chosen', reasoningEffort: 'high' });
     const claude = invocation('claude', config, { sessionId: 'existing' });
     assert.equal(claude.protocol, 'claude-control'); assert.equal(claude.stdin, true);
-    assert(claude.args.includes('--permission-prompt-tool=stdio'));
+    assert(!claude.args.some(arg => arg.startsWith('--permission-prompt-tool')));
     assert.equal(claude.args[claude.args.indexOf('--input-format') + 1], 'stream-json');
     assert.equal(claude.args[claude.args.indexOf('--permission-prompts') + 1], 'host');
     assert.equal(claude.args[claude.args.indexOf('--resume') + 1], 'existing');
@@ -87,6 +87,14 @@ test('explicit native denials mark a failed result even when the CLI exits succe
   assert.equal(result.permissionDenied, true); assert.match(result.failure, /拒绝|批准/); assert.equal(f.actions.length, 0);
   const parser = createParser('claude', () => {}); parser.write(Buffer.from(JSON.stringify({ type: 'result', subtype: 'success', permission_denials: [{ tool_name: 'Write' }] }) + '\n'));
   assert.equal(parser.finish().permissionDenied, true);
+});
+
+test('Claude host-less permission denial cannot be reported as completed', async () => {
+  const f = fixture(); f.claudeReady();
+  f.receive({ type: 'result', subtype: 'success', result: 'Permission for this tool use was denied. It requires approval, and this session has no approval surface — nobody can answer a permission prompt here. The action was NOT performed.' });
+  const result = await f.attachment.completion;
+  assert.equal(result.permissionDenied, true);
+  assert.match(result.failure, /拒绝|批准/);
 });
 
 test('cancelled permission requests abort their broker signal and never send a late allow', async () => {

@@ -8,7 +8,7 @@ using System.Reflection;
 [assembly: AssemblyTitle("Codex Forge")]
 [assembly: AssemblyProduct("Codex Forge")]
 [assembly: AssemblyDescription("Codex Forge plugin host launcher")]
-[assembly: AssemblyVersion("0.1.0.0")]
+[assembly: AssemblyVersion("0.2.0.0")]
 internal static class Launcher {
     static string Quote(string value) { return "\""+value.Replace("\"", "\\\"")+"\""; }
     [STAThread] static int Main(string[] args) {

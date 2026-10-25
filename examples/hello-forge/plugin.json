@@ -4,18 +4,83 @@
   "apiVersion": 1,
   "id": "example.hello",
   "name": "Hello Forge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "演示原生标签、输入框、独立存储、会话输出、浏览器和统一设置。",
-  "compatibility": {"codex":["26.1016.8622.0"],"forge":[">=0.1.0 <0.2.0"]},
-  "permissions": ["panels","sidebar","toolbar","composer","conversation.read","conversation.title","output","browser","storage","settings"],
+  "compatibility": {
+    "codex": [
+      "26.1016.8622.0",
+      "26.1021.2667.0"
+    ],
+    "forge": [
+      ">=0.2.0 <0.3.0"
+    ]
+  },
+  "permissions": [
+    "panels",
+    "sidebar",
+    "toolbar",
+    "composer",
+    "conversation.read",
+    "conversation.title",
+    "output",
+    "browser",
+    "storage",
+    "settings"
+  ],
   "entry": "main.js",
   "contributes": {
-    "commands":[{"id":"hello","title":"问候当前对话"}],
-    "panels":[{"id":"main","title":"Hello Forge","entry":"panel.html"}],
-    "sidebar":[{"id":"open","title":"Hello Forge","panel":"main"}],
-    "toolbar":[{"id":"hello","title":"Forge 示例","panel":"main"}],
-    "composer":[{"id":"greeting","title":"插入问候","command":"hello"}],
-    "settings":{"properties":{"greeting":{"type":"string","title":"问候内容","default":"Hello from Codex Forge!","maxLength":1000}}}
+    "commands": [
+      {
+        "id": "hello",
+        "title": "问候当前对话"
+      }
+    ],
+    "panels": [
+      {
+        "id": "main",
+        "title": "Hello Forge",
+        "entry": "panel.html"
+      }
+    ],
+    "sidebar": [
+      {
+        "id": "open",
+        "title": "Hello Forge",
+        "panel": "main"
+      }
+    ],
+    "toolbar": [
+      {
+        "id": "hello",
+        "title": "Forge 示例",
+        "panel": "main"
+      }
+    ],
+    "composer": [
+      {
+        "id": "greeting",
+        "title": "插入问候",
+        "command": "hello"
+      }
+    ],
+    "settings": {
+      "properties": {
+        "greeting": {
+          "type": "string",
+          "title": "问候内容",
+          "default": "Hello from Codex Forge!",
+          "maxLength": 1000
+        }
+      }
+    }
   },
-  "changelog":[{"version":"0.1.0","date":"2026-10-23","items":["首个 Forge API 1 示例。"]}]
+  "changelog": [
+    {
+      "version": "0.2.0",
+      "date": "2026-10-23",
+      "items": [
+        "首个 Forge API 1 示例。"
+      ]
+    }
+  ]
 }

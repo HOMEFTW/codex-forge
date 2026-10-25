@@ -8,7 +8,7 @@
   // an immutable startup value before native React code evaluates its gate.
   contextBridge.exposeInMainWorld('__codexForgeStartup', ipcRenderer.sendSync('forge:startup-flags'));
   const invoke = (method, args = {}) => ipcRenderer.invoke('forge:manage', {method,args});
-  const post = (frame, name, value) => frame.contentWindow?.postMessage({forgePluginEvent:{name,value}}, '*');
+  const post = (frame, name, value, metadata) => frame.contentWindow?.postMessage({forgePluginEvent:{name,value,metadata}}, '*');
   const escapeScript = s => s.replace(/<\/script/gi, '<\\/script');
   const active = id => snapshot?.plugins.find(p=>p.id===id)?.enabled;
   function contextFor(id) { const context={...snapshot.context}; if(!snapshot.plugins.find(p=>p.id===id)?.permissions.includes('conversation.read')) context.threadId=null; return context; }
@@ -99,6 +99,15 @@
     }catch(error){frame.contentWindow?.postMessage({forgePluginReply:{id:request.id,error:error.message}},'*');}
   });
   globalThis.__forgeBridge={configure:fn=>{nativeRequest=fn;},mount:(node,page)=>{const [,id,viewId]=page.split(':');return mount(node,id,viewId);},refresh,layout:()=>{contributions();outputView();},snapshot:()=>snapshot};
-  ipcRenderer.on('fast-ext:changed',()=>refresh());
+  ipcRenderer.on('fast-ext:changed',(_event,payload)=>{
+    if(payload?.type==='forge-plugin-event') {
+      for(const [frame,info] of frames) {
+        if(!frame.isConnected||!active(info.id)) continue;
+        if(payload.metadata?.threadId && contextFor(info.id).threadId!==payload.metadata.threadId) continue;
+        post(frame,payload.name,payload.value,payload.metadata);
+      }
+    }
+    refresh();
+  });
   window.addEventListener('DOMContentLoaded',()=>refresh(),{once:true});
 })();

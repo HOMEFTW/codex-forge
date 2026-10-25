@@ -18,6 +18,10 @@ function finish(allowed = true) {
 function start() {
   if (mode === 'fail') { process.stderr.write('failed api_key=example-secret-value\n'); process.exit(7); }
   if (mode === 'hold') { if (agent === 'claude') emit({ type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'started' } } }); else update('started'); return; }
+  if (mode === 'host-denial' && agent === 'claude') {
+    emit({ type: 'result', subtype: 'success', session_id: 'fixture-session', result: 'Permission for this tool use was denied. It requires approval, and this session has no approval surface. The action was NOT performed.' });
+    return;
+  }
   if (mode === 'approval' || mode === 'human') {
     const input = { file_path: 'approval-fixture.txt', content: task };
     if (agent === 'claude') emit({ type: 'control_request', request_id: 'permission-one', request: { subtype: 'can_use_tool', tool_name: 'Write', input, tool_use_id: 'tool-one', ...(mode === 'human' ? { requires_user_interaction: true } : {}) } });

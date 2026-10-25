@@ -102,9 +102,9 @@ export default function CollaborationPanel({ api, threadId, mode = 'right', onMo
   }
   return <main className="fast-collab" aria-label="智能体协作">
     <header className="fast-collab-header"><div><CollaborationIcon size={23} /><h1>智能体协作</h1></div><div>{onMode && <button onClick={() => onMode(mode === 'expanded' ? 'right' : 'expanded')} aria-label={mode === 'expanded' ? '恢复右侧栏' : '展开协作面板'}>{mode === 'expanded' ? '并排' : '展开'}</button>}<button onClick={onClose} aria-label="关闭协作面板">×</button></div></header>
-    <div className={`fast-collab-authorization ${thread?.enabled ? 'enabled' : ''}`}>
-      <label className="fast-collab-toggle"><strong>{thread?.enabled ? '本对话已启用协作' : '本对话尚未启用协作'}</strong><input type="checkbox" role="switch" aria-label="开启本对话智能体协作" checked={!!thread?.enabled} disabled={!threadId || !!busy || !selectedAgents.length} onChange={event => enable(event.target.checked)} /></label>
-      <p>{!threadId ? '先打开一个对话，即可设置协作。也可以在输入框选择智能体直接发送。' : '默认关闭。可在这里开启，或在提示词中明确要求协作；每个对话独立设置。'}</p>
+    <div className={`fast-collab-authorization ${thread?.enabled ? 'enabled' : ''} ${thread?.authorizationPending ? 'pending' : ''}`}>
+      <label className="fast-collab-toggle"><strong>{thread?.authorizationPending ? '等待 Codex 手动审批' : thread?.enabled ? '本对话已启用协作' : '本对话尚未启用协作'}</strong><input type="checkbox" role="switch" aria-label="开启本对话智能体协作" checked={!!thread?.enabled} disabled={!threadId || !!busy || !!thread?.authorizationPending || !selectedAgents.length} onChange={event => enable(event.target.checked)} /></label>
+      <p>{thread?.authorizationPending ? '你已在提示词中明确请求启动协作；当前对话的 Codex 审批通过后会自动开启。' : !threadId ? '先打开一个对话，即可设置协作。也可以在输入框选择智能体直接发送。' : '默认关闭。可在这里开启，或在提示词中明确要求协作；每个对话独立设置。'}</p>
       <div className="fast-collab-participants" aria-label="参与协作的智能体">{Object.entries(names).map(([agent, name]) => <label key={agent}><input type="checkbox" aria-label={`允许 ${name} 协作`} checked={selectedAgents.includes(agent)} disabled={!!busy} onChange={event => selectAgent(agent, event.target.checked)} />{name}</label>)}</div>
     </div>
     <nav className="fast-collab-tabs" aria-label="协作面板页签">{!settingsOnly && <button onClick={() => api.request('forge',{method:'openSettings',args:{id:'forge.collaboration'}})}>连接配置</button>}<button aria-selected={tab === 'jobs'} onClick={() => setTab('jobs')}>协作任务<span>{jobs.length}</span></button></nav>

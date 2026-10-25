@@ -1,6 +1,7 @@
 'use strict';
 const path = require('node:path');
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 const { CanvasStore } = require('./store.cjs');
 const { TodoStore } = require('./todos.cjs');
 const { ThreadContexts, userSubmission } = require('./context.cjs');
@@ -31,7 +32,17 @@ function install() {
   const active = id => !forge || forge.enabled(id);
   let signalNonce = ''; const contextRequests = new Map();
   const report = error => console.error('[FAST extension]', error.message || error);
-  const approvalQueue = new ApprovalQueue(collaboration.store), humanApprovals = new NativeApprovals({ states });
+  const approvalQueue = new ApprovalQueue(collaboration.store), humanApprovals = new NativeApprovals({ states }), promptAuthorizationRequests = new Map();
+  function requestPromptAuthorization(state, captured) {
+    const pending = captured?.authorizationPending, key = pending ? pending.eventId + ':' + captured.id : '';
+    if (!pending || promptAuthorizationRequests.has(key)) return;
+    const request = { kind: 'collaboration-authorization', id: 'collaboration-authorization-' + crypto.randomUUID(), threadId: captured.id, cwd: contexts.binding(captured.id).cwd, agents: pending.agents, prompt: captured.lastUserPrompt || '', reason: '用户明确请求启动协作，但本对话尚未勾选协作开关。', action: { toolName: '开启本对话智能体协作', input: { agents: pending.agents }, nativeDecision: 'ask' } };
+    const promise = humanApprovals.request({ request }).then(answer => {
+      const result = collaboration.approvePromptAuthorization(captured.id, pending.eventId, answer?.approved === true, { source: 'host', trusted: true });
+      notify(state, { type: 'refresh' }); return result;
+    }).catch(error => { report(error); }).finally(() => promptAuthorizationRequests.delete(key));
+    promptAuthorizationRequests.set(key, promise);
+  }
   const approvalProcessor = new ApprovalProcessor({ queue: approvalQueue,
     review: async ({ request, job, signal }) => {
       const state = [...states.values()].find(s => s.bridge && !s.win.isDestroyed());
@@ -111,7 +122,10 @@ function install() {
           } catch (error) { reply({ error: { code: -32000, message: error.message } }); }
           return;
         }
-        if (active('forge.collaboration')) await collaboration.captureUserPrompt(submission.threadId, submission.text, { ...submission, cwd: contexts.binding(submission.threadId).cwd, source: 'user', trusted: true });
+        if (active('forge.collaboration')) {
+          const captured = await collaboration.captureUserPrompt(submission.threadId, submission.text, { ...submission, cwd: contexts.binding(submission.threadId).cwd, source: 'user', trusted: true });
+          if (captured.authorizationPending) { notify(state, { type: 'refresh' }); requestPromptAuthorization(state, { ...captured, lastUserPrompt: submission.text }); }
+        }
         try { await directHistory.sync(submission.threadId, (name, args) => nativeCall(state, name, args)); }
         catch (error) { event.sender.send('codex_desktop:message-for-view', { type: 'mcp-response', hostId: 'local', message: { id: message.request.id, error: { code: -32000, message: error.message } } }); return; }
       }

@@ -2,29 +2,33 @@
 
 ## Forge 本体及官方客户端
 
-Forge 查询官方 `windows-store-update.json` 与配置仓库的 GitHub Release。客户端版本、Forge API 和已启用第三方插件都匹配时才允许更新；未知官方版本不直接套用旧适配器。
+Forge 查询官方 `windows-store-update.json` 与配置仓库的 GitHub Release。客户端身份版本、官方 Feed 构建版本、Forge API 和已启用第三方插件都匹配时才允许更新；未知官方版本不直接套用旧适配器。当前适配器为 `26.1021.2667.0`，旧版 `26.1016.8622.0` 仍保留用于回归。
 
 每个 Forge Release 必须提供 `codex-forge-release.json`：
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "platform": "win32-x64",
   "apiVersion": 1,
-  "forgeVersion": "0.1.0",
-  "codexVersion": "26.1016.8622.0",
+  "forgeVersion": "0.2.0",
+  "codexVersion": "26.1021.2667.0",
+  "codexBuildVersion": "26.1021.3705.0",
   "repository": "HOMEFTW/codex-forge",
-  "distribution": "forge-bootstrap",
+  "distribution": "msi-portable",
   "containsOfficialClient": false,
-  "url": "https://github.com/HOMEFTW/codex-forge/releases/download/v0.1.0/Codex-Forge-0.1.0-Setup-x64.exe",
+  "url": "https://github.com/HOMEFTW/codex-forge/releases/download/v0.2.0/Codex-Forge-0.2.0-Windows.msi",
   "sha256": "由构建器计算的64位小写SHA256",
-  "bytes": 123456
+  "bytes": 123456,
+  "portableUrl": "https://github.com/HOMEFTW/codex-forge/releases/download/v0.2.0/Codex-Forge-0.2.0-Windows-Portable.zip",
+  "portableSha256": "由构建器计算的64位小写SHA256",
+  "portableBytes": 123456
 }
 ```
 
 清单示例的摘要与大小是占位值，不可用于实际发布。`node scripts/build-installer.mjs` 生成真实清单与 `SHA256SUMS.txt`。
 
-客户端核验下载的 EXE 后打开安装向导。安装器仅安装 Forge；准备程序按 `adapters/<codexVersion>.json` 下载官方 MSIX，检查大小、SHA-256、签名及 MSIX 产品身份，解包和应用固定版本适配器，验证最终清单后才切换 `current.json`。现有进程继续运行，用户完成当前工作后退出并重新启动。
+客户端核验下载的 MSI 后交给 Windows Installer 完成 per-user 升级；便携 ZIP 由用户手动替换。安装包仅安装 Forge；准备程序按 `adapters/<codexVersion>.json` 下载官方 MSIX；`codexVersion` 是 MSIX 身份版本，`codexBuildVersion` 是官方 Feed 构建版本，两者分别核验，检查大小、SHA-256、签名及 MSIX 产品身份，解包和应用固定版本适配器，验证最终清单后才切换 `current.json`。切换成功后会删除旧的 Forge 管理客户端目录及旧 MSIX 缓存，当前正在运行的旧客户端会延迟到下一次启动清理；没有完整 Forge 清单的目录不会删除。现有进程继续运行，用户完成当前工作后退出并重新启动。
 
 不接受旧的全量 ZIP 更新协议，也不接受 r 系列原地升级。官方客户端二进制不得加入 Forge 安装包或 Release。
 

@@ -12,6 +12,14 @@ const sourceArg=process.argv[2]||process.env.CODEX_FORGE_SOURCE;
 assert(sourceArg,'Provide the verified official app directory');
 const source = path.resolve(sourceArg);
 const target = path.resolve(process.argv[3] || path.join(root, 'release', 'package-full'));
+const currentAdapter = adapter.nativeSymbols?.registryMap === 'mH';
+const members = adapter.members || {
+  renderer: 'webview/assets/app-initial-ad16eaadf81f.js',
+  settingsPage: 'webview/assets/settings-page-a6baa82f3c14.js',
+  visibleSettings: 'webview/assets/use-visible-settings-sections-f3457cb7f00e.js',
+  network: '.vite/build/application-network-startup-BG13czUt.js',
+};
+const nativeVersion = currentAdapter ? 'current' : 'legacy';
 const hash = data => crypto.createHash('sha256').update(data).digest('hex');
 fs.mkdirSync(target, { recursive: true });
 if (!fs.existsSync(path.join(target, 'app', 'resources', 'app.asar'))) fs.cpSync(source, path.join(target,'app'), { recursive: true });
@@ -42,20 +50,24 @@ for (const { member, entry, offset } of all) {
     const version = hash(fs.readFileSync(path.join(root, 'dist/fast-extension/ui/app.js'))).slice(0, 16);
     const preload = fs.readFileSync(path.join(root,'runtime','forge-preload.cjs'),'utf8')+'\n'+fs.readFileSync(path.join(root, 'runtime', 'host-preload.cjs'), 'utf8').replaceAll('__FAST_UI_VERSION__', version) + '\n' + fs.readFileSync(path.join(root, 'runtime', 'host-workspace.cjs'), 'utf8');
     changed = Buffer.concat([original, Buffer.from('\n' + preload)]);
-  } else if (!process.env.FAST_NO_PATCH && member === 'webview/assets/app-initial-ad16eaadf81f.js') {
+  } else if (!process.env.FAST_NO_PATCH && member === members.renderer) {
     let renderer=original.toString();
-    const labelAnchor='function oPl(e,t=!1,n=!1){';assert.equal(renderer.split(labelAnchor).length,2);
-    renderer=renderer.replace(labelAnchor,labelAnchor+'if(e===`codex-forge`)return {id:`codexForge.settings`,defaultMessage:`Codex Forge 鎻掍欢璁剧疆`};');
-    renderer=patchFastAccess(renderer);
-    changed = Buffer.from(patchNativeTabs(renderer, fs.readFileSync(path.join(root, 'runtime/native-tabs-renderer.js'), 'utf8')));
-  } else if(!process.env.FAST_NO_PATCH && member==='webview/assets/settings-page-a6baa82f3c14.js') {
-    changed=Buffer.from(patchSettingsPage(original.toString()));
-  } else if(!process.env.FAST_NO_PATCH && member==='webview/assets/use-visible-settings-sections-f3457cb7f00e.js') {
-    changed=Buffer.from(patchSettingsVisibility(original.toString()));
-  } else if (!process.env.FAST_NO_PATCH && member === '.vite/build/application-network-startup-BG13czUt.js') {
-    const sourceText = original.toString(), start = sourceText.indexOf('function rc('), end = sourceText.indexOf('function ic(', start);
+    if (!currentAdapter) {
+      const labelAnchor='function oPl(e,t=!1,n=!1){';assert.equal(renderer.split(labelAnchor).length,2);
+      renderer=renderer.replace(labelAnchor,labelAnchor+'if(e===`codex-forge`)return {id:`codexForge.settings`,defaultMessage:`Codex Forge 插件设置`};');
+    }
+    renderer=patchFastAccess(renderer,{version:nativeVersion});
+    changed = Buffer.from(patchNativeTabs(renderer, fs.readFileSync(path.join(root, 'runtime/native-tabs-renderer.js'), 'utf8'), {version:nativeVersion}));
+  } else if(!process.env.FAST_NO_PATCH && member===members.settingsPage) {
+    changed=Buffer.from(patchSettingsPage(original.toString(),{version:nativeVersion}));
+  } else if(!process.env.FAST_NO_PATCH && member===members.visibleSettings) {
+    changed=Buffer.from(patchSettingsVisibility(original.toString(),{version:nativeVersion}));
+  } else if (!process.env.FAST_NO_PATCH && member === members.network) {
+    const sourceText = original.toString(), start = sourceText.indexOf(`function ${currentAdapter ? 'Oc' : 'rc'}(`), end = sourceText.indexOf(`function ${currentAdapter ? 'kc' : 'ic'}(`, start);
     assert(start >= 0 && end > start);
-    const replacement = 'function rc(){let e=[...Os,`app-server`,`--analytics-default-enabled`],t=process.env;for(let n of ks){let r=t[n.envVar]?.trim();r&&e.push(`-c`,n.configKey+`=`+JSON.stringify(r))}if(t.CODEX_FORGE_FAST===`1`)e.push(`-c`,`features.fast_mode=true`);if(t.CODEX_FORGE_FAST===`1`&&t.CODEX_FORGE_SPEED===`fast`)e.push(`-c`,`service_tier="fast"`);if(t.CODEX_FAST_IAB===`1`)e.push(`-c`,`desktop.conversationDetailMode="STEPS_COMMANDS"`);if(t.CODEX_FAST_CANVAS===`1`){let r=process.resourcesPath.replace(/\\\\/g,`/`);e.push(`-c`,`mcp_servers.fast_canvas.command=`+JSON.stringify(r+`/cua_node/bin/node.exe`),`-c`,`mcp_servers.fast_canvas.args=`+JSON.stringify([r+`/fast-extension/mcp.cjs`]),`-c`,`mcp_servers.fast_canvas.enabled=true`,`-c`,`mcp_servers.fast_canvas.startup_timeout_sec=25`);if(t.CODEX_FORGE_HOME)e.push(`-c`,`mcp_servers.fast_canvas.env.CODEX_FORGE_HOME=`+JSON.stringify(t.CODEX_FORGE_HOME));if(t.CODEX_FAST_CANVAS_DIR)e.push(`-c`,`mcp_servers.fast_canvas.env.CODEX_FAST_CANVAS_DIR=`+JSON.stringify(t.CODEX_FAST_CANVAS_DIR))}return e}';
+    const replacement = currentAdapter
+      ? 'function Oc(){let e=tc.flatMap(({configKey:e,envVar:t})=>{let n=process.env[t]?.trim();return n==null||n===``?[]:[`-c`,`${e}=${JSON.stringify(n)}`]}),t=process.env;if(t.CODEX_FORGE_FAST===`1`)e.push(`-c`,`features.fast_mode=true`);if(t.CODEX_FORGE_FAST===`1`&&t.CODEX_FORGE_SPEED===`fast`)e.push(`-c`,`service_tier="fast"`);if(t.CODEX_FAST_IAB===`1`)e.push(`-c`,`desktop.conversationDetailMode="STEPS_COMMANDS"`);if(t.CODEX_FAST_CANVAS===`1`){let n=process.resourcesPath.replace(/\\\\/g,`/`);e.push(`-c`,`mcp_servers.fast_canvas.command=`+JSON.stringify(n+`/cua_node/bin/node.exe`),`-c`,`mcp_servers.fast_canvas.args=`+JSON.stringify([n+`/fast-extension/mcp.cjs`]),`-c`,`mcp_servers.fast_canvas.enabled=true`,`-c`,`mcp_servers.fast_canvas.startup_timeout_sec=25`);if(t.CODEX_FORGE_HOME)e.push(`-c`,`mcp_servers.fast_canvas.env.CODEX_FORGE_HOME=`+JSON.stringify(t.CODEX_FORGE_HOME));if(t.CODEX_FAST_CANVAS_DIR)e.push(`-c`,`mcp_servers.fast_canvas.env.CODEX_FAST_CANVAS_DIR=`+JSON.stringify(t.CODEX_FAST_CANVAS_DIR))}return e.length===0?[...ec,`app-server`,`--analytics-default-enabled`]:[`app-server`,...ec,...e,`--analytics-default-enabled`]}'
+      : 'function rc(){let e=[...Os,`app-server`,`--analytics-default-enabled`],t=process.env;for(let n of ks){let r=t[n.envVar]?.trim();r&&e.push(`-c`,n.configKey+`=`+JSON.stringify(r))}if(t.CODEX_FORGE_FAST===`1`)e.push(`-c`,`features.fast_mode=true`);if(t.CODEX_FORGE_FAST===`1`&&t.CODEX_FORGE_SPEED===`fast`)e.push(`-c`,`service_tier="fast"`);if(t.CODEX_FAST_IAB===`1`)e.push(`-c`,`desktop.conversationDetailMode="STEPS_COMMANDS"`);if(t.CODEX_FAST_CANVAS===`1`){let r=process.resourcesPath.replace(/\\\\/g,`/`);e.push(`-c`,`mcp_servers.fast_canvas.command=`+JSON.stringify(r+`/cua_node/bin/node.exe`),`-c`,`mcp_servers.fast_canvas.args=`+JSON.stringify([r+`/fast-extension/mcp.cjs`]),`-c`,`mcp_servers.fast_canvas.enabled=true`,`-c`,`mcp_servers.fast_canvas.startup_timeout_sec=25`);if(t.CODEX_FORGE_HOME)e.push(`-c`,`mcp_servers.fast_canvas.env.CODEX_FORGE_HOME=`+JSON.stringify(t.CODEX_FORGE_HOME));if(t.CODEX_FAST_CANVAS_DIR)e.push(`-c`,`mcp_servers.fast_canvas.env.CODEX_FAST_CANVAS_DIR=`+JSON.stringify(t.CODEX_FAST_CANVAS_DIR))}return e}';
     changed = Buffer.from(sourceText.slice(0, start) + replacement + sourceText.slice(end));
   }
   if (!changed.equals(original)) {
@@ -97,7 +109,7 @@ fs.copyFileSync(path.join(root,'dist','CodexForge.exe'),path.join(target,'CodexF
 fs.copyFileSync(path.join(root,'dist','CodexForge.exe.config'),path.join(target,'CodexForge.exe.config'));
 fs.copyFileSync(path.join(root,'assets','codex-forge.ico'),path.join(target,'codex-forge.ico'));
 const oldCmd=path.join(target,'Start-Codex-Forge.cmd');if(fs.existsSync(oldCmd))fs.unlinkSync(oldCmd);
-const manifest = { product: 'Codex Forge', forgeVersion: config.version, apiVersion:config.apiVersion, fullInstallation:true, sourceMSIXVersion: config.codexVersion, baseASARSHA256: hash(base), asarSHA256: digest.digest('hex'), headerSHA256: newHash, executableSHA256: hash(exe), executableIntegrityOffset: at, integrityChecksEnabled: true, fusesChanged: false, modifications };
+const manifest = { product: 'Codex Forge', forgeVersion: config.version, apiVersion:config.apiVersion, fullInstallation:true, sourceMSIXVersion: config.codexVersion, sourceBuildVersion: config.codexBuildVersion || adapter.codexBuildVersion || config.codexVersion, baseASARSHA256: hash(base), asarSHA256: digest.digest('hex'), headerSHA256: newHash, executableSHA256: hash(exe), executableIntegrityOffset: at, integrityChecksEnabled: true, fusesChanged: false, modifications };
 const files=[];function inventory(dir){for(const name of fs.readdirSync(dir)){const file=path.join(dir,name);if(fs.statSync(file).isDirectory())inventory(file);else if(file!==path.join(target,'forge-install.json'))files.push({path:path.relative(target,file).replaceAll('\\','/'),bytes:fs.statSync(file).size,sha256:hash(fs.readFileSync(file))});}}inventory(target);manifest.files=files;
 fs.writeFileSync(path.join(target,'forge-install.json'),JSON.stringify(manifest,null,2));
 console.log(JSON.stringify({...manifest,files:manifest.files.length}, null, 2));

@@ -92,6 +92,15 @@ test('native human form accepts only exact window/thread/id and explicit approve
   }
   const controller = new AbortController(), pending = native.request({ request: req, signal: controller.signal }); controller.abort(); assert.equal((await pending).approved, false);
 });
+test('native human form describes a pending collaboration authorization', async () => {
+  const sent = [], state = { threadId: 'thread-one', bridge: {}, win: { isDestroyed: () => false, webContents: { id: 7, send: (...args) => sent.push(args) } } };
+  const native = new NativeApprovals({ states: new Map([[7, state]]) });
+  const req = { kind: 'collaboration-authorization', threadId: 'thread-one', agents: ['claude'], prompt: '请让 Claude Code 检查代码', action: { toolName: '开启本对话智能体协作', input: { agents: ['claude'] }, nativeDecision: 'ask' }, reason: '用户明确请求启动协作，但本对话尚未勾选协作开关。' };
+  const result = native.request({ request: req }), id = sent[0][1].request.id;
+  assert.match(sent[0][1].request.params.message, /本对话智能体协作/); assert.match(sent[0][1].request.params.message, /请让 Claude Code 检查代码/);
+  native.respond({ sender: { id: 7 } }, { type: 'mcp-response', hostId: 'local', threadId: 'thread-one', response: { id, result: { action: 'accept', content: { decision: 'approve' } } } });
+  assert.deepEqual(await result, { approved: true });
+});
 function rpcFixture({ text = JSON.stringify({ decision: 'allow', reason: 'authorized' }), tool = false, failStart = false } = {}) {
   const calls = []; let listener;
   const call = async (method, params) => {

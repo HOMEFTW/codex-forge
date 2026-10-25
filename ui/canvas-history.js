@@ -1,5 +1,5 @@
 const clone = value => JSON.parse(JSON.stringify(value));
-export const canvasContent = doc => clone({ title: doc.title, nodes: doc.nodes, edges: doc.edges });
+export const canvasContent = doc => clone({ title: doc.title, description: doc.description || '', color: doc.color || 'neutral', nodes: doc.nodes, edges: doc.edges });
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 // History belongs to one open canvas and one uninterrupted revision sequence.

@@ -4,7 +4,7 @@ const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
 const idPattern = /^[A-Za-z0-9_-]{1,80}$/;
-const nodeTypes = new Set(['text', 'sticky', 'image', 'file']);
+const nodeTypes = new Set(['text', 'sticky', 'image', 'file', 'group']);
 const maxDocumentBytes = 12 * 1024 * 1024;
 const copy = value => JSON.parse(JSON.stringify(value));
 function check(ok, message) { if (!ok) throw new Error(message); }
@@ -17,20 +17,28 @@ function validateNode(node) {
   number(node.width, 140, 1600); number(node.height, 90, 1600);
   check(node.data && typeof node.data === 'object' && !Array.isArray(node.data), 'Invalid node data');
   const data = node.data;
-  for (const key of Object.keys(data)) check(['title', 'text', 'color', 'asset', 'filePath'].includes(key), 'Unknown node data field');
+  for (const key of Object.keys(data)) check(['title', 'text', 'color', 'asset', 'filePath', 'members', 'collapsed', 'gridColumns', 'gridRows'].includes(key), 'Unknown node data field');
   if (data.title !== undefined) text(data.title, 300);
   if (data.text !== undefined) text(data.text);
   if (data.color !== undefined) check(['yellow', 'blue', 'green', 'pink', 'neutral'].includes(data.color), 'Invalid node color');
   if (data.asset !== undefined) check(/^[a-f0-9]{64}\.(png|jpg|webp|gif)$/.test(data.asset), 'Invalid image asset');
   if (data.filePath !== undefined) check(typeof data.filePath === 'string' && data.filePath.length <= 32767 && path.isAbsolute(data.filePath) && !/[\r\n\0]/.test(data.filePath), 'File path must be absolute');
+  if (data.members !== undefined) { check(Array.isArray(data.members) && data.members.length <= 1500, 'Invalid group members'); data.members.forEach(member => id(member)); check(new Set(data.members).size === data.members.length, 'Duplicate group member'); }
+  if (data.collapsed !== undefined) check(typeof data.collapsed === 'boolean', 'Invalid group collapsed state');
+  if (data.gridColumns !== undefined) check(Number.isSafeInteger(data.gridColumns) && data.gridColumns >= 0 && data.gridColumns <= 50, 'Invalid group columns');
+  if (data.gridRows !== undefined) check(Number.isSafeInteger(data.gridRows) && data.gridRows >= 0 && data.gridRows <= 50, 'Invalid group rows');
   check(Object.keys(node).every(key => ['id', 'type', 'x', 'y', 'width', 'height', 'data'].includes(key)), 'Unknown node field');
 }
 function validateDocument(doc) {
   check(doc.schemaVersion === 1, 'Unsupported canvas format'); id(doc.id); text(doc.title, 200);
+  if (doc.description === undefined) doc.description = '';
+  if (doc.color === undefined) doc.color = 'neutral';
+  text(doc.description, 2000); check(['yellow', 'blue', 'green', 'pink', 'neutral'].includes(doc.color), 'Invalid canvas color');
   check(Number.isSafeInteger(doc.revision) && doc.revision >= 0, 'Invalid revision');
   check(Array.isArray(doc.nodes) && doc.nodes.length <= 1500 && Array.isArray(doc.edges) && doc.edges.length <= 5000, 'Canvas size limit exceeded');
   const nodes = new Set();
   for (const node of doc.nodes) { validateNode(node); check(!nodes.has(node.id), 'Duplicate node ID'); nodes.add(node.id); }
+  for (const node of doc.nodes) if (node.type === 'group' && node.data.members) for (const member of node.data.members) { check(member !== node.id && nodes.has(member), 'Group member does not exist'); }
   const edges = new Set();
   for (const edge of doc.edges) {
     id(edge.id); check(!edges.has(edge.id), 'Duplicate edge ID'); edges.add(edge.id);
@@ -56,7 +64,7 @@ class CanvasStore {
   }
   list() {
     return fs.readdirSync(this.root).filter(file => /^[A-Za-z0-9_-]{1,80}\.json$/.test(file)).flatMap(file => {
-      try { const doc = this.read(file.slice(0, -5)); return [{ id: doc.id, title: doc.title, revision: doc.revision, updatedAt: doc.updatedAt, nodes: doc.nodes.length }]; }
+      try { const doc = this.read(file.slice(0, -5)); return [{ id: doc.id, title: doc.title, description: doc.description, color: doc.color, revision: doc.revision, updatedAt: doc.updatedAt, nodes: doc.nodes.length, preview: doc.nodes.slice(0, 24).map(node => ({ id: node.id, type: node.type, x: node.x, y: node.y, width: node.width, height: node.height, color: node.data.color || null })), groups: doc.nodes.filter(node => node.type === 'group').length }]; }
       catch { return []; }
     }).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
@@ -88,12 +96,14 @@ class CanvasStore {
       fs.renameSync(temporary, target);
     } finally { if (fs.existsSync(temporary)) fs.unlinkSync(temporary); }
   }
-  async create(title = '新画布', canvasId = crypto.randomUUID(), source = 'user') {
-    id(canvasId); text(title, 200);
+  async create(title = '新画布', canvasId = crypto.randomUUID(), source = 'user', metadata = {}) {
+    id(canvasId); text(title, 200); check(metadata && typeof metadata === 'object' && !Array.isArray(metadata), 'Invalid canvas metadata');
+    const description = metadata.description === undefined ? '' : text(metadata.description, 2000);
+    const color = metadata.color === undefined ? 'neutral' : metadata.color; check(['yellow', 'blue', 'green', 'pink', 'neutral'].includes(color), 'Invalid canvas color');
     return this.lock(canvasId, () => {
       check(!fs.existsSync(this.file(canvasId)), 'Canvas already exists');
       const now = new Date().toISOString();
-      const doc = { schemaVersion: 1, id: canvasId, title, revision: 0, createdAt: now, updatedAt: now, nodes: [], edges: [], lastChange: { source, nodeIds: [], message: '创建画布' } };
+      const doc = { schemaVersion: 1, id: canvasId, title, description, color, revision: 0, createdAt: now, updatedAt: now, nodes: [], edges: [], lastChange: { source, nodeIds: [], message: '创建画布' } };
       this.save(doc); return doc;
     });
   }
@@ -110,13 +120,19 @@ class CanvasStore {
         const findNode = nodeId => { const node = doc.nodes.find(item => item.id === id(nodeId)); check(node, 'Node not found'); return node; };
         switch (operation.op) {
           case 'set_title': doc.title = text(operation.title, 200); break;
+          case 'set_metadata': {
+            if (operation.title !== undefined) doc.title = text(operation.title, 200);
+            if (operation.description !== undefined) doc.description = text(operation.description, 2000);
+            if (operation.color !== undefined) { check(['yellow', 'blue', 'green', 'pink', 'neutral'].includes(operation.color), 'Invalid canvas color'); doc.color = operation.color; }
+            break;
+          }
           case 'replace_content': {
             const content = operation.content;
             check(content && typeof content === 'object' && !Array.isArray(content), 'Invalid canvas content');
-            check(Object.keys(content).every(key => ['title', 'nodes', 'edges'].includes(key)), 'Unknown canvas content field');
+            check(Object.keys(content).every(key => ['title', 'description', 'color', 'nodes', 'edges'].includes(key)), 'Unknown canvas content field');
             const restored = copy(content);
             const previousIds = doc.nodes.map(node => node.id);
-            doc.title = text(restored.title, 200); doc.nodes = restored.nodes; doc.edges = restored.edges;
+            doc.title = text(restored.title, 200); doc.description = restored.description === undefined ? doc.description : text(restored.description, 2000); doc.color = restored.color === undefined ? doc.color : restored.color; doc.nodes = restored.nodes; doc.edges = restored.edges;
             validateDocument(doc);
             for (const nodeId of [...previousIds, ...doc.nodes.map(node => node.id)]) changed.add(nodeId);
             break;
@@ -126,6 +142,14 @@ class CanvasStore {
             const index = doc.nodes.findIndex(item => item.id === node.id);
             if (index < 0) doc.nodes.push(node); else doc.nodes[index] = node;
             changed.add(node.id); break;
+          }
+          case 'set_group_members': {
+            const group = findNode(operation.id); check(group.type === 'group', 'Node is not a group');
+            check(Array.isArray(operation.members) && operation.members.length <= 1500, 'Invalid group members');
+            const members = operation.members.map(member => id(member));
+            check(new Set(members).size === members.length && !members.includes(group.id), 'Invalid group members');
+            members.forEach(member => check(doc.nodes.some(node => node.id === member), 'Group member does not exist'));
+            group.data.members = members; changed.add(group.id); members.forEach(member => changed.add(member)); break;
           }
           case 'update_node': {
             const node = findNode(operation.id), patch = operation.patch;
@@ -152,6 +176,8 @@ class CanvasStore {
           default: throw new Error('Unsupported operation');
         }
       }
+      for (const group of doc.nodes.filter(node => node.type === 'group')) group.data.members = (group.data.members || []).filter(member => doc.nodes.some(node => node.id === member));
+      validateDocument(doc);
       doc.revision++; doc.updatedAt = new Date().toISOString();
       doc.lastChange = { source, nodeIds: [...changed], message: message || (source === 'model' ? '模型更新了画布' : '已自动保存') };
       this.save(doc); return doc;

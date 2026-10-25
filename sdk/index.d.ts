@@ -1,9 +1,11 @@
 export interface Context {threadId:string|null;codexVersion:string;forgeVersion:string;apiVersion:1}
 export interface Contribution {id:string;title:string;command?:string;panel?:string}
+export interface ForgeEventMetadata {sourcePluginId?:string;threadId?:string|null}
+export interface ForgeCapabilities {apiVersion:1;codexVersion:string;forgeVersion:string;permissions:string[];events:string[];surfaces:string[]}
 export interface ForgeAPI {
   readonly apiVersion:1;
   context:{get():Promise<Context>};
-  events:{on(name:'ready'|'context.changed'|'settings.changed'|'dispose',listener:(value:any)=>void):()=>void};
+  events:{on(name:'ready'|'context.changed'|'settings.changed'|'dispose'|'output.changed'|`plugin.${string}`,listener:(value:any,metadata?:ForgeEventMetadata)=>void):()=>void;emit(name:string,value?:unknown):Promise<{accepted:boolean;name:string}>};
   commands:{register(id:string,handler:(args:any)=>unknown|Promise<unknown>):()=>void};
   panels:{open(id:string,options?:{mode?:'right'|'expanded'}):Promise<unknown>;close(id:string):Promise<unknown>};
   sidebar:{register(item:Contribution):()=>Promise<unknown>};
@@ -15,5 +17,6 @@ export interface ForgeAPI {
   storage:{get<T=unknown>(key:string):Promise<T|null>;set(key:string,value:unknown):Promise<boolean>;delete(key:string):Promise<boolean>};
   settings:{get<T=Record<string,unknown>>():Promise<T>};
   metadata:{get():Promise<Record<string,unknown>>};
+  capabilities:{get():Promise<ForgeCapabilities>};
 }
 declare global {interface Window {readonly CodexForge:ForgeAPI}}

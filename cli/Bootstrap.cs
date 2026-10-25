@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
 using System.Xml;
+using System.Text.RegularExpressions;
 
 internal static class BootstrapCore {
     static BootstrapCore() {
@@ -84,7 +85,7 @@ internal static class BootstrapCore {
                 if(offset>expected){File.Delete(partial);offset=0;}
                 if(offset==expected)break;
                 using(var request=new HttpRequestMessage(HttpMethod.Get,Text(adapter,"downloadUrl"))) {
-                    request.Headers.UserAgent.ParseAdd("Codex-Forge/0.1.0");if(offset>0)request.Headers.Range=new System.Net.Http.Headers.RangeHeaderValue(offset,null);
+                request.Headers.UserAgent.ParseAdd("Codex-Forge/0.2.0");if(offset>0)request.Headers.Range=new System.Net.Http.Headers.RangeHeaderValue(offset,null);
                     using(var response=await http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,token)) {
                         Need(response.StatusCode==HttpStatusCode.OK||response.StatusCode==HttpStatusCode.PartialContent,"官方客户端下载失败：HTTP "+(int)response.StatusCode);
                         if(response.StatusCode==HttpStatusCode.OK)offset=0;
@@ -102,6 +103,49 @@ internal static class BootstrapCore {
         }
         Need(new FileInfo(partial).Length==expected&&Hash(partial)==Text(adapter,"packageSHA256"),"官方客户端 SHA-256 不匹配");File.Move(partial,file);
     }
+    static bool RunningFrom(string directory) {
+        try {
+            string prefix=Path.GetFullPath(directory).TrimEnd('\\')+"\\";
+            foreach(string processName in new[]{"ChatGPT","Codex"}) {
+                Process[] processes;
+                try { processes=Process.GetProcessesByName(processName); }
+                catch { continue; }
+                foreach(Process process in processes) {
+                    try { string file=process.MainModule.FileName; if(file!=null&&file.StartsWith(prefix,StringComparison.OrdinalIgnoreCase)) return true; }
+                    catch { }
+                    finally { process.Dispose(); }
+                }
+            }
+        } catch { }
+        return false;
+    }
+    internal static int CleanupOldClients(string root,string keepRelative,string currentVersion) {
+        string clients=SafePath(root,"clients"),keep=Path.GetFullPath(SafePath(root,keepRelative));int removed=0;
+        if(Directory.Exists(clients)) foreach(string directory in Directory.GetDirectories(clients)) {
+            if(String.Equals(Path.GetFullPath(directory),keep,StringComparison.OrdinalIgnoreCase)) continue;
+            if(!Path.GetFileName(directory).StartsWith("Codex-Forge-",StringComparison.OrdinalIgnoreCase)) continue;
+            string receipt=Path.Combine(directory,"forge-install.json");
+            if(!File.Exists(receipt)||RunningFrom(directory)) continue;
+            Dictionary<string,object> manifest;
+            try { manifest=Read(receipt); }
+            catch(Exception) { continue; }
+            bool managed;
+            try { managed=Text(manifest,"product")=="Codex Forge"&&manifest.ContainsKey("fullInstallation")&&Convert.ToBoolean(manifest["fullInstallation"])&&manifest.ContainsKey("sourceMSIXVersion"); }
+            catch(Exception) { managed=false; }
+            if(!managed) continue;
+            try { Directory.Delete(directory,true);removed++; }
+            catch(IOException) { }
+            catch(UnauthorizedAccessException) { }
+            catch(ArgumentException) { }
+        }
+        string cache=Path.Combine(root,".cache"),current="Codex-"+currentVersion+"-x64.msix";
+        if(Directory.Exists(cache)) foreach(string file in Directory.GetFiles(cache)) {
+            string name=Path.GetFileName(file);if(String.Equals(name,current,StringComparison.OrdinalIgnoreCase)) continue;
+            if(!Regex.IsMatch(name,@"^Codex-[0-9]+(\.[0-9]+){2,3}-x64\.msix(?:\.partial)?$",RegexOptions.IgnoreCase)) continue;
+            try { File.Delete(file);removed++; } catch(IOException) { } catch(UnauthorizedAccessException) { }
+        }
+        return removed;
+    }
     internal static async Task Prepare(string payload,string root,Action<string,int> progress,CancellationToken token) {
         Directory.CreateDirectory(root);
         using(var setupLock=new FileStream(Path.Combine(root,".forge-prepare.lock"),FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None)) {
@@ -110,7 +154,7 @@ internal static class BootstrapCore {
             progress("校验 Forge 安装文件…",0);VerifyFiles(payload,Read(Path.Combine(payload,"forge-payload.json")),token);
             string versionName="Codex-Forge-"+Text(config,"version")+"-"+Text(adapter,"codexVersion"),relative="clients/"+versionName,target=SafePath(root,relative);
             string receipt=Path.Combine(target,"forge-install.json");
-            if(Directory.Exists(target)){Need(File.Exists(receipt),"目标目录已存在但不属于 Forge");VerifyFiles(target,Read(receipt),token);Publish(root,relative);progress("客户端已准备好",100);return;}
+            if(Directory.Exists(target)){Need(File.Exists(receipt),"目标目录已存在但不属于 Forge");VerifyFiles(target,Read(receipt),token);Publish(root,relative);CleanupOldClients(root,relative,Text(adapter,"codexVersion"));progress("客户端已准备好",100);return;}
             string cache=Path.Combine(root,".cache");Directory.CreateDirectory(cache);string package=Path.Combine(cache,"Codex-"+Text(adapter,"codexVersion")+"-x64.msix");
             await Download(adapter,package,progress,token);
             progress("验证官方数字签名…",72);
@@ -123,7 +167,7 @@ internal static class BootstrapCore {
                 progress("应用 Forge API "+Text(config,"apiVersion")+" 适配器…",86);
                 Run(node,Quote(Path.Combine(payload,"scripts","build-client.mjs"))+" "+Quote(source)+" "+Quote(output),payload,token,Path.Combine(staging,"temp"));
                 progress("校验最终安装…",95);var installed=Read(Path.Combine(output,"forge-install.json"));Need(Text(installed,"forgeVersion")==Text(config,"version")&&Text(installed,"sourceMSIXVersion")==Text(adapter,"codexVersion"),"生成的客户端版本不一致");VerifyFiles(output,installed,token);
-                token.ThrowIfCancellationRequested();Directory.CreateDirectory(Path.GetDirectoryName(target));Directory.Move(output,target);Publish(root,relative);progress("官方客户端及 Codex Forge 已准备好",100);
+                token.ThrowIfCancellationRequested();Directory.CreateDirectory(Path.GetDirectoryName(target));Directory.Move(output,target);Publish(root,relative);CleanupOldClients(root,relative,Text(adapter,"codexVersion"));progress("官方客户端及 Codex Forge 已准备好",100);
             }finally{if(Directory.Exists(staging))Directory.Delete(staging,true);}
         }
     }

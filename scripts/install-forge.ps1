@@ -1,4 +1,4 @@
-﻿param([string]$Destination='D:\Codex-Forge',[switch]$NoShortcut,[switch]$SideBySide)
+param([string]$Destination=(Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Programs\Codex Forge'),[switch]$NoShortcut,[switch]$SideBySide,[string]$InstallSuffix='')
 $ErrorActionPreference='Stop'
 $source=Join-Path (Split-Path $PSScriptRoot -Parent) 'release\package-full'
 $manifest=Get-Content -LiteralPath (Join-Path $source 'forge-install.json') -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -6,6 +6,7 @@ if ($manifest.product -ne 'Codex Forge' -or !$manifest.fullInstallation) { throw
 $Destination=[IO.Path]::GetFullPath($Destination)
 $versionName='Codex-Forge-'+$manifest.forgeVersion+'-'+$manifest.sourceMSIXVersion
 if($SideBySide){$versionName+='-'+$manifest.asarSHA256.Substring(0,12)}
+if($InstallSuffix){if($InstallSuffix -notmatch '^[A-Za-z0-9._-]{1,64}$'){throw '安装后缀无效。'};$versionName+='-'+$InstallSuffix}
 $target=Join-Path $Destination $versionName
 if ((Test-Path -LiteralPath $target) -and !(Test-Path -LiteralPath (Join-Path $target 'forge-install.json'))) { throw '目标目录非空且不是 Forge 安装。' }
 $running=@(Get-Process ChatGPT -ErrorAction SilentlyContinue | Where-Object {$_.Path -and $_.Path.StartsWith($target+'\',[StringComparison]::OrdinalIgnoreCase)})

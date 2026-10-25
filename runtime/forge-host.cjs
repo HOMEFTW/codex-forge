@@ -3,10 +3,12 @@ const fs = require('node:fs'), path = require('node:path'), os = require('node:o
 const { ForgeRegistry } = require('./forge-registry.cjs');
 const { check } = require('./forge-manifest.cjs');
 const { atomic, json } = require('./collaboration-store.cjs');
+const { DshCompatibilityLayer } = require('./dsh-compat.cjs');
 function installForge({ ipcMain, dialog, host, threadContext, nativeCall, nativeMessage, open, notify, states, collaboration }) {
   const config = json(fs.existsSync(path.join(__dirname,'forge.config.json'))?path.join(__dirname,'forge.config.json'):path.join(__dirname,'../forge.config.json'));
   const root = process.env.CODEX_FORGE_HOME || path.join(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'forge');
   const registry = new ForgeRegistry({ root, bundledRoot:fs.existsSync(path.join(__dirname,'plugins'))?path.join(__dirname,'plugins'):path.join(__dirname,'../plugins'), versions: { codex: config.codexVersion, forge: config.version, apiVersion: config.apiVersion } });
+  const dsh = new DshCompatibilityLayer({ runtimeVersion: process.env.DSH_VERSION || '' });
   require('./forge-content.cjs').registerPluginProtocol(registry,require('electron'));
   const pluginUpdates = require('./forge-plugin-updates.cjs'), pluginPlans = new Map();
   const updateResults = pluginUpdates.applyPending(registry);
@@ -15,9 +17,16 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
   let output = json(outputFile, {}), currentUpdate = null;
   const publicContext = (event, state) => ({ threadId: threadContext(event, state).threadId, codexVersion: config.codexVersion, forgeVersion: config.version, apiVersion: config.apiVersion });
   function broadcast() { for (const state of states.values()) notify(state, { type: 'forge-refresh' }); }
+  function broadcastPluginEvent(name, value, metadata = {}, threadId = null) {
+    for (const target of states.values()) {
+      if (target.win.isDestroyed()) continue;
+      if (threadId && target.threadId !== threadId) continue;
+      notify(target, { type: 'forge-plugin-event', name, value, metadata: { ...metadata, threadId } });
+    }
+  }
   function snapshot(event, state) {
     const result = registry.list();
-    return { ...result, pluginUpdates:Object.fromEntries(pluginPlans), pendingUpdates:pluginUpdates.pendingUpdates(registry), pluginUpdateResults:updateResults, context: publicContext(event, state), dynamic: [...dynamic.values()].filter(x => registry.status(x.pluginId).enabled), settingsPlugin: state.settingsPlugin || null, output: output[state.threadId] || [], config: { githubRepository: config.githubRepository, channel: config.channel }, update: currentUpdate };
+    return { ...result, pluginUpdates:Object.fromEntries(pluginPlans), pendingUpdates:pluginUpdates.pendingUpdates(registry), pluginUpdateResults:updateResults, context: publicContext(event, state), dynamic: [...dynamic.values()].filter(x => registry.status(x.pluginId).enabled), settingsPlugin: state.settingsPlugin || null, output: output[state.threadId] || [], config: { githubRepository: config.githubRepository, channel: config.channel }, dsh: dsh.snapshot(), update: currentUpdate };
   }
   function panel(id, viewId) {
     const entry = registry.permission(id, 'panels'), view = entry.manifest.contributes?.panels?.find(v => v.id === viewId);
@@ -25,6 +34,16 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
   }
   const pageId = (id, view) => `forge-plugin:${id}:${view}`;
   function text(value, max, label) { check(typeof value === 'string' && value.length <= max, label+'无效'); return value; }
+  function eventName(value) {
+    check(typeof value === 'string' && /^(?:plugin\.[a-z][a-z0-9.-]*\.[a-z][a-z0-9_.:-]{0,79}|plugin\.event)$/.test(value), '事件名称必须使用 plugin.<插件域名>.<事件名> 格式');
+    return value;
+  }
+  function eventValue(value) {
+    check(value === null || (typeof value === 'object' && value !== undefined) || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean', '事件数据必须为 JSON 值');
+    let encoded; try { encoded = JSON.stringify(value); } catch { throw Error('事件数据必须可序列化'); }
+    check(Buffer.byteLength(encoded || 'null') <= 64 * 1024, '事件数据超过 64KB');
+    return value;
+  }
   function expectedThread(event, state, request) {
     const context = publicContext(event, state); check(context.threadId && request.threadId === context.threadId, '当前对话已变化或尚未创建'); return context.threadId;
   }
@@ -90,6 +109,7 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
     switch (method) {
       case 'context.get': { const value=publicContext(event,state); if(!entry.manifest.permissions.includes('conversation.read')) value.threadId=null; return value; }
       case 'metadata.get': return entry.manifest;
+      case 'capabilities.get': return { apiVersion: config.apiVersion, codexVersion: config.codexVersion, forgeVersion: config.version, permissions: [...entry.manifest.permissions], events: ['ready','context.changed','settings.changed','dispose','output.changed',...(entry.manifest.contributes?.events || []).map(item => item.name)], surfaces: ['panels','sidebar','toolbar','composer'] };
       case 'settings.get': permission('settings'); return registry.settings(id);
       case 'storage.get': case 'storage.set': case 'storage.delete': return registry.storage(id, method.split('.')[1], args.key, args.value);
       case 'panels.open': { const view = panel(id,args.id); if (args.mode === 'expanded') check(view.placement === 'expanded', '此面板未声明全宽功能需求'); open(state,{page:pageId(id,view.id),mode:view.placement}); return {page:pageId(id,view.id)}; }
@@ -113,13 +133,23 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
         permission('browser'); const threadId = expectedThread(event,state,request), url = new URL(text(args.url,10000,'浏览器地址')); check(['https:','http:'].includes(url.protocol) && !url.username && !url.password,'仅支持无凭据的HTTP(S)地址');
         await nativeMessage(state,{type:'open-in-browser',url:url.href,conversationId:threadId,hostId:'local',initiator:'app',source:'codex-forge',useExternalBrowser:false}); return {opened:url.href};
       }
+      case 'events.emit': {
+        permission('events');
+        const name = eventName(args.name), value = eventValue(args.value);
+        check((entry.manifest.contributes?.events || []).some(item => item.name === name), '事件必须先在 plugin.json.contributes.events 中声明');
+        const threadId = request.threadId || null;
+        if (threadId) expectedThread(event, state, request);
+        const metadata = { sourcePluginId: id, threadId };
+        broadcastPluginEvent(name, value, metadata, threadId);
+        return { accepted: true, name };
+      }
       case 'output.append': case 'output.clear': case 'output.open': {
         permission('output'); const threadId = expectedThread(event,state,request);
         if (method === 'output.open') { open(state,{page:'forge-output'}); return true; }
         const items = output[threadId] ||= [];
         if (method === 'output.clear') output[threadId] = items.filter(x => x.pluginId !== id);
         else { items.push({pluginId:id,pluginName:entry.manifest.name,text:text(args.text,200000,'输出'),title:text(args.title||entry.manifest.name,200,'输出标题'),at:new Date().toISOString(),level:['info','warning','error'].includes(args.level)?args.level:'info'}); while (items.length > 100 || Buffer.byteLength(JSON.stringify(items)) > 2*1024*1024) items.shift(); }
-        atomic(outputFile,output); broadcast(); return true;
+        atomic(outputFile,output); broadcastPluginEvent('output.changed', { threadId, pluginId: id }); broadcast(); return true;
       }
       default: throw Error('Forge API 不支持此操作');
     }

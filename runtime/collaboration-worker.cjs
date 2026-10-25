@@ -93,6 +93,10 @@ async function runWorker(root, jobId) {
       fs.appendFileSync(store.file('events', job.id, '.jsonl'), JSON.stringify({ seq: ++job.sequence, type, text: part, at: new Date().toISOString() }) + '\n', { mode: 0o600 });
       job.outputChars += part.length;
     }
+    if (type !== 'delegation_started' && type !== 'delegation_completed' && !job.lifecycleStartedAt) {
+      job.lifecycleStartedAt = new Date().toISOString();
+      append('delegation_started', JSON.stringify({ task_id: job.id, agent_type: ({ claude: 'claude_code', grok: 'grok', dsh: 'deepseek' })[job.agent], status: 'running', task: job.task, resumed: !!job.resumedAt }));
+    }
     if (String(value).length > remaining) job.truncated = true;
     if (Date.now() - lastSave > 120) save();
   };
@@ -174,6 +178,18 @@ async function runWorker(root, jobId) {
     if (child) await killTree(child);
     job.status = store.cancelled(job.id) ? 'cancelled' : 'failed'; job.error = clean(error.message);
   } finally {
+    // Mirror Codeg's delegation lifecycle on the durable event stream. The
+    // structured payload is data for the client/UI; it never grants authority
+    // or changes the parent conversation's instructions.
+    if (terminal.has(job.status) && (job.startedAt || job.lifecycleStartedAt) && !job.lifecycleCompletedAt) {
+      const wireStatus = job.status === 'cancelled' || job.status === 'interrupted' ? 'canceled' : job.status;
+      const report = { task_id: job.id, status: wireStatus };
+      if (wireStatus === 'completed') report.text = job.finalText || '';
+      else if (wireStatus === 'failed') { report.error_code = 'agent_failed'; report.message = job.error || '智能体任务失败'; }
+      else { report.error_code = 'canceled'; report.message = job.error || '任务已取消'; }
+      job.lifecycleCompletedAt = new Date().toISOString();
+      try { append('delegation_completed', JSON.stringify(report)); } catch { /* Preserve terminal state even if lifecycle logging fails. */ }
+    }
     stopped = true; approvalAbort.abort(); session?.dispose(); clearInterval(tick); clearTimeout(timeout); clearInterval(heartbeat); process.removeListener('SIGTERM', signal); process.removeListener('SIGINT', signal);
     job.finishedAt = new Date().toISOString(); save();
     for (const target of [slot, taskFile, patchFile]) if (target) try { fs.unlinkSync(target); } catch (error) { if (error.code !== 'ENOENT') { /* Preserve completed state even if cleanup fails. */ } }

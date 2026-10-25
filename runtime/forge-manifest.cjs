@@ -1,7 +1,7 @@
 'use strict';
 const fs = require('node:fs'), path = require('node:path');
 const { parts, ranges, compatibility } = require('./forge-versions.cjs');
-const permissions = new Set(['panels', 'sidebar', 'toolbar', 'composer', 'conversation.read', 'conversation.title', 'output', 'browser', 'storage', 'settings', 'network']);
+const permissions = new Set(['panels', 'sidebar', 'toolbar', 'composer', 'conversation.read', 'conversation.title', 'output', 'browser', 'storage', 'settings', 'network', 'events']);
 const surfaces = ['sidebar', 'toolbar', 'composer'];
 const idPattern = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/;
 const localId = /^[a-zA-Z][\w-]{0,79}$/;
@@ -23,8 +23,15 @@ function validate(input, root, { builtin = false } = {}) {
   check(Array.isArray(m.permissions) && m.permissions.every(p => permissions.has(p)) && new Set(m.permissions).size === m.permissions.length, '插件声明了未知或重复权限');
   if (m.entry) { check(m.entry.endsWith('.js'), '入口必须为浏览器 JavaScript'); safeFile(root, m.entry); }
   for (const [id, version] of Object.entries(m.dependencies || {})) { check(idPattern.test(id) && id !== m.id, '依赖 ID 无效'); ranges([version]); }
-  const c = m.contributes ||= {}, commands = new Set(), views = new Set();
+  const c = m.contributes ||= {}, commands = new Set(), views = new Set(), events = new Set();
   for (const command of c.commands || []) { check(localId.test(command.id) && !commands.has(command.id), '命令 ID 无效或重复'); commands.add(command.id); check(typeof command.title === 'string' && command.title.length <= 100, '命令标题无效'); }
+  for (const event of c.events || []) {
+    check(event && typeof event.name === 'string' && /^plugin\.[a-z][a-z0-9.-]*\.[a-z][a-z0-9_.:-]{0,79}$/.test(event.name), '事件名称无效');
+    check(event.name.startsWith('plugin.' + m.id + '.') && !events.has(event.name), '事件必须属于本插件且不能重复');
+    if (event.title !== undefined) check(typeof event.title === 'string' && event.title.length <= 100, '事件标题无效');
+    events.add(event.name);
+  }
+  if (events.size) check(m.permissions.includes('events'), '声明事件需要 events 权限');
   for (const view of c.panels || []) {
     check(localId.test(view.id) && !views.has(view.id), '面板 ID 无效或重复'); views.add(view.id);
     check(typeof view.title === 'string' && view.title.length <= 100, '面板标题无效');

@@ -18,7 +18,10 @@ function setup(t) {
   fs.copyFileSync(path.join(__dirname, 'fixtures/agent.cjs'), fixture);
   const service = new CollaborationService({ root, nodePath: process.execPath });
   const configure = async (mode = 'ok', concurrency = 1) => service.dispatch('configure', { concurrency, agents: Object.fromEntries(['claude', 'grok', 'dsh'].map(agent => [agent, { command: process.execPath, args: [fixture, '--fixture-agent=' + agent, '--fixture-mode=' + mode] }])) }, host);
-  const authorize = (threadId = 'thread-a', text = '启用智能体协作') => service.captureUserPrompt(threadId, text, { source: 'user', trusted: true, cwd: special, eventId: 'user-' + Math.random() });
+  const authorize = async (threadId = 'thread-a', text = '启用智能体协作') => {
+    const captured = await service.captureUserPrompt(threadId, text, { source: 'user', trusted: true, cwd: special, eventId: 'user-' + Math.random() });
+    return captured.authorizationPending ? service.approvePromptAuthorization(threadId, captured.authorizationPending.eventId, true, host) : captured;
+  };
   t.after(async () => {
     for (const thread of service.store.threads()) for (const job of service.store.jobs(thread.id)) if (!terminal.has(job.status)) service.store.cancel(job.id);
     const deadline = Date.now() + 10000;
@@ -48,6 +51,21 @@ test('prompt intent distinguishes delegation from discussion, quotation and nega
   assert.deepEqual(intent('协作 Claude Code，让它实现模型选择功能'), { action: 'enable', agents: ['claude'] });
 });
 
+test('explicit collaboration prompt waits for Codex manual approval before enabling this conversation', async t => {
+  const { service, configure, special } = setup(t); await configure();
+  const pending = await service.captureUserPrompt('thread-a', '启用智能体协作', { source: 'user', trusted: true, cwd: special, eventId: 'approval-1' });
+  assert.equal(pending.enabled, false);
+  assert.deepEqual(pending.authorizationPending.agents, ['claude', 'grok', 'dsh']);
+  assert.equal(pending.authorizationPending.eventId, 'approval-1');
+  await assert.rejects(service.dispatch('run', { agent: 'claude', task: 'should wait' }, host), /未获用户明确协作授权/);
+  const denied = await service.approvePromptAuthorization('thread-a', 'approval-1', false, host);
+  assert.equal(denied.enabled, false); assert.equal(denied.authorizationPending, null);
+
+  const second = await service.captureUserPrompt('thread-a', '请让 Claude Code 检查代码', { source: 'user', trusted: true, cwd: special, eventId: 'approval-2' });
+  const approved = await service.approvePromptAuthorization('thread-a', second.authorizationPending.eventId, true, host);
+  assert.equal(approved.enabled, true); assert.deepEqual(approved.agents, ['claude']); assert.equal(approved.source, 'trusted-user-prompt');
+});
+
 test('disabled by default, model cannot fabricate user permission or change executable configuration', async t => {
   const { service, configure } = setup(t); await configure();
   assert.equal((await service.dispatch('thread', {}, host)).enabled, false);
@@ -59,6 +77,26 @@ test('disabled by default, model cannot fabricate user permission or change exec
   assert.equal((await probe('claude', service.store.config().agents.claude, process.execPath)).available, true);
   for (const method of ['set_thread', 'direct', 'capabilities']) await assert.rejects(service.dispatch(method, { enabled: true, agent: 'claude', task: 'work', requestId: 'spoof' }, { threadId: 'thread-a' }), /真实用户操作/);
   assert.equal(tools.some(tool => /set_thread|direct|capabilities/.test(tool.name)), false);
+});
+
+test('missing approval settings migrate to the requested per-agent defaults', async t => {
+  const { service, configure } = setup(t); await configure();
+  const config = service.store.config();
+  assert.equal(config.agents.claude.approvalMode, 'auto');
+  assert.equal(config.agents.grok.approvalMode, 'auto');
+  assert.equal(config.agents.dsh.approvalMode, 'codex');
+});
+
+test('Codeg delegation aliases preserve task ids, batch status shape and lifecycle events', async t => {
+  const { service, configure, authorize } = setup(t); await configure(); await authorize();
+  const started = await callTool(service, 'delegate_to_agent', { agent_type: 'claude_code', task: 'codeg alias' }, host);
+  assert.match(started.task_id, /^[A-Za-z0-9_-]+$/); assert.equal(started.status, 'running'); assert.equal(started.agent_type, 'claude_code');
+  const status = await callTool(service, 'get_delegation_status', { task_ids: [started.task_id], wait_ms: 10000 }, host);
+  assert.deepEqual(Object.keys(status), ['tasks']); assert.equal(status.tasks.length, 1); assert.equal(status.tasks[0].task_id, started.task_id); assert.equal(status.tasks[0].status, 'completed'); assert.match(status.tasks[0].text, /codeg alias/);
+  const read = await service.dispatch('read', { jobId: started.task_id }, host); assert(read.events.some(event => event.type === 'delegation_started')); assert(read.events.some(event => event.type === 'delegation_completed'));
+  const saved = service.store.job(started.task_id); saved.status = 'interrupted'; saved.finishedAt = new Date().toISOString(); saved.error = 'fixture interruption'; service.store.saveJob(saved);
+  const resumed = await callTool(service, 'resume_delegation', { task_id: started.task_id, reason: '测试恢复' }, host); assert.equal(resumed.task_id, started.task_id); assert.equal(resumed.status, 'running');
+  const resumedStatus = await callTool(service, 'get_delegation_status', { task_ids: [started.task_id], wait_ms: 10000 }, host); assert.equal(resumedStatus.tasks[0].status, 'completed'); assert.match(resumedStatus.tasks[0].text, /codeg alias/);
 });
 
 test('reported real user prompt enables Claude and panel control has revision guards and revocation', async t => {
@@ -181,6 +219,25 @@ test('unexpected worker loss is reported interrupted without retrying already-st
   assert.equal((await restored.dispatch('read', { jobId: job.id }, host)).status, 'interrupted', 'a stale PID reused after restart cannot leave a task pending forever');
 });
 
+test('atomic retries a transient Windows rename collision', () => {
+  const directory = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'atomic-retry-'));
+  const file = path.join(directory, 'record.json');
+  const originalRename = fs.renameSync;
+  let transientFailures = 2;
+  fs.renameSync = (source, target) => {
+    if (target === file && transientFailures > 0) {
+      transientFailures--;
+      const error = Error('sharing violation'); error.code = 'EPERM'; throw error;
+    }
+    return originalRename(source, target);
+  };
+  let saved;
+  try { atomic(file, { status: 'running' }); saved = JSON.parse(fs.readFileSync(file, 'utf8')); }
+  finally { fs.renameSync = originalRename; fs.rmSync(directory, { recursive: true, force: true }); }
+  assert.equal(transientFailures, 0);
+  assert.deepEqual(saved, { status: 'running' });
+});
+
 test('all three worker protocols suspend for approval, resume once, and never report a denied action completed', async t => {
   const { service, configure, authorize } = setup(t); await configure('approval'); await authorize();
   const queue = new ApprovalQueue(service.store);
@@ -196,6 +253,14 @@ test('all three worker protocols suspend for approval, resume once, and never re
     assert.equal(result.approval.state, allow ? 'allowed' : 'denied');
     assert(service.store.job(job.id).userRequest.includes('启用智能体协作'));
   }
+});
+
+test('worker rejects Claude host-less textual permission denial without permission_denials metadata', async t => {
+  const { service, configure, authorize } = setup(t); await configure('host-denial'); await authorize();
+  const job = await service.dispatch('run', { agent: 'claude', task: 'write the requested file' }, host);
+  const result = await finish(service, job.id);
+  assert.equal(result.status, 'failed');
+  assert.match(result.error, /未获批准|权限/); assert.match(result.finalText, /action was NOT performed/);
 });
 
 test('parser accepts byte boundaries and redacts credentials in persisted event text', () => {

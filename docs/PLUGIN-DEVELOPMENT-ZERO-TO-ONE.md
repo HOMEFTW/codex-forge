@@ -1,6 +1,6 @@
 # 从零开发一个 Codex Forge 插件
 
-本教程用 JavaScript 和 HTML 创建一个能在原生右侧标签中显示、读取统一设置、向当前会话输出、编辑输入草稿及打开内置浏览器的插件。目标环境：Windows x64，Codex Forge 0.1.0 / API 1，客户端 26.1016.8622.0。
+本教程用 JavaScript 和 HTML 创建一个能在原生右侧标签中显示、读取统一设置、向当前会话输出、编辑输入草稿及打开内置浏览器的插件。目标环境：Windows x64，Codex Forge 0.2.0 / API 1，客户端 26.1021.2667.0（同时兼容旧版 26.1016.8622.0）。
 
 ## 1. 获取源码与创建项目
 
@@ -31,16 +31,17 @@ node cli/forge.mjs create ./my-first-plugin
   "apiVersion": 1,
   "id": "yourname.first-plugin",
   "name": "我的第一个插件",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "在当前会话插入问候，显示可折叠输出，并打开内置浏览器。",
   "compatibility": {
-    "codex": ["26.1016.8622.0"],
-    "forge": [">=0.1.0 <0.2.0"]
+    "codex": ["26.1021.2667.0", "26.1016.8622.0"],
+    "forge": [">=0.2.0 <0.3.0"]
   },
   "permissions": ["panels", "sidebar", "toolbar", "composer", "conversation.read", "output", "browser", "storage", "settings"],
   "entry": "main.js",
   "contributes": {
     "commands": [{"id": "hello", "title": "问候当前会话"}],
+    "events": [{"name": "plugin.yourname.first-plugin.status", "title": "状态变化"}],
     "panels": [{"id": "main", "title": "我的插件", "entry": "panel.html"}],
     "sidebar": [{"id": "open", "title": "我的插件", "panel": "main"}],
     "toolbar": [{"id": "open", "title": "我的插件", "panel": "main"}],
@@ -51,11 +52,11 @@ node cli/forge.mjs create ./my-first-plugin
       }
     }
   },
-  "changelog": [{"version": "0.1.0", "date": "2026-10-23", "items": ["首次发布。"]}]
+  "changelog": [{"version": "0.2.0", "date": "2026-10-24", "items": ["适配 Codex Forge 0.2.0。"]}]
 }
 ```
 
-每个插件必须同时声明客户端和 Forge 兼容范围。数组里的多个版本是“或”，单个字符串中的条件是“且”，例如 `codex: ["26.1016.8622.0", "26.1017.1.0"]` 表示开发者验证过两个版本；第二个版本这里只演示语法，不代表 Forge 已提供对应适配器。不要未测试就扩大范围。API 版本目前仅支持整数 `1`。
+每个插件必须同时声明客户端和 Forge 兼容范围。数组里的多个版本是“或”，单个字符串中的条件是“且”，例如 `codex: ["26.1021.2667.0", "26.1016.8622.0"]` 表示开发者验证过两个版本；当前 Forge 为这两个版本分别维护固定适配器。后续客户端版本仍必须先完成适配和验证，再加入兼容数组。API 版本目前仅支持整数 `1`。
 
 `panels` 没有指定 `placement` 时就是原生右侧标签页。只有功能确需全宽时才声明 `placement: "expanded"` 和至少 6 个字符的 `placementReason`，不要自己叠加侧栏。`description` 和 `changelog` 会自动显示在“扩展插件功能与升级日志”中。
 
@@ -165,9 +166,15 @@ const stopWatching = forge.events.on('settings.changed', async () => {
   const settings = await forge.settings.get();
   // 根据 settings 更新本插件界面。
 });
+const capabilities = await forge.capabilities.get();
+if (capabilities.permissions.includes('events')) {
+  await forge.events.emit('plugin.yourname.first-plugin.status', { ready: true });
+}
 ```
 
 `sidebar.register`、`toolbar.register`、`composer.register` 返回注销函数。注册项引用本插件声明的 `command` 或 `panel`。全局事件监听器应在 dispose 时清理；设置变化事件可以重复到达，处理器应能重复执行。
+
+能力查询和事件接口只用于协作插件之间的轻量 UI 状态同步。事件不写入 Codex 会话日志，也不具备 DSH `session/event` 的崩溃恢复语义；重要状态请写入 `storage`，并在 `ready` 或 `context.changed` 后重新读取。
 
 ## 7. 打包与发布更新
 
@@ -187,7 +194,7 @@ const stopWatching = forge.events.on('settings.changed', async () => {
 
 ```powershell
 node cli/forge.mjs validate ./my-first-plugin
-node cli/forge.mjs pack ./my-first-plugin ./first-plugin-0.1.0.forge-plugin.json
+node cli/forge.mjs pack ./my-first-plugin ./first-plugin-0.2.0.forge-plugin.json
 ```
 
 输出包必须在源目录之外，目标文件不能已存在。打包器拒绝链接、`.git`、`node_modules`；插件最多 1,000 文件、20 MiB 解包内容。打包产生两个文件：包本身及其 `.release.json` 清单。

@@ -5,6 +5,7 @@ const os = require('node:os');
 const crypto = require('node:crypto');
 const { AGENTS, validateAgentConfig } = require('./agent-cli.cjs');
 const terminal = new Set(['completed', 'failed', 'cancelled', 'interrupted']);
+const approvalDefaults = Object.freeze({ claude: 'auto', grok: 'auto', dsh: 'codex' });
 const check = (value, message) => { if (!value) throw new Error(message); };
 function identifier(value) { check(typeof value === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(value), '无效的对话或任务 ID'); return value; }
 function defaultRoot() { return process.env.CODEX_FAST_COLLABORATION_DIR || path.join(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'fast-collaboration'); }
@@ -17,7 +18,18 @@ function atomic(file, value) {
   try {
     const descriptor = fs.openSync(temporary, 'wx', 0o600);
     try { fs.writeFileSync(descriptor, JSON.stringify(value, null, 2) + '\n'); fs.fsyncSync(descriptor); } finally { fs.closeSync(descriptor); }
-    fs.renameSync(temporary, file);
+    // Windows may briefly keep the destination open while another process
+    // reads or replaces the same task record. Retry only transient rename
+    // errors so a short collision does not kill a running worker.
+    let renamed = false;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      try { fs.renameSync(temporary, file); renamed = true; break; }
+      catch (error) {
+        if (!['EPERM', 'EACCES', 'EBUSY', 'ENOTEMPTY'].includes(error.code) || attempt === 7) throw error;
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Math.min(25 * (attempt + 1), 150));
+      }
+    }
+    if (!renamed) throw Error('无法替换协作记录');
   } finally { try { fs.unlinkSync(temporary); } catch (error) { if (error.code !== 'ENOENT') throw error; } }
 }
 function json(file, fallback) {
@@ -32,7 +44,11 @@ class CollaborationStore {
   file(kind, id, suffix = '.json') { return path.join(this.root, kind, identifier(id) + suffix); }
   config() {
     const value = json(path.join(this.root, 'settings.json'), { schemaVersion: 1, concurrency: 1, agents: {} });
-    return { schemaVersion: 1, concurrency: value.concurrency || 1, agents: Object.fromEntries(Object.keys(AGENTS).map(agent => [agent, validateAgentConfig(value.agents?.[agent])])) };
+    // Existing r4 settings predate the per-agent approval selector. Keep an
+    // explicit user choice, while migrating missing values to the requested
+    // defaults: Claude/Grok try their native automatic approval first; DSH
+    // enters the Codex approval path first.
+    return { schemaVersion: 1, concurrency: value.concurrency || 1, agents: Object.fromEntries(Object.keys(AGENTS).map(agent => [agent, validateAgentConfig({ approvalMode: approvalDefaults[agent], ...(value.agents?.[agent] || {}) })])) };
   }
   configure(value) {
     check(value && Object.keys(value).every(key => ['concurrency', 'agents'].includes(key)), '未知协作配置字段');
@@ -41,7 +57,7 @@ class CollaborationStore {
     check(Number.isInteger(concurrency) && concurrency >= 1 && concurrency <= 3, '并发数应为 1 到 3');
     check(!value.agents || Object.keys(value.agents).every(agent => AGENTS[agent]), '未知智能体');
     const agents = { ...existing.agents };
-    for (const [agent, config] of Object.entries(value.agents || {})) agents[agent] = validateAgentConfig(config);
+    for (const [agent, config] of Object.entries(value.agents || {})) agents[agent] = validateAgentConfig({ approvalMode: approvalDefaults[agent], ...config });
     check(!agents.dsh.model || agents.dsh.provider, 'DSH 模型覆盖需同时填写提供商 ID');
     const result = { schemaVersion: 1, concurrency, agents }; atomic(path.join(this.root, 'settings.json'), result); return result;
   }
@@ -58,6 +74,17 @@ class CollaborationStore {
     return job;
   }
   saveJob(job) { atomic(this.file('jobs', job.id), job); }
+  appendEvent(job, type, text) {
+    identifier(job.id);
+    const value = String(text ?? '');
+    if (!value) return null;
+    const event = { seq: (job.sequence || 0) + 1, type, text: value.slice(0, 16000), at: new Date().toISOString() };
+    fs.appendFileSync(this.file('events', job.id, '.jsonl'), JSON.stringify(event) + '\n', { mode: 0o600 });
+    job.sequence = event.seq;
+    job.outputChars = (job.outputChars || 0) + event.text.length;
+    this.saveJob(job);
+    return event;
+  }
   jobs(threadId) {
     identifier(threadId);
     return fs.readdirSync(path.join(this.root, 'jobs')).filter(file => /^[A-Za-z0-9_-]+\.json$/.test(file)).flatMap(file => {

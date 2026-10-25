@@ -10,7 +10,7 @@
     });
   }
   function on(name, callback) { const set = listeners.get(name) || new Set(); set.add(callback); listeners.set(name, set); return () => set.delete(callback); }
-  function emit(name, value) { for (const callback of listeners.get(name) || []) { try { callback(value); } catch (error) { console.error(error); } } }
+  function emit(name, value, metadata) { for (const callback of listeners.get(name) || []) { try { callback(value, metadata); } catch (error) { console.error(error); } } }
   window.addEventListener('message', async event => {
     if (event.source !== parent) return;
     const data = event.data;
@@ -19,10 +19,10 @@
       waiting.delete(id); clearTimeout(pending.timer); error ? pending.reject(Error(error)) : pending.resolve(result);
     }
     if (data?.forgePluginEvent) {
-      const { name, value } = data.forgePluginEvent;
+      const { name, value, metadata } = data.forgePluginEvent;
       if (name === 'context.changed') context = value;
       if (name === 'dispose') { disposed = true; for (const pending of waiting.values()) { clearTimeout(pending.timer); pending.reject(Error('插件已停止')); } waiting.clear(); }
-      emit(name, value);
+      emit(name, value, metadata);
     }
     if (data?.forgePluginCommand) {
       const { id, command, args, context: supplied } = data.forgePluginCommand;
@@ -34,7 +34,7 @@
   const api = {
     apiVersion: 1,
     context: { async get() { return context = await request('context.get'); } },
-    events: { on },
+    events: { on, emit: (name, value) => request('events.emit', { name, value }) },
     commands: { register(id, handler) { if (handlers.has(id)) throw Error('重复命令'); handlers.set(id, handler); return () => handlers.delete(id); } },
     panels: { open: (id, options = {}) => request('panels.open', { id, ...options }), close: id => request('panels.close', { id }) },
     sidebar: { register: item => register('sidebar', item) },
@@ -46,6 +46,7 @@
     storage: { get: key => request('storage.get', { key }), set: (key, value) => request('storage.set', { key, value }), delete: key => request('storage.delete', { key }) },
     settings: { get: () => request('settings.get') },
     metadata: { get: () => request('metadata.get') },
+    capabilities: { get: () => request('capabilities.get') },
   };
   function register(surface, item) { const promise = request('ui.register', { surface, item }); return async () => { await promise; return request('ui.unregister', { surface, id: item.id }); }; }
   Object.defineProperty(window, 'CodexForge', { value: Object.freeze(api), writable: false });

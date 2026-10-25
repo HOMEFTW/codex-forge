@@ -2,6 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { TodoStore, callTool } = require('../runtime/todos.cjs');
 test('todos preserve unrelated items, reject stale writes and roll back invalid batches', async t => {
   const base = path.resolve(__dirname, '../output'); fs.mkdirSync(base, { recursive: true });
@@ -19,4 +20,16 @@ test('todos preserve unrelated items, reject stale writes and roll back invalid 
   await assert.rejects(callTool(store, 'todo_apply', { expectedRevision: 0, operations: [{ op: 'add', title: 'oops' }] }, {}), /resume a conversation/);
   await callTool(store, 'todo_apply', { expectedRevision: 0, operations: [{ op: 'add', title: '模型任务' }] }, { threadId: 'thread-2' });
   assert.equal(store.read('thread-2').items[0].title, '模型任务');
+});
+test('todos provide Codeg-style columns, ordering, schedule, retry and event history', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'forge-todos-extended-')); t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const store = new TodoStore(root);
+  let doc = await store.apply('thread', 0, [{ op: 'add', id: 'a', title: '失败任务', status: 'failed', scheduledAt: '2026-10-25T01:00:00.000Z' }, { op: 'add', id: 'b', title: '运行任务', status: 'running' }]);
+  assert.equal(doc.items.find(item => item.id === 'a').events.at(-1).action, 'created');
+  doc = await store.apply('thread', doc.revision, [{ op: 'retry', id: 'a' }]);
+  assert.equal(doc.items.find(item => item.id === 'a').status, 'queued'); assert.equal(doc.items.find(item => item.id === 'a').attempts, 1);
+  doc = await store.apply('thread', doc.revision, [{ op: 'reorder', order: ['b', 'a'] }, { op: 'update', id: 'b', status: 'awaiting_input', message: '需要用户输入' }]);
+  assert.deepEqual(doc.items.map(item => item.id), ['b', 'a']); assert.equal(doc.items[0].events.at(-1).message, '需要用户输入');
+  doc = await store.apply('thread', doc.revision, [{ op: 'defer', id: 'a', until: '2026-10-26T01:00:00.000Z' }]);
+  assert.equal(doc.items.find(item => item.id === 'a').deferredUntil, '2026-10-26T01:00:00.000Z');
 });

@@ -17,7 +17,7 @@ function errorText(error) {
   return value.includes('Revision conflict') ? '画布已有新修改，本次操作未写入。草稿已保留，请核对后保存。' : value.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
 }
 const uuid = () => crypto.randomUUID();
-const labels = { text: '文字', sticky: '便签', image: '图片', file: '文件' };
+const labels = { text: '文字', sticky: '便签', image: '图片', file: '文件', group: '分组' };
 function ImageAsset({ asset, title }) {
   const [src, setSrc] = useState('');
   useEffect(() => { let active = true; setSrc(''); if (asset) api.request('asset', { asset }).then(value => { if (active) setSrc(value); }).catch(() => {}); return () => { active = false; }; }, [asset]);
@@ -25,10 +25,12 @@ function ImageAsset({ asset, title }) {
 }
 function Card({ data, selected }) {
   const item = data.item;
+  const members = (item.data.members || []).map(id => data.allItems?.find(value => value.id === id)).filter(Boolean);
   return <article className={`card ${item.type} ${item.data.color || 'neutral'} ${data.highlight ? 'model-change' : ''} ${selected ? 'selected' : ''}`} style={{ width: item.width, minHeight: item.height }}>
     <Handle type="target" position={Position.Left} />
     <div className="card-label"><span>{labels[item.type]}</span>{data.highlight && <small>模型修改</small>}</div>
     <strong>{item.data.title || labels[item.type]}</strong>
+    {item.type === 'group' && <div className="group-members" style={item.data.gridColumns > 0 ? { gridTemplateColumns: `repeat(${item.data.gridColumns}, minmax(0, 1fr))` } : undefined}>{item.data.collapsed ? <span className="muted">已折叠 · {members.length} 个成员</span> : members.length ? members.slice(0, item.data.gridRows > 0 && item.data.gridColumns > 0 ? item.data.gridRows * item.data.gridColumns : members.length).map(member => <span key={member.id} className="group-member">{member.data.title || labels[member.type] || member.id}</span>) : <span className="muted">暂无成员</span>}</div>}
     {item.type === 'image' && <ImageAsset asset={item.data.asset} title={item.data.title} />}
     {item.type === 'file' && <div className="file-path">{item.data.filePath || '未选择文件'}</div>}
     {item.data.text && <p>{item.data.text}</p>}
@@ -44,11 +46,14 @@ function Editor({ node, revision, save, remove, reveal, register, disabled, lock
   useEffect(() => controller.current.context(node.data, revision), [node.data, revision]);
   useEffect(() => { const editor = controller.current, unregister = register(editor); return () => { unregister(); editor.dispose(); }; }, [register]);
   const change = (key, value) => controller.current.change(key, value);
+  const memberIds = node.type === 'group' ? (draft.members || []) : [];
+  const toggleMember = id => controller.current.change('members', memberIds.includes(id) ? memberIds.filter(value => value !== id) : [...memberIds, id]);
   return <section className="editor" aria-label="编辑节点">
     <fieldset className="canvas-editor-fields" disabled={locked}>
     <div className="editor-heading"><span>编辑{labels[node.type]}</span><code title="可在对话中引用此 ID">{node.id.slice(0, 12)}</code><button className="danger" onClick={remove} disabled={disabled} aria-label="删除节点">删除</button></div>
     <input aria-label="节点标题" value={draft.title || ''} maxLength={300} onChange={event => change('title', event.target.value)} placeholder="标题" />
     <textarea aria-label="节点内容" value={draft.text || ''} maxLength={100000} onChange={event => change('text', event.target.value)} placeholder="输入文字，自动保存…" />
+    {node.type === 'group' && <div className="group-editor"><label><input type="checkbox" checked={!!draft.collapsed} onChange={event => change('collapsed', event.target.checked)} /> 折叠分组</label><label>列数 <input type="number" min="0" max="50" value={draft.gridColumns ?? 0} onChange={event => change('gridColumns', Math.max(0, Math.min(50, Number(event.target.value) || 0)))} /></label><label>行数 <input type="number" min="0" max="50" value={draft.gridRows ?? 0} onChange={event => change('gridRows', Math.max(0, Math.min(50, Number(event.target.value) || 0)))} /></label><div className="group-member-picker"><span>成员</span>{(node.allItems || []).filter(item => item.id !== node.id && item.type !== 'group').map(item => <label key={item.id}><input type="checkbox" checked={memberIds.includes(item.id)} onChange={() => toggleMember(item.id)} /> {item.data.title || labels[item.type]}</label>)}</div></div>}
     <div className="editor-actions"><select aria-label="节点颜色" value={draft.color || 'neutral'} onChange={event => change('color', event.target.value)}><option value="neutral">默认</option><option value="yellow">暖黄</option><option value="blue">蓝色</option><option value="green">绿色</option><option value="pink">粉色</option></select><span className="muted" role="status">{status}</span>{node.type === 'file' && <button onClick={reveal}>在文件夹中显示</button>}{controller.current.dirty && /未保存|画布已更新/.test(status) && <button onClick={() => controller.current.discard()}>放弃修改</button>}<button onClick={() => controller.current.flush(true).catch(() => {})}>保存</button></div>
     </fieldset>
   </section>;
@@ -68,6 +73,15 @@ function EdgeEditor({ edge, revision, save, remove, register, disabled, locked }
   useEffect(() => controller.current.context({ label: edge.label || '' }, revision), [edge.label, revision]);
   useEffect(() => { const editor = controller.current, unregister = register(editor); return () => { unregister(); editor.dispose(); }; }, [register]);
   return <fieldset className="edge-editor" disabled={locked}><input aria-label="连线标签" value={draft.label} maxLength={500} placeholder="连线说明" onChange={event => controller.current.change('label', event.target.value)} /><span className="muted" role="status">{status}</span>{controller.current.dirty && /未保存|画布已更新/.test(status) && <button onClick={() => controller.current.discard()}>放弃修改</button>}<button onClick={() => controller.current.flush(true).catch(() => {})}>保存</button><button className="danger" onClick={remove} disabled={disabled}>删除连线</button></fieldset>;
+}
+function CanvasMetaEditor({ doc, save, disabled }) {
+  const [draft, setDraft] = useState({ title: doc.title, description: doc.description || '', color: doc.color || 'neutral' });
+  const [status, setStatus] = useState('');
+  const controller = useRef(null), saveRef = useRef(save); saveRef.current = save;
+  if (!controller.current) controller.current = new CanvasDraft({ value: draft, revision: doc.revision, save: (patch, revision) => saveRef.current({ op: 'set_metadata', ...patch }, undefined, revision), onChange: setDraft, onStatus: setStatus, errorText });
+  useEffect(() => { controller.current.context({ title: doc.title, description: doc.description || '', color: doc.color || 'neutral' }, doc.revision); }, [doc.title, doc.description, doc.color, doc.revision]);
+  useEffect(() => () => controller.current.dispose(), []);
+  return <section className="canvas-meta" aria-label="画布信息"><div className="canvas-meta-heading"><span>画布信息</span><span className="muted" role="status">{status}</span></div><input aria-label="画布标题" value={draft.title || ''} maxLength={200} disabled={disabled} onChange={event => controller.current.change('title', event.target.value)} /><textarea aria-label="画布描述" value={draft.description || ''} maxLength={2000} disabled={disabled} onChange={event => controller.current.change('description', event.target.value)} placeholder="描述这张画布的用途…" /><div className="canvas-meta-actions"><select aria-label="画布颜色" value={draft.color || 'neutral'} disabled={disabled} onChange={event => controller.current.change('color', event.target.value)}><option value="neutral">默认颜色</option><option value="yellow">暖黄</option><option value="blue">蓝色</option><option value="green">绿色</option><option value="pink">粉色</option></select>{controller.current.dirty && <button onClick={() => controller.current.flush(true).catch(() => {})} disabled={disabled}>保存信息</button>}</div></section>;
 }
 function CanvasApp() {
   const [canvases, setCanvases] = useState([]), [doc, setDoc] = useState(null), [nodes, setNodes] = useState([]), [edges, setEdges] = useState([]);
@@ -95,7 +109,7 @@ function CanvasApp() {
     if (history.current.observe(value)) historyInvalidated(); updateHistory();
     current.current = value; setDoc(value);
     const highlights = new Set(value.lastChange?.source === 'model' ? value.lastChange.nodeIds : []);
-    setNodes(old => value.nodes.map(item => ({ id: item.id, type: 'card', position: { x: item.x, y: item.y }, data: { item, highlight: highlights.has(item.id) }, selected: !changedCanvas && old.some(node => node.id === item.id && node.selected), style: { width: item.width }, width: item.width, height: item.height })));
+    setNodes(old => value.nodes.map(item => ({ id: item.id, type: 'card', position: { x: item.x, y: item.y }, data: { item, allItems: value.nodes, highlight: highlights.has(item.id) }, selected: !changedCanvas && old.some(node => node.id === item.id && node.selected), style: { width: item.width }, width: item.width, height: item.height })));
     setEdges(value.edges.map(edge => ({ ...edge, type: 'smoothstep', markerEnd: { type: 'arrowclosed' }, selected: !changedCanvas && edge.id === edgeId })));
     if (changedCanvas) { setSelected(null); setEdgeId(null); setNotice(null); setHistoryNotice(''); setDeleteConfirm(null); setTimeout(() => flow.fitView({ padding: .25, duration: 250, maxZoom: 1 }), 100); }
     if (value.lastChange?.source === 'model') setNotice(value.lastChange);
@@ -211,6 +225,7 @@ function CanvasApp() {
     if (deleteConfirm || !canvasId || !await flushEditor() || current.current?.id !== canvasId) return;
     try {
       let data = { title: type === 'sticky' ? '新便签' : `新${labels[type]}`, text: '', color: type === 'sticky' ? 'yellow' : 'neutral' };
+      if (type === 'group') data = { title: '新分组', text: '', color: 'blue', members: [], collapsed: false, gridColumns: 0, gridRows: 0 };
       if (type === 'image' || type === 'file') { const attachment = await api.request('attach', { kind: type }); if (!attachment) return; data = { ...data, ...attachment }; }
       const position = flow.screenToFlowPosition({ x: innerWidth / 2 - 120, y: Math.min(innerHeight / 2, 330) });
       const item = { id: uuid(), type, x: Math.round(position.x), y: Math.round(position.y), width: type === 'image' ? 300 : 260, height: type === 'image' ? 260 : 180, data };
@@ -308,6 +323,8 @@ function CanvasApp() {
   return <main className={`canvas-app ${mode}`}>
     <header className="topbar"><span className="canvas-symbol">▧</span><strong>无限画布</strong><span className="badge">Forge</span><div className="spacer"/><button onClick={onMode} title={mode === 'right' ? '展开画布' : '在右侧栏打开'} aria-label={mode === 'right' ? '展开画布' : '在右侧栏打开'}>{mode === 'right' ? '⛶' : '◧'}</button><button onClick={close} aria-label="关闭面板">×</button></header>
     <div className="canvas-picker"><select aria-label="选择画布" value={doc?.id || ''} disabled={blocked} onChange={event => chooseCanvas(event.target.value)}><option value="" disabled>选择画布</option>{canvases.map(value => <option key={value.id} value={value.id}>{value.title}</option>)}</select><button onClick={createCanvas} disabled={blocked}>新建画布</button>{doc && <button className="danger" aria-label="删除当前画布" onClick={beginDeleteCanvas} disabled={blocked}>删除画布</button>}</div>
+    <div className="canvas-preview-list" aria-label="画布预览">{canvases.map(value => <button key={value.id} className={`canvas-preview ${doc?.id === value.id ? 'active' : ''}`} onClick={() => chooseCanvas(value.id)} disabled={blocked}><span className={`canvas-swatch ${value.color || 'neutral'}`} /><span className="canvas-preview-copy"><strong>{value.title}</strong><small>{value.description || '暂无描述'} · {value.nodes || 0} 个节点{value.groups ? ` · ${value.groups} 个分组` : ''}</small></span><span className="canvas-thumbnail">{(value.preview || []).slice(0, 8).map(rect => <i key={rect.id} className={rect.type} style={{ left: `${Math.max(0, Math.min(86, rect.x / 12))}%`, top: `${Math.max(0, Math.min(72, rect.y / 12))}%`, width: `${Math.max(8, Math.min(44, rect.width / 12))}%`, height: `${Math.max(8, Math.min(30, rect.height / 12))}%` }} />)}</span></button>)}</div>
+    {doc && <CanvasMetaEditor doc={doc} disabled={blocked} save={(ops, message, revision) => commit(ops, message, revision, doc.id)} />}
     {deleteConfirm && <div className="canvas-delete-confirm" role="alertdialog" aria-label="确认删除画布"><strong>删除“{deleteConfirm.title}”？</strong><p>所有节点和连线将一起移入回收站，可撤销删除。</p>{doc?.revision !== deleteConfirm.revision && <p>画布已有新修改，请取消后重新确认。</p>}<div><button onClick={() => setDeleteConfirm(null)} disabled={busy}>取消</button><button className="danger" aria-label="确认删除画布" onClick={deleteCanvas} disabled={busy || doc?.revision !== deleteConfirm.revision}>确认删除</button></div></div>}
     {lastDeleted && <div className="canvas-delete-notice" role="status"><span>已删除“{lastDeleted.title}”</span><button onClick={restoreCanvas} disabled={blocked}>撤销删除</button><button onClick={() => setLastDeleted(null)} aria-label="关闭画布删除提示">×</button></div>}
     {doc && <div className="tools">{Object.keys(labels).map(type => <button key={type} onClick={() => addNode(type)} disabled={blocked}>＋{labels[type]}</button>)}<div className="spacer"/><button aria-label="撤销画布修改" onClick={() => travelHistory('undo')} disabled={blocked || !historyState.canUndo} title="撤销（Ctrl/Cmd+Z；文字输入框使用文字撤销）">↶ 撤销</button><button aria-label="重做画布修改" onClick={() => travelHistory('redo')} disabled={blocked || !historyState.canRedo} title="重做（Ctrl+Y / Ctrl/Cmd+Shift+Z）">↷ 重做</button><button aria-label="删除所选内容" onClick={() => deleteItems(selectedNodeIds, selectedEdgeIds)} disabled={blocked || (!selectedNodeIds.length && !selectedEdgeIds.length)} title="删除所选节点和连线（Delete）">删除</button><button onClick={() => flow.fitView({ padding: .25, duration: 200, maxZoom: 1 })} title="显示全部节点">适应</button></div>}
@@ -317,7 +334,7 @@ function CanvasApp() {
     <div className="flow-container">
       {!doc ? <div className="empty"><div className="empty-icon">▧</div><h2>让想法在这里连接</h2><p>添加文字、便签和文件。<br/>对模型说“帮我编辑无限画布”，即可协作。</p><button className="primary" onClick={createCanvas} disabled={blocked}>创建第一张画布</button></div> : <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onNodeClick={(_event, node) => selectItem(node.id, null)} onEdgeClick={(_event, edge) => selectItem(null, edge.id)} onPaneClick={() => selectItem(null, null)} onNodeDragStop={(_event, node, moved) => saveMovement(moved?.length ? moved : [node])} onConnect={connectNodes} nodesDraggable={!blocked} nodesConnectable={!blocked} deleteKeyCode={null} minZoom={.08} maxZoom={2.5} fitView attributionPosition="bottom-right"><Background gap={22} size={1} color="#c5cbd0"/><Controls showInteractive={false}/></ReactFlow>}
     </div>
-    {selectedNode && <Editor key={doc.id + selectedNode.id} node={selectedNode} revision={doc.revision} register={registerEditor} disabled={blocked} locked={loading || changingCanvas || !!deleteConfirm} save={(ops, message, revision) => commit(ops, message, revision, doc.id)} remove={() => deleteItems([selectedNode.id], [])} reveal={() => api.request('reveal', { canvasId: doc.id, nodeId: selectedNode.id }).catch(failure => setError(errorText(failure)))} />}
+    {selectedNode && <Editor key={doc.id + selectedNode.id} node={{ ...selectedNode, allItems: doc.nodes }} revision={doc.revision} register={registerEditor} disabled={blocked} locked={loading || changingCanvas || !!deleteConfirm} save={(ops, message, revision) => commit(ops, message, revision, doc.id)} remove={() => deleteItems([selectedNode.id], [])} reveal={() => api.request('reveal', { canvasId: doc.id, nodeId: selectedNode.id }).catch(failure => setError(errorText(failure)))} />}
     {edgeId && doc?.edges.some(edge => edge.id === edgeId) && <EdgeEditor key={doc.id + edgeId} edge={doc.edges.find(edge => edge.id === edgeId)} revision={doc.revision} register={registerEditor} disabled={blocked} locked={loading || changingCanvas || !!deleteConfirm} save={(ops, message, revision) => commit(ops, message, revision, doc.id)} remove={() => deleteItems([], [edgeId])} />}
     <footer><span>{loading ? '正在打开…' : busy ? '正在保存…' : doc ? `已保存 · 修订 ${doc.revision}` : '本地画布'}</span><span className="muted">{doc ? `${doc.nodes.length} 个节点 · ${doc.edges.length} 条连线` : '自动保存 · 模型可编辑'}</span><button onClick={() => api.request('data-folder')}>数据目录</button></footer>
   </main>;

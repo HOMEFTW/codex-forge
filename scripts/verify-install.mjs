@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import assert from 'node:assert/strict';
-const root=path.resolve(import.meta.dirname,'..'),install=path.resolve(process.argv[2]||'D:/Codex-Forge/Codex-Forge-0.1.0-26.1016.8622.0');
+const root=path.resolve(import.meta.dirname,'..'),install=path.resolve(process.argv[2]||'D:/Codex-Forge/Codex-Forge-0.2.0-26.1021.2667.0');
 const hash=data=>crypto.createHash('sha256').update(data).digest('hex');
 const manifest=JSON.parse(fs.readFileSync(path.join(install,'forge-install.json'),'utf8'));
 for(const entry of manifest.files){const file=path.resolve(install,entry.path);assert(file.startsWith(install+path.sep));assert.equal(hash(fs.readFileSync(file)),entry.sha256,entry.path);}

@@ -3,7 +3,7 @@ const {satisfies,compatibility}=require('../runtime/forge-versions.cjs');
 const {validate}=require('../runtime/forge-manifest.cjs');
 const {ForgeRegistry}=require('../runtime/forge-registry.cjs');
 const updates=require('../runtime/forge-plugin-updates.cjs');
-const {matchUpdate,checkUpdates,stageUpdate}=require('../runtime/forge-updates.cjs');
+const {matchUpdate,checkUpdates,stageUpdate,launchUpdate}=require('../runtime/forge-updates.cjs');
 const versions={codex:'26.1016.8622.0',forge:'0.1.0',apiVersion:1};
 const base=()=>({schemaVersion:1,apiVersion:1,id:'test.example',name:'Example',version:'0.1.0',compatibility:{codex:['26.1016.8622.0'],forge:['>=0.1.0 <0.2.0']},permissions:['storage','settings'],contributes:{settings:{properties:{greeting:{title:'Greeting',type:'string',default:'hello'}}}},update:{provider:'server',manifestUrl:'https://plugins.example/release.json'}});
 function setup(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'forge-test-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const source=path.join(root,'source');fs.mkdirSync(source);fs.writeFileSync(path.join(source,'plugin.json'),JSON.stringify(base()));const registry=new ForgeRegistry({root:path.join(root,'data'),bundledRoot:path.join(root,'empty'),versions});return {root,source,registry};}
@@ -19,6 +19,9 @@ test('plugin installation is disabled by default; settings persist and changed c
 });
 test('manifest rejects undeclared settings, reserved namespace, path escape and unreasoned expanded panels',t=>{
  const {source}=setup(t);const m=base();m.id='forge.impersonate';assert.throws(()=>validate(m,source),/保留/);m.id='test.example';m.entry='../main.js';assert.throws(()=>validate(m,source),/路径/);delete m.entry;m.permissions=[];assert.throws(()=>validate(m,source),/settings/);m.permissions=['panels','settings'];m.contributes.panels=[{id:'main',title:'Main',entry:'panel.html',placement:'expanded'}];assert.throws(()=>validate(m,source),/全宽/);
+});
+test('manifest accepts the DSH-inspired scoped events capability',t=>{
+ const {source}=setup(t);const m=base();m.permissions.push('events');m.entry='main.js';m.contributes.events=[{name:'plugin.test.example.status'}];fs.writeFileSync(path.join(source,'main.js'),'void 0');fs.writeFileSync(path.join(source,'plugin.json'),JSON.stringify(m));assert.equal(validate(JSON.parse(fs.readFileSync(path.join(source,'plugin.json'),'utf8')),source).permissions.includes('events'),true);m.contributes.events=[{name:'plugin.other.status'}];assert.throws(()=>validate(m,source),/事件必须属于本插件/);
 });
 test('permissions and dependency disablement propagate without deleting data',t=>{
  const {source,registry}=setup(t);registry.install(source);registry.setEnabled('test.example',true);assert.throws(()=>registry.permission('test.example','browser'),/未声明/);
@@ -78,13 +81,58 @@ test('GitHub and private server sources validate origin and perform release disc
  const {source,registry}=setup(t);const m=base();m.update={provider:'github',repository:'test/plugins'};fs.writeFileSync(path.join(source,'plugin.json'),JSON.stringify(m));registry.install(source);const release={...m,version:'0.1.1',url:'https://github.com/test/plugins/releases/download/v1/plugin.json',sha256:'a'.repeat(64),bytes:100};
  const seen=[];const plan=await updates.checkPluginUpdate(registry,m.id,async url=>{seen.push(url);return url.includes('api.github')?{assets:[{name:'codex-forge-plugin-release.json',browser_download_url:'https://github.com/test/plugins/releases/download/v1/release.json'}]}:release;});assert(plan.compatible);assert.equal(seen.length,2);assert.throws(()=>updates.allowedURL('https://other.example/a',m.update));assert.throws(()=>updates.source({provider:'server',manifestUrl:'http://private.example/a'}));
 });
+test('Forge update matching uses the official build version separately from MSIX identity',()=>{
+ const config={version:'0.1.0',codexVersion:'26.1021.2667.0',codexBuildVersion:'26.1021.3705.0'};
+ const baseRelease={schemaVersion:3,platform:'win32-x64',apiVersion:1,forgeVersion:'0.1.1',codexVersion:'26.1021.2667.0',codexBuildVersion:'26.1021.4000.0',repository:'test/forge',url:'https://github.com/test/forge/releases/download/v0.1.1/Setup.msi',sha256:'c'.repeat(64),bytes:10,portableUrl:'https://github.com/test/forge/releases/download/v0.1.1/Setup-Portable.zip',portableSha256:'e'.repeat(64),portableBytes:10,distribution:'msi-portable',containsOfficialClient:false};
+ assert(matchUpdate({config,plugins:[],releases:[baseRelease],native:{buildVersion:'26.1021.4000.0'}}).plan);
+ const ahead={...baseRelease,codexBuildVersion:'26.1021.4100.0'};
+ const assessed=matchUpdate({config,plugins:[],releases:[ahead],native:{buildVersion:'26.1021.4000.0'}});
+ assert.equal(assessed.plan,null); assert.match(assessed.candidates[0].reasons.join('；'),/官方更新源/);
+});
+test('Forge updater stages a verified MSI and records its receipt',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'forge-msi-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const body=Buffer.from('verified-msi-fixture');
+ const plan={schemaVersion:3,platform:'win32-x64',apiVersion:1,forgeVersion:'0.1.1',codexVersion:'26.1021.2667.0',codexBuildVersion:'26.1021.4000.0',repository:'test/forge',url:'https://github.com/test/forge/releases/download/v0.1.1/Setup.msi',sha256:crypto.createHash('sha256').update(body).digest('hex'),bytes:body.length,portableUrl:'https://github.com/test/forge/releases/download/v0.1.1/Setup-Portable.zip',portableSha256:'e'.repeat(64),portableBytes:10,distribution:'msi-portable',containsOfficialClient:false,compatible:true};
+ const receipt=await stageUpdate(plan,root,async()=>new Response(body));
+ assert.match(receipt.file,/\.msi$/);assert.equal(fs.statSync(receipt.file).size,body.length);assert.equal(JSON.parse(fs.readFileSync(receipt.file+'.json','utf8')).sha256,plan.sha256);
+ await assert.rejects(stageUpdate({...plan,sha256:'0'.repeat(64)},path.join(root,'bad'),async()=>new Response(body)),/摘要/);
+});
+test('Forge updater launches from the versioned payload root',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'forge-launch-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const installer=path.join(root,'update.msi'),sha256=crypto.createHash('sha256').update('fixture').digest('hex');
+ fs.writeFileSync(installer,'fixture');fs.writeFileSync(path.join(root,'forge-payload.json'),'{}');fs.writeFileSync(installer+'.json',JSON.stringify({file:installer,sha256}));
+ let invocation;
+ const result=launchUpdate({file:installer,sha256},root,undefined,(file,args,options)=>{invocation={file,args,options};return {unref(){}}});
+ assert.equal(result.scheduled,true);assert.deepEqual(invocation.args,['/i',installer,'/passive','/norestart']);assert.equal(invocation.file,'msiexec.exe');
+ assert.throws(()=>launchUpdate({file:installer,sha256},path.join(root,'missing'),undefined,()=>({unref(){}})),/已安装/);
+});
+test('Forge update check cannot approve a newer build when the official feed is unavailable',async()=>{
+ const config={version:'0.1.0',codexVersion:'26.1021.2667.0',codexBuildVersion:'26.1021.3705.0',githubRepository:'test/forge'};
+ const release={schemaVersion:3,platform:'win32-x64',apiVersion:1,forgeVersion:'0.1.1',codexVersion:'26.1021.2667.0',codexBuildVersion:'26.1021.4000.0',repository:'test/forge',url:'https://github.com/test/forge/releases/download/v0.1.1/Setup.msi',sha256:'d'.repeat(64),bytes:10,portableUrl:'https://github.com/test/forge/releases/download/v0.1.1/Setup-Portable.zip',portableSha256:'e'.repeat(64),portableBytes:10,distribution:'msi-portable',containsOfficialClient:false};
+ const result=await checkUpdates({config,plugins:[],readJSON:async url=>{if(url.includes('oaistatic'))throw Error('offline');if(url.includes('api.github'))return [{assets:[{name:'codex-forge-release.json',browser_download_url:'https://github.com/test/forge/releases/download/v0.1.1/manifest.json'}]}];return release;}});
+ assert.equal(result.plan,null); assert.equal(result.native.status,'unavailable');
+});
 test('Forge matching checks third party ranges and failed official feed cannot approve a new client',async()=>{
  const config={version:'0.1.0',codexVersion:versions.codex,githubRepository:'test/forge'};
- const release={schemaVersion:2,platform:'win32-x64',apiVersion:1,forgeVersion:'0.1.1',codexVersion:'26.1017.1.0',repository:'test/forge',url:'https://github.com/test/forge/releases/download/v0.1.1/Setup.exe',sha256:'a'.repeat(64),bytes:10,distribution:'forge-bootstrap',containsOfficialClient:false};
+ const release={schemaVersion:3,platform:'win32-x64',apiVersion:1,forgeVersion:'0.1.1',codexVersion:'26.1017.1.0',repository:'test/forge',url:'https://github.com/test/forge/releases/download/v0.1.1/Setup.msi',sha256:'a'.repeat(64),bytes:10,portableUrl:'https://github.com/test/forge/releases/download/v0.1.1/Setup-Portable.zip',portableSha256:'e'.repeat(64),portableBytes:10,distribution:'msi-portable',containsOfficialClient:false};
  assert(!matchUpdate({config,plugins:[{...base(),enabled:true}],releases:[release],native:{buildVersion:release.codexVersion}}).plan);
  assert(matchUpdate({config,plugins:[{...base(),builtin:true}],releases:[release],native:{buildVersion:release.codexVersion}}).plan);
  const {recheckPlan}=require('../runtime/forge-updates.cjs');
  assert.throws(()=>recheckPlan({...release,compatible:true},{config,plugins:[base()],native:{version:release.codexVersion}}),/Example/);
  assert(recheckPlan({...release,compatible:true},{config,plugins:[],native:{version:release.codexVersion}}));
  const result=await checkUpdates({config,plugins:[],readJSON:async url=>{if(url.includes('oaistatic'))throw Error('offline');if(url.includes('api.github'))return [{assets:[{name:'codex-forge-release.json',browser_download_url:'https://github.com/test/forge/releases/download/v0.1.1/manifest.json'}]}];return release;}});assert.equal(result.plan,null);assert.equal(result.native.status,'unavailable');
+});
+test('Forge update check falls back from GitHub API 403 to the public latest manifest', async () => {
+ const config={version:'0.1.0',codexVersion:versions.codex,githubRepository:'test/forge',channel:'stable'};
+ const release={schemaVersion:3,platform:'win32-x64',apiVersion:1,forgeVersion:'0.1.1',codexVersion:versions.codex,repository:'test/forge',url:'https://github.com/test/forge/releases/download/v0.1.1/Setup.msi',sha256:'b'.repeat(64),bytes:10,portableUrl:'https://github.com/test/forge/releases/download/v0.1.1/Setup-Portable.zip',portableSha256:'e'.repeat(64),portableBytes:10,distribution:'msi-portable',containsOfficialClient:false};
+ const seen=[];
+ const result=await checkUpdates({config,plugins:[],readJSON:async url=>{
+   seen.push(url);
+   if(url.includes('oaistatic')) return {schemaVersion:1,packageIdentity:'OpenAI.Codex',storeProductId:'9PLM9XGG6VKS',buildVersion:versions.codex};
+   if(url.includes('api.github.com')) throw Error('更新源 HTTP 403（GitHub API 限流或拒绝匿名请求）');
+   assert.match(url,/github\.com\/test\/forge\/releases\/latest\/download\/codex-forge-release\.json$/);
+   return release;
+ }});
+ assert.equal(result.forge.source,'github-latest-manifest'); assert.equal(result.forge.warning.includes('403'),true);
+ assert.equal(result.plan.forgeVersion,'0.1.1'); assert.equal(seen.length,3);
 });

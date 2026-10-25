@@ -35,3 +35,19 @@ test('image import copies safe raster assets and rejects SVG/arbitrary reads', a
   const asset = store.importImage(image); assert.match(asset, /^[a-f0-9]{64}\.png$/); assert.match(store.imageData(asset), /^data:image\/png;base64,/);
   fs.writeFileSync(path.join(store.root, 'bad.svg'), '<svg></svg>'); assert.throws(() => store.importImage(path.join(store.root, 'bad.svg')), /Only PNG/); assert.throws(() => store.imageData('../image.png'), /Invalid asset/);
 });
+test('canvas metadata, previews and collapsible groups persist without changing existing node IDs', async t => {
+  const store = fixture(t), created = await store.create('项目画布', 'meta', 'user', { description: '分组说明', color: 'blue' });
+  let doc = await store.apply(created.id, 0, [
+    { op: 'upsert_node', node: item('note') },
+    { op: 'upsert_node', node: { id: 'group', type: 'group', x: 20, y: 250, width: 420, height: 260, data: { title: '阶段一', text: '', color: 'blue', members: [], collapsed: false, gridColumns: 2, gridRows: 1 } } },
+    { op: 'set_group_members', id: 'group', members: ['note'] },
+    { op: 'set_metadata', description: '已更新', color: 'green' },
+  ]);
+  assert.equal(doc.description, '已更新'); assert.equal(doc.color, 'green'); assert.deepEqual(doc.nodes[1].data.members, ['note']);
+  assert.equal(store.list()[0].groups, 1); assert.equal(store.list()[0].preview.length, 2);
+  doc = await store.apply(doc.id, doc.revision, [{ op: 'update_node', id: 'group', patch: { data: { collapsed: true } } }]);
+  assert.equal(doc.nodes.find(value => value.id === 'group').data.collapsed, true);
+  doc = await store.apply(doc.id, doc.revision, [{ op: 'remove_node', id: 'note' }]);
+  assert.deepEqual(doc.nodes.find(value => value.id === 'group').data.members, []);
+  await assert.rejects(store.apply(doc.id, doc.revision, [{ op: 'set_group_members', id: 'group', members: ['missing'] }]), /member/);
+});

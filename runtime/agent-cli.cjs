@@ -78,7 +78,11 @@ function resolveCommand(agent, config = {}, nodePath) {
 }
 function invocation(agent, config, { nodePath, taskFile, patchFile, sessionId } = {}) {
   const resolved = resolveCommand(agent, config, nodePath), args = [...resolved.prefix, ...config.args];
-  if (agent === 'claude') args.push('--print', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--permission-prompts', 'host', '--permission-prompt-tool=stdio');
+  // In Claude Code print/stream mode, `host` routes permission prompts to the
+  // SDK host. `--permission-prompt-tool` names an MCP tool; passing `stdio`
+  // here makes current Claude Code look for a nonexistent MCP permission tool
+  // and auto-deny writes before our control-request handler can respond.
+  if (agent === 'claude') args.push('--print', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--permission-prompts', 'host');
   if (agent === 'grok') args.push('--no-auto-update');
   if (agent !== 'dsh' && config.approvalMode === 'auto') args.push('--permission-mode', 'auto');
   if (agent !== 'dsh' && config.approvalMode === 'codex') args.push('--permission-mode', agent === 'claude' ? 'manual' : 'default');
