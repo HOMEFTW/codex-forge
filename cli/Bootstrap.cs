@@ -15,6 +15,11 @@ using System.Web.Script.Serialization;
 using System.Windows.Forms;
 using System.Xml;
 using System.Text.RegularExpressions;
+using System.Reflection;
+
+[assembly: AssemblyTitle("Codex Forge Bootstrap")]
+[assembly: AssemblyProduct("Codex Forge")]
+[assembly: AssemblyVersion("0.3.0.0")]
 
 internal static class BootstrapCore {
     static BootstrapCore() {
@@ -25,6 +30,10 @@ internal static class BootstrapCore {
     internal static Dictionary<string,object> Read(string file) { return Json.Deserialize<Dictionary<string,object>>(File.ReadAllText(file)); }
     internal static string Text(Dictionary<string,object> value,string key) { return Convert.ToString(value[key]); }
     internal static string Hash(string file) { using(var stream=File.OpenRead(file))using(var algorithm=SHA256.Create())return BitConverter.ToString(algorithm.ComputeHash(stream)).Replace("-","").ToLowerInvariant(); }
+    internal static string PayloadDigest(Dictionary<string,object> manifest) {
+        var rows=new List<string>();foreach(Dictionary<string,object> item in (IEnumerable)manifest["files"])rows.Add(Text(item,"path")+"\0"+Convert.ToInt64(item["bytes"])+"\0"+Text(item,"sha256"));rows.Sort(StringComparer.Ordinal);
+        using(var algorithm=SHA256.Create())return BitConverter.ToString(algorithm.ComputeHash(Encoding.UTF8.GetBytes(String.Join("\n",rows)))).Replace("-","").ToLowerInvariant();
+    }
     internal static void Need(bool ok,string error) { if(!ok)throw new InvalidDataException(error); }
     internal static string SafePath(string root,string relative) {
         Need(!String.IsNullOrEmpty(relative)&&!Path.IsPathRooted(relative)&&relative.IndexOfAny(new[]{':','\\','\0'})<0,"无效的安装路径");
@@ -33,7 +42,7 @@ internal static class BootstrapCore {
         Need(resolved.StartsWith(Path.GetFullPath(root).TrimEnd('\\')+"\\",StringComparison.OrdinalIgnoreCase),"安装路径越界");return resolved;
     }
     internal static void ValidateAdapter(Dictionary<string,object> adapter) {
-        Need(Convert.ToInt32(adapter["schemaVersion"])==1&&Convert.ToInt32(adapter["apiVersion"])==1&&Text(adapter,"architecture")=="x64","不支持的 Forge API 或系统架构");
+        Need(Convert.ToInt32(adapter["schemaVersion"])==1&&Convert.ToInt32(adapter["apiVersion"])==2&&Text(adapter,"architecture")=="x64","不支持的 Forge API 或系统架构");
         string version=Text(adapter,"codexVersion");Version parsed;
         Need(Version.TryParse(version,out parsed)&&parsed.Revision>=0&&version!="26.1013.4894.0","不支持的客户端版本");
         Need(Text(adapter,"packageIdentity")=="OpenAI.Codex"&&Text(adapter,"publisher")=="CN=50BDFD77-8903-4850-9FFE-6E8522F64D5B","官方产品身份不匹配");
@@ -85,7 +94,7 @@ internal static class BootstrapCore {
                 if(offset>expected){File.Delete(partial);offset=0;}
                 if(offset==expected)break;
                 using(var request=new HttpRequestMessage(HttpMethod.Get,Text(adapter,"downloadUrl"))) {
-                request.Headers.UserAgent.ParseAdd("Codex-Forge/0.2.0");if(offset>0)request.Headers.Range=new System.Net.Http.Headers.RangeHeaderValue(offset,null);
+                request.Headers.UserAgent.ParseAdd("Codex-Forge/0.3.0");if(offset>0)request.Headers.Range=new System.Net.Http.Headers.RangeHeaderValue(offset,null);
                     using(var response=await http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,token)) {
                         Need(response.StatusCode==HttpStatusCode.OK||response.StatusCode==HttpStatusCode.PartialContent,"官方客户端下载失败：HTTP "+(int)response.StatusCode);
                         if(response.StatusCode==HttpStatusCode.OK)offset=0;
@@ -151,10 +160,18 @@ internal static class BootstrapCore {
         using(var setupLock=new FileStream(Path.Combine(root,".forge-prepare.lock"),FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None)) {
             var config=Read(Path.Combine(payload,"forge.config.json"));var adapter=Read(Path.Combine(payload,"adapters",Text(config,"codexVersion")+".json"));ValidateAdapter(adapter);
             Need(Text(config,"version")==Text(adapter,"forgeVersion")&&Convert.ToInt32(config["apiVersion"])==Convert.ToInt32(adapter["apiVersion"]),"Forge 与适配器版本不匹配");
-            progress("校验 Forge 安装文件…",0);VerifyFiles(payload,Read(Path.Combine(payload,"forge-payload.json")),token);
+            progress("校验 Forge 安装文件…",0);var payloadManifest=Read(Path.Combine(payload,"forge-payload.json"));VerifyFiles(payload,payloadManifest,token);string payloadDigest=PayloadDigest(payloadManifest);
             string versionName="Codex-Forge-"+Text(config,"version")+"-"+Text(adapter,"codexVersion"),relative="clients/"+versionName,target=SafePath(root,relative);
             string receipt=Path.Combine(target,"forge-install.json");
-            if(Directory.Exists(target)){Need(File.Exists(receipt),"目标目录已存在但不属于 Forge");VerifyFiles(target,Read(receipt),token);Publish(root,relative);CleanupOldClients(root,relative,Text(adapter,"codexVersion"));progress("客户端已准备好",100);return;}
+            if(Directory.Exists(target)) {
+                Need(File.Exists(receipt),"目标目录已存在但不属于 Forge");
+                bool reusable=false;
+                try { var installed=Read(receipt);reusable=Text(installed,"product")=="Codex Forge"&&Text(installed,"forgeVersion")==Text(config,"version")&&Text(installed,"sourceMSIXVersion")==Text(adapter,"codexVersion")&&Text(installed,"forgePayloadSHA256")==payloadDigest; if(reusable)VerifyFiles(target,installed,token); }
+                catch { reusable=false; }
+                if(reusable){Publish(root,relative);CleanupOldClients(root,relative,Text(adapter,"codexVersion"));progress("客户端已准备好",100);return;}
+                versionName+="-"+payloadDigest.Substring(0,12);relative="clients/"+versionName;target=SafePath(root,relative);receipt=Path.Combine(target,"forge-install.json");
+                Need(!Directory.Exists(target),"当前版本已有不同 Forge 内容，请先关闭旧客户端后重试");
+            }
             string cache=Path.Combine(root,".cache");Directory.CreateDirectory(cache);string package=Path.Combine(cache,"Codex-"+Text(adapter,"codexVersion")+"-x64.msix");
             await Download(adapter,package,progress,token);
             progress("验证官方数字签名…",72);
@@ -166,7 +183,7 @@ internal static class BootstrapCore {
                 string source=Path.Combine(official,"app"),node=Path.Combine(source,@"resources\cua_node\bin\node.exe"),output=Path.Combine(staging,"client");
                 progress("应用 Forge API "+Text(config,"apiVersion")+" 适配器…",86);
                 Run(node,Quote(Path.Combine(payload,"scripts","build-client.mjs"))+" "+Quote(source)+" "+Quote(output),payload,token,Path.Combine(staging,"temp"));
-                progress("校验最终安装…",95);var installed=Read(Path.Combine(output,"forge-install.json"));Need(Text(installed,"forgeVersion")==Text(config,"version")&&Text(installed,"sourceMSIXVersion")==Text(adapter,"codexVersion"),"生成的客户端版本不一致");VerifyFiles(output,installed,token);
+                progress("校验最终安装…",95);var installed=Read(Path.Combine(output,"forge-install.json"));Need(Text(installed,"forgeVersion")==Text(config,"version")&&Text(installed,"sourceMSIXVersion")==Text(adapter,"codexVersion")&&Text(installed,"forgePayloadSHA256")==payloadDigest,"生成的客户端版本或 Forge 内容不一致");VerifyFiles(output,installed,token);
                 token.ThrowIfCancellationRequested();Directory.CreateDirectory(Path.GetDirectoryName(target));Directory.Move(output,target);Publish(root,relative);CleanupOldClients(root,relative,Text(adapter,"codexVersion"));progress("官方客户端及 Codex Forge 已准备好",100);
             }finally{if(Directory.Exists(staging))Directory.Delete(staging,true);}
         }

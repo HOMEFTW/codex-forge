@@ -1,7 +1,9 @@
 'use strict';
 const fs = require('node:fs'), path = require('node:path');
 const { parts, ranges, compatibility } = require('./forge-versions.cjs');
-const permissions = new Set(['panels', 'sidebar', 'toolbar', 'composer', 'conversation.read', 'conversation.title', 'output', 'browser', 'storage', 'settings', 'network', 'events']);
+const { CAPABILITIES, normalize: normalizeCapabilities } = require('./forge-capabilities.cjs');
+const { SLOTS } = require('./forge-slots.cjs');
+const permissions = new Set(['panels', 'sidebar', 'toolbar', 'composer', 'ui', 'devtools', 'conversation.read', 'conversation.title', 'output', 'browser', 'storage', 'settings', 'network', 'events', 'dsh', 'dsh.manage']);
 const surfaces = ['sidebar', 'toolbar', 'composer'];
 const idPattern = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/;
 const localId = /^[a-zA-Z][\w-]{0,79}$/;
@@ -15,15 +17,59 @@ function safeFile(root, relative) {
 function validate(input, root, { builtin = false } = {}) {
   check(input && typeof input === 'object' && !Array.isArray(input), '插件清单必须为对象');
   const m = JSON.parse(JSON.stringify(input));
-  check(m.schemaVersion === 1 && m.apiVersion === 1, '不支持的清单或 API 版本');
+  check(m.schemaVersion === 1 && [1, 2].includes(m.apiVersion), '不支持的清单或 API 版本');
   check(idPattern.test(m.id) && m.id.length <= 100, '插件 ID 使用 publisher.name 格式');
   check(builtin || !m.id.startsWith('forge.'), 'forge.* 是内置插件保留命名空间');
   check(typeof m.name === 'string' && m.name.trim() && m.name.length <= 100, '插件名称无效');
   parts(m.version); ranges(m.compatibility?.codex); ranges(m.compatibility?.forge);
   check(Array.isArray(m.permissions) && m.permissions.every(p => permissions.has(p)) && new Set(m.permissions).size === m.permissions.length, '插件声明了未知或重复权限');
+  check(!m.permissions.includes('devtools') || (builtin && m.id === 'forge.devtools'), 'devtools 仅限内置 forge.devtools 插件');
+  if (m.capabilities !== undefined) {
+    check(Array.isArray(m.capabilities) && m.capabilities.length <= 32, 'capabilities 必须为数组');
+    const declared = new Set();
+    for (const item of m.capabilities) {
+      check(item && typeof item === 'object' && !Array.isArray(item), '能力声明必须为对象');
+      const unknown = Object.keys(item).find(key => !['name', 'version', 'optional'].includes(key));
+      check(!unknown, '未知能力字段：' + unknown);
+      check(typeof item.name === 'string' && Object.hasOwn(CAPABILITIES, item.name), '未知能力：' + item.name);
+      check(!declared.has(item.name), '能力重复：' + item.name);
+      declared.add(item.name);
+      if (item.version !== undefined) check(item.version === CAPABILITIES[item.name].version, `能力 ${item.name} 版本无效，当前为 ${CAPABILITIES[item.name].version}`);
+      if (item.optional !== undefined) check(typeof item.optional === 'boolean', '能力 optional 必须为布尔值');
+      const required = CAPABILITIES[item.name].permission;
+      if (required) check(m.permissions.includes(required), `能力 ${item.name} 需要 ${required} 权限`);
+    }
+  }
+  // 未声明的旧插件按 permissions 推断，保持 0.2.0 的行为不变。
+  m.capabilities = normalizeCapabilities(m);
+  if (m.dshClient) {
+    const d = m.dshClient;
+    check(d && typeof d === 'object' && !Array.isArray(d) && typeof d.packageName === 'string' && /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/.test(d.packageName), 'DSH 客户端清单无效');
+    check(m.permissions.includes('dsh') && m.permissions.includes('storage'), 'DSH 客户端需要 dsh 和 storage 权限');
+    check(typeof d.entry === 'string' && d.entry.endsWith('.js'), 'DSH 客户端入口必须为 JavaScript');
+    safeFile(root, d.entry); if (d.css) { check(d.css.endsWith('.css'), 'DSH 样式入口无效'); safeFile(root, d.css); }
+  }
   if (m.entry) { check(m.entry.endsWith('.js'), '入口必须为浏览器 JavaScript'); safeFile(root, m.entry); }
   for (const [id, version] of Object.entries(m.dependencies || {})) { check(idPattern.test(id) && id !== m.id, '依赖 ID 无效'); ranges([version]); }
   const c = m.contributes ||= {}, commands = new Set(), views = new Set(), events = new Set();
+  if (c.slots !== undefined) {
+    check(Array.isArray(c.slots) && c.slots.length <= 32, 'contributes.slots 必须为数组');
+    const slotKeys = new Set();
+    for (const item of c.slots) {
+      check(item && typeof item === 'object' && !Array.isArray(item), 'slot 条目必须为对象');
+      const unknown = Object.keys(item).find(key => !['slot', 'id', 'key', 'view'].includes(key));
+      check(!unknown, '未知 slot 字段：' + unknown);
+      const spec = Object.hasOwn(SLOTS, item.slot) ? SLOTS[item.slot] : null;
+      check(spec, '未知 slot：' + String(item.slot));
+      check(m.permissions.includes(spec.permission), `slot ${item.slot} 需要 ${spec.permission} 权限`);
+      check(localId.test(item.id), 'slot 条目 ID 无效');
+      if (spec.kind === 'keyed') check(typeof item.key === 'string' && item.key.length > 0 && item.key.length <= 80, `slot ${item.slot} 需要 key`);
+      else check(item.key === undefined, `slot ${item.slot} 不接受 key`);
+      check(!slotKeys.has(item.slot + '\0' + (item.key || '')), '同一插件在同一 slot 重复声明');
+      slotKeys.add(item.slot + '\0' + (item.key || ''));
+      safeFile(root, item.view);
+    }
+  }
   for (const command of c.commands || []) { check(localId.test(command.id) && !commands.has(command.id), '命令 ID 无效或重复'); commands.add(command.id); check(typeof command.title === 'string' && command.title.length <= 100, '命令标题无效'); }
   for (const event of c.events || []) {
     check(event && typeof event.name === 'string' && /^plugin\.[a-z][a-z0-9.-]*\.[a-z][a-z0-9_.:-]{0,79}$/.test(event.name), '事件名称无效');

@@ -3,7 +3,7 @@
   const { ipcRenderer } = require('electron');
   let panel = null, queued = false, requestId = 0;
   const nativePending = new Map(), frames = new Map();
-  const pages = new Set(['canvas', 'todos', 'collaboration', 'skills', 'updates','forge-settings','forge-updates','forge-plugins','forge-features','forge-changelog','forge-extension-info','forge-output']);
+  const pages = new Set(['canvas', 'todos', 'collaboration', 'skills', 'information-stats', 'codex-memory', 'updates','forge-settings','forge-updates','forge-plugins','forge-features','forge-changelog','forge-extension-info','forge-output']);
   function nativeRequest(action, value = {}) {
     return new Promise((resolve, reject) => {
       const id = ++requestId, timer = setTimeout(() => { nativePending.delete(id); reject(new Error('原生标签页未响应，请重新打开面板')); }, 12000);
@@ -122,8 +122,10 @@
       if (request.method === 'mode' || request.method === 'close') {
         result = await nativeRequest(request.method, { page: info.page, mode: args.mode, threadId: info.threadId, scopeId: info.mount.dataset.fastNativeScope });
       } else {
+        if (request.method === 'statistics' && info.page !== 'information-stats') throw Error('统计操作仅在信息统计页面可用');
+        if (request.method === 'memory' && info.page !== 'codex-memory') throw Error('记忆管理操作仅在记忆管理页面可用');
         const nativeCollaboration = request.method === 'collaboration' && ['capabilities', 'set_thread', 'direct'].includes(args.method);
-        result = await ipcRenderer.invoke(nativeCollaboration ? 'fast-ext:collaboration-native' : 'fast-ext:canvas', nativeCollaboration ? args : { method: request.method, args });
+        result = request.method === 'statistics' ? await ipcRenderer.invoke('fast-ext:statistics', { ...args, threadId:info.threadId }) : request.method === 'memory' ? await ipcRenderer.invoke('fast-ext:memory', args) : await ipcRenderer.invoke(nativeCollaboration ? 'fast-ext:collaboration-native' : 'fast-ext:canvas', nativeCollaboration ? args : { method: request.method, args });
         if(request.method==='forge'&&args.method==='snapshot'&&info.page==='forge-settings') result.settingsPlugin=info.mount.dataset.forgeSettingsPlugin||result.settingsPlugin;
         if (request.method === 'bootstrap') {
           info.threadId = result.threadId;

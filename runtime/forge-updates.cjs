@@ -7,7 +7,7 @@ const { atomic, json } = require('./collaboration-store.cjs');
 const nativeFeed = 'https://persistent.oaistatic.com/codex-app-prod/windows-store-update.json';
 const blockedVersions = new Set(['26.1013.4894.0']);
 async function fetchJSON(url, { limit = 2*1024*1024 } = {}) {
-  const response = await fetch(url, { headers: { Accept:'application/json','User-Agent':'Codex-Forge/0.2.0' }, signal:AbortSignal.timeout(20000) });
+  const response = await fetch(url, { headers: { Accept:'application/json','User-Agent':'Codex-Forge/0.3.0' }, signal:AbortSignal.timeout(20000) });
   if (!response.ok) {
     const retry = response.headers.get('retry-after');
     throw Error(`更新源 HTTP ${response.status}${response.status === 403 ? '（GitHub API 限流或拒绝匿名请求）' : response.status === 404 ? '（私有仓库或尚未发布版本）' : ''}${retry ? `；Retry-After ${retry}` : ''}`);
@@ -42,7 +42,7 @@ async function githubReleaseManifests(repository, config, readJSON) {
 }
 function releaseBuildVersion(value) { return value.codexBuildVersion || value.codexVersion; }
 function validateRelease(value, repository) {
-  check(value.schemaVersion === 3 && value.platform === 'win32-x64' && value.apiVersion === 1, '发布清单格式不兼容');
+  check(value.schemaVersion === 3 && value.platform === 'win32-x64' && [1, 2].includes(value.apiVersion), '发布清单格式不兼容');
   compare(value.forgeVersion,'0.0.0'); compare(value.codexVersion,'0.0.0'); compare(releaseBuildVersion(value),'0.0.0'); check(!blockedVersions.has(value.codexVersion) && !blockedVersions.has(releaseBuildVersion(value)),'被禁止的客户端版本');
   check(value.repository === repository && value.distribution === 'msi-portable' && value.containsOfficialClient === false && /^[a-f0-9]{64}$/.test(value.sha256) && Number.isSafeInteger(value.bytes) && value.bytes > 0 && value.bytes <= 256*1024*1024 && /^[a-f0-9]{64}$/.test(value.portableSha256) && Number.isSafeInteger(value.portableBytes) && value.portableBytes > 0 && value.portableBytes <= 256*1024*1024,'发布清单身份或摘要无效');
   const url = new URL(value.url); check(url.protocol === 'https:' && url.hostname === 'github.com' && url.pathname.startsWith('/'+repository+'/releases/download/') && !url.username && !url.password,'下载地址不属于配置仓库');
@@ -98,6 +98,13 @@ function recheckPlan(plan,{config,plugins,native}) {
 function launchUpdate(staged, installRoot, executable, spawnProcess=spawn) {
   check(installRoot&&fs.existsSync(path.join(installRoot,'forge-payload.json')),'请从已安装的 Codex Forge 启动');
   const receipt=json(staged.file+'.json');check(receipt.sha256===staged.sha256&&receipt.file===staged.file,'下载记录不匹配');
+  // Windows Installer is handed the file directly, so re-hash the staged bytes
+  // immediately before launching. The download receipt alone cannot prove the
+  // file on disk was not replaced after staging.
+  let verified;
+  try { verified=crypto.createHash('sha256').update(fs.readFileSync(staged.file)).digest('hex'); }
+  catch(error) { throw Error('升级包不可读：'+error.message); }
+  check(verified===staged.sha256,'升级包 SHA-256 已变化，请重新下载');
   const child=spawnProcess('msiexec.exe',['/i',staged.file,'/passive','/norestart'],{windowsHide:true,detached:true,stdio:'ignore',shell:false});child.unref();
   return {scheduled:true,restartRequired:true,message:'正在打开 Windows Installer 更新；完成后请退出当前客户端并重新启动。'};
 }

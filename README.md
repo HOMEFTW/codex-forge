@@ -1,21 +1,31 @@
 # Codex Forge
 
-Codex Forge 是 Windows Codex 客户端的第三方插件宿主，为插件提供原生界面入口、统一设置、会话输出和版本兼容检查。当前版本为 **0.2.0 / Forge API 1**，适配官方客户端 **26.1021.2667.0（Windows x64）**；同时保留 26.1016.8622.0 旧版适配器用于回归。
+Codex Forge 是 Windows Codex 客户端的第三方插件宿主，为插件提供原生界面入口、统一设置、会话输出和版本兼容检查。当前版本为 **0.3.0 / Forge API 2**，适配官方客户端 **26.1021.2667.0（Windows x64，构建 26.1021.3705.0）**；同时保留 26.1016.8622.0 旧版适配器用于回归。
 
-[下载安装包](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.2.0) · [从零开发插件](docs/PLUGIN-DEVELOPMENT-ZERO-TO-ONE.md) · [API 参考](docs/PLUGIN-API.md) · [更新协议](docs/UPDATES.md)
+[下载安装包](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.3.0) · [从零开发插件](docs/PLUGIN-DEVELOPMENT-ZERO-TO-ONE.md) · [API 参考](docs/PLUGIN-API.md) · [更新协议](docs/UPDATES.md)
 
 [DSH 源码对照](docs/DEEPSEEK-HARNESS-MAPPING.md) 记录了 Forge API 对 DeepSeek Harness 的实际借鉴、实现位置和有意保留的边界。
 
+## 0.3.0 更新
+
+- **左栏信息卡**：账号区上方显示当前对话最近响应的 Agent 速度（tok/s）与模型指纹，点击打开右侧统计。确认不符时指纹变红；过期、未收录和弱证据分别标注，支持深浅主题和窄栏。
+- **信息统计重写**：概览、模型检测和历史三视图；参考 agent-speed、ModelTrace、is-gpt-nerfed，提供 Token/速度统计、数字指纹及模型、思考强度、窗口变化记录。[来源与许可证](plugins/forge.information-stats/SOURCES.md)。指纹是概率诊断，不证明服务端身份；主动采样由用户手动启动并可能消耗模型额度，参考库未收录 `gpt-6.1-sol`。
+- **记忆管理重写**：双目录检索、来源与分类筛选、排序、备注新建/重命名/删除、草稿保留及保存冲突保护；生成摘要和历史只读。
+- **独立 500K 修复**：启动时生成专用模型目录，并传入原生后端及检测进程，仅覆盖 `gpt-6.1-sol`。本地协议验证报告 475,000 可用窗口；远端服务接受真实长输入仍取决于提供商。
+- **Forge API 2**：能力声明与查询、具名 UI 插槽、组合包/profile、内置开发检查器、DSH 预构建客户端导入。内置插件与示例统一使用 API 2；API 1 插件保留清单读取及诊断，作者迁移后方可在 API 2 宿主中启用。见 [API 迁移说明](docs/PLUGIN-API.md) 与 [组合包](docs/BUNDLES.md)。
+
 ## 安装与启动
 
-1. 从 Release 下载 `Codex-Forge-0.2.0-Windows.msi`，可对照 `SHA256SUMS.txt` 校验；也可以下载 `Codex-Forge-0.2.0-Windows-Portable.zip` 直接解压运行。
+1. 从 Release 下载 `Codex-Forge-0.3.0-Windows.msi`，可对照 `SHA256SUMS.txt` 校验；也可以下载 `Codex-Forge-0.3.0-Windows-Portable.zip` 直接解压运行。
 2. 双击 MSI 或使用 `msiexec /i` 安装。默认安装在 `%LOCALAPPDATA%\Programs\Codex Forge`，Windows Installer 负责升级和卸载；桌面快捷方式可通过 `CREATEDESKTOPSHORTCUT=0` 关闭。
 3. 安装完成后，准备程序从 OpenAI 官方 HTTPS 地址下载适配的 Codex MSIX（约 919 MiB），检查大小、SHA-256、签名、产品身份、版本及架构，再在本地应用 Forge 适配器。
 4. 准备成功后运行 **CodexForge.exe**。请先退出其他使用相同配置的 Codex 客户端。
 
 **MSI 和便携 ZIP 只包含 Forge，不包含官方客户端、Node、MSIX 或用户凭据。** 首次准备需要网络和约 7 GB 临时可用空间。下载支持续传；准备失败后再次启动 Forge 可重试，日志位于安装目录的 `forge-prepare.log`。安装阶段不下载官方客户端，启动 `CodexForge.exe` 后才开始准备。
 
-发行包不再使用 Inno Setup 或自解压外层 `Setup.exe`。当前工作区生成的 MSI、ZIP 和其中的 Forge EXE 是未签名构建，只能用于结构、摘要和回归验证；正式 Release 还必须使用可信 Authenticode 证书签名 `CodexForge.exe`、`CodexForgeBootstrap.exe` 和 MSI，再发布清单中的 SHA-256。签名和 Defender 声誉验证未在本地完成。
+从 0.2.x 升级请手动下载 0.3.0 MSI 并运行；旧客户端的 API 1 更新器不能直接接受 API 2 发布清单。已有 API 1 第三方插件会显示版本不兼容，须由作者迁移；用户数据继续保留。
+
+发行包使用 MSI 和便携 ZIP。**0.3.0 的 Forge EXE 与 MSI 未进行 Authenticode 签名**，Windows 可能显示未知发布者。`SHA256SUMS.txt` 用于核对下载文件完整性，不替代发布者签名；签名和 Defender 声誉验证尚未完成。
 
 如需移除当前运行的 Forge，可在项目目录执行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/uninstall-current-forge.ps1 -WhatIf` 先预览，再去掉 `-WhatIf` 执行。脚本只清理 Forge 安装目录、快捷方式和启动项，保留 `%CODEX_HOME%` 用户数据。
 
@@ -30,12 +40,14 @@ GitHub 仓库与 Release 已公开，无需登录即可查看源码、下载安�
 | 功能 | 行为 |
 | --- | --- |
 | Fast 与模型配置 | API Key / 无需登录的自定义提供商可以使用原生 Fast 控件，保留受管限制；发送时由原生后端转换为 `service_tier: priority`。不开放 API Ultrafast。 |
-| 上下文目录保持 | 继续读取用户的 `model_catalog_json`，保留已有 GPT-6.1-Sol 500,000 上下文配置（原生 95% 可用窗口为 475,000）；不全局改写其他模型，也不为新用户强制生成模型目录。 |
+| GPT-6.1-Sol 独立 500K | 启动时基于用户模型目录（或 `models_cache.json`）生成 Forge 专用覆盖目录，仅将 `gpt-6.1-sol` 设置为 500,000（95% 可用窗口为 475,000），传给原生后端与检测进程。缺少该条目时沿用 GPT-6-Sol 能力描述；其他模型和原配置文件不改写。无可用目录时输出启动诊断。 |
+| 信息统计 | 左栏底部速度/指纹卡片，确认不符时红字提示；右侧概览、检测、历史三视图，显示端到端速度、加权均速、缓存/推理 Token、日志上下文占用及模型/思考强度/窗口变更。三组临时分支数字检测由用户手动启动。 |
+| 记忆管理 | 搜索双记忆目录，按来源、分类及时间/名称筛选；自定义备注新建、重命名、删除、冲突保护与面板内草稿保留；生成摘要和历史保持只读。 |
 | 内置浏览器 | 继承 r3 免登录配置，通过启动参数启用 `desktop.conversationDetailMode="STEPS_COMMANDS"`；保留完整 `@oai` 浏览器组件。该选项可在插件设置中关闭。 |
 | 无限画布 | 节点、连线、图片、缩放、撤销/重做、删除/恢复，画布描述/颜色/预览，以及可折叠、可配置网格的分组节点；模型可读取与编辑。 |
 | 待办清单 | 个人及会话待办，Codeg 四列状态映射、排序、计划/延后、重试/重新排队/取消、删除/撤销删除和可折叠变更记录。 |
-| 智能体协作 | Claude Code、Grok Build、DSH 的模型/思考档位选择、消息直发、折叠输出、结果回读、会话协作图标与摘要列表。协作默认关闭；用户在提示词中明确要求启动协作但尚未勾选本对话时，先由 Codex 发起手动审批，批准后才自动开启当前对话。同步兼容 Codeg 的 `delegate_to_agent`、`get_delegation_status`、`cancel_delegation`、`resume_delegation` 委派协议。 |
-| 分级审批 | Claude / Grok 可先尝试原生自动审批，再交给 Codex 审批；DSH 默认先交给 Codex；未获通过再转原生人工审批。 |
+| 智能体协作 | Claude Code、Grok Build、DSH 的模型/思考档位选择、消息直发、折叠输出、结果回读、会话协作图标与摘要列表。协作默认关闭；用户在提示词中明确要求启动协作但尚未勾选本对话时，先由 Codex 发起手动审批，批准后才自动开启当前对话。协作要求和外部结果会作为标记数据回写当前对话，避免只出现在面板里。同步兼容 Codeg 的 `delegate_to_agent`、`get_delegation_status`、`cancel_delegation`、`resume_delegation` 委派协议。 |
+| 分级审批 | 默认沿用各 CLI 的原生审批（执行前会询问）；可在协作面板改为“原生自动审批 → Codex → 人工”。DSH 默认先交给 Codex；未获通过再转原生人工审批。 |
 | Codeg 技能包 | 四组 37 项技能及参考资源，按智能体独立启用；默认停用。第三方工具和服务仍需自行配置。 |
 
 Fast 插件默认以进程参数启用 Fast；设置为 `native` 时尊重原生速度选择。停用插件则不注入 Fast 配置。已有会话的显式速度选择仍有效，Fast 请求是否获得加速取决于模型服务的支持。

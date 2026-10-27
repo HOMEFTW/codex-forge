@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "forgeVersion": "0.2.0",
-  "apiVersion": 1,
+  "forgeVersion": "0.3.0",
+  "apiVersion": 2,
   "codexVersion": "26.1021.2667.0",
   "codexBuildVersion": "26.1021.3705.0",
   "architecture": "x64",
@@ -18,6 +18,7 @@
     "visibleSettings": "webview/assets/use-visible-settings-sections-a3c8b169285c.js",
     "network": ".vite/build/application-network-startup-Bu9OoKJq.js"
   },
+  "patchSet": "current",
   "nativeSymbols": {
     "registryAnchor": "Ksi=[`left`,`right`],mH=new Map,qsi=",
     "scopeAnchor": "function fGt(e){let t=(0,pGt.c)(14),{layout:n,fallback:r}=e,i=r!==void 0&&r,a=bs(Ux),o=i?qWt:KWt,s=",

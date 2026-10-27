@@ -11,8 +11,16 @@ const { SkillsStore } = require('./skills.cjs');
 const { ApprovalQueue, ApprovalProcessor, settled } = require('./approval-broker.cjs');
 const { runCodexReview } = require('./approval-reviewer.cjs');
 const { NativeApprovals } = require('./native-approvals.cjs');
+const { InformationStats } = require('./information-stats.cjs');
+const { runInformationProbe } = require('./information-probe.cjs');
+const { CodexMemory } = require('./codex-memory.cjs');
+const { prepareModelCatalog } = require('./model-catalog.cjs');
 const defaultTarget = () => ({ agent: 'codex', model: '', reasoningEffort: '' });
 function install() {
+  if (process.versions.electron) {
+    try { process.env.CODEX_FORGE_MODEL_CATALOG = prepareModelCatalog({ root: process.env.CODEX_FORGE_HOME }).path; }
+    catch (error) { delete process.env.CODEX_FORGE_MODEL_CATALOG; console.error('[Forge 500K]', error.message); }
+  }
   const { app, BrowserWindow, ipcMain, Menu, MenuItem, dialog, shell } = require('electron');
   ipcMain.on('forge:startup-flags', event => {
     const frame = event.senderFrame, main = event.sender.mainFrame;
@@ -27,7 +35,10 @@ function install() {
   const skills = new SkillsStore({ root: path.join(store.root, 'skills') });
   const collaboration = new CollaborationService({ root: path.join(store.root, 'collaboration'), nodePath: path.join(process.resourcesPath || '', 'cua_node/bin/node.exe'), promptCatalog: agent => skills.promptCatalog(agent) });
   const directHistory = new NativeDirectHistory(collaboration.store), nativeRequests = new Map(), internalRequests = new Map();
-  const pages = new Set(['canvas', 'updates', 'todos', 'collaboration', 'skills']);
+  const statistics = new InformationStats({ root:path.join(store.root,'information-stats'), probeRunner:context => runInformationProbe({ executable:path.join(process.resourcesPath,'codex.exe'), ...context }) });
+  const codexMemory = new CodexMemory();
+  const informationContexts = new Map();
+  const pages = new Set(['canvas', 'updates', 'todos', 'collaboration', 'skills', 'information-stats', 'codex-memory']);
   let forge;
   const active = id => !forge || forge.enabled(id);
   let signalNonce = ''; const contextRequests = new Map();
@@ -70,6 +81,29 @@ function install() {
     const route = new URL(event.sender.getURL()).pathname.match(/^\/(?:local|hotkey-window\/thread)\/([A-Za-z0-9_-]+)(?:\/|$)/);
     const threadId = state?.threadId ?? route?.[1] ?? null;
     return { threadId, cwd: contexts.binding(threadId).cwd, source: 'host', trusted: true };
+  }
+  function rememberInformation(thread, result = {}, selected = {}) {
+    if (!thread?.id) return;
+    const previous = informationContexts.get(thread.id) || {};
+    const value = { ...previous, at:Date.now(),
+      model:selected.model || result.model || thread.model || previous.model || '',
+      provider:result.modelProvider || thread.modelProvider || previous.provider || '',
+      effort:selected.effort ?? result.reasoningEffort ?? thread.reasoningEffort ?? previous.effort ?? '',
+      cwd:thread.cwd || previous.cwd || contexts.binding(thread.id).cwd || '',
+      sessionPath:thread.path || previous.sessionPath,
+    };
+    informationContexts.set(thread.id,value);
+    while (informationContexts.size > 64) informationContexts.delete(informationContexts.keys().next().value);
+  }
+  async function informationContext(event, state) {
+    const context = threadContext(event,state), cached = informationContexts.get(context.threadId);
+    if (context.threadId && (!cached || Date.now()-cached.at > 30000)) {
+      try { const result = await nativeCall(state,'thread/read',{threadId:context.threadId,includeTurns:false}); rememberInformation(result.thread,result); }
+      catch { /* Read-only session metrics remain available before the native bridge is ready. */ }
+    }
+    if (threadContext(event,state).threadId !== context.threadId) throw Error('当前对话已变化，请刷新信息统计');
+    const saved=informationContexts.get(context.threadId);
+    return { ...context, ...saved, cwd:saved?.cwd || context.cwd };
   }
   function composerTarget(state, threadId = state.threadId) { return threadId ? state.composerTargets.get(threadId) || defaultTarget() : state.draftTarget; }
   // The app's original request handler is registered after early-bootstrap.
@@ -122,6 +156,7 @@ function install() {
           } catch (error) { reply({ error: { code: -32000, message: error.message } }); }
           return;
         }
+        rememberInformation({ id:submission.threadId }, {}, { model:message.request.params.model, effort:message.request.params.effort });
         if (active('forge.collaboration')) {
           const captured = await collaboration.captureUserPrompt(submission.threadId, submission.text, { ...submission, cwd: contexts.binding(submission.threadId).cwd, source: 'user', trusted: true });
           if (captured.authorizationPending) { notify(state, { type: 'refresh' }); requestPromptAuthorization(state, { ...captured, lastUserPrompt: submission.text }); }
@@ -143,7 +178,7 @@ function install() {
           if (action) directHistory.mutation(action, incoming.params);
         }
         const response = args[0], request = response?.type === 'mcp-response' ? contextRequests.get(response.message?.id) : null;
-        if (response?.type === 'mcp-response' && response.hostId === 'local' && response.message?.result?.thread) directHistory.remember(response.message.result.thread);
+        if (response?.type === 'mcp-response' && response.hostId === 'local' && response.message?.result?.thread) { directHistory.remember(response.message.result.thread); rememberInformation(response.message.result.thread, response.message.result); }
         const binding = contexts.response(response);
         if (request) {
           contextRequests.delete(response.message.id);
@@ -187,7 +222,7 @@ function install() {
   function open(state, { mode = 'right', page = 'canvas', canvasId, nodeIds = [] } = {}) {
     if (!state) return;
     state.mode = mode === 'expanded' ? 'expanded' : 'right'; state.page = pages.has(page) || forge?.page(page) ? page : 'canvas';
-    const owner={canvas:'forge.canvas',todos:'forge.todos',collaboration:'forge.collaboration',skills:'forge.skills'}[state.page];
+    const owner={canvas:'forge.canvas',todos:'forge.todos',collaboration:'forge.collaboration',skills:'forge.skills','information-stats':'forge.information-stats','codex-memory':'forge.codex-memory'}[state.page];
     if(owner && !active(owner)) throw Error('此插件已停用');
     if (canvasId) state.canvasId = canvasId;
     state.visible = true; state.win.webContents.send('fast-ext:panel', panelState(state));
@@ -208,6 +243,21 @@ function install() {
     const state = host(event), context = threadContext(event, state);
     const data = await collaboration.dispatch('bootstrap', {}, context);
     return { forgePlugins: forge?.registry.list().plugins.map(p=>({id:p.id,enabled:p.enabled})), threadId: context.threadId, thread: data.thread, threads: data.threads, jobs: data.jobs, composerTarget: composerTarget(state, context.threadId), todo: context.threadId ? todos.read(context.threadId) : null };
+  });
+  ipcMain.handle('fast-ext:statistics', async (event, { method = 'snapshot', args = {}, threadId } = {}) => {
+    const state = host(event);
+    if (!active('forge.information-stats')) throw Error('信息统计插件已停用');
+    if (!['snapshot','analyze','import','probe','cancel'].includes(method)) throw Error('不支持的统计操作');
+    if (threadId !== undefined && threadId !== threadContext(event,state).threadId) throw Error('当前对话已变化，请刷新信息统计');
+    const context = await informationContext(event,state);
+    // Paths and model settings come only from the native bridge, never iframe arguments.
+    return statistics.dispatch(method, { outputs:args.outputs, threadId:context.threadId }, context);
+  });
+  ipcMain.handle('fast-ext:memory', (event, { method, args = {} } = {}) => {
+    const state = host(event);
+    if (state.page !== 'codex-memory') throw Error('记忆管理操作仅在记忆管理页面可用');
+    if (!active('forge.codex-memory')) throw Error('记忆管理插件已停用');
+    return codexMemory.dispatch(method, args);
   });
   ipcMain.handle('fast-ext:collaboration-native', async (event, { method, args = {}, threadId } = {}) => {
     const state = host(event), context = threadContext(event, state);
@@ -289,12 +339,12 @@ function install() {
         } catch (error) { report(error); }
         for (const state of states.values()) {
           notify(state, { type: 'refresh', canvasId: state.canvasId });
-          if (state.bridge && state.threadId && collaboration.store.jobs(state.threadId).some(job => job.source === 'trusted-user-direct')) directHistory.sync(state.threadId, (method, args) => nativeCall(state, method, args)).catch(report);
+          if (state.bridge && state.threadId && directHistory.syncJobs(state.threadId).length) directHistory.sync(state.threadId, (method, args) => nativeCall(state, method, args)).catch(report);
         }
       } catch (error) { report(error); }
     }, 90);
   });
-  app.once('will-quit', () => { clearInterval(approvalTimer); approvalProcessor.stop(); humanApprovals.stop(); watcher.close(); clearTimeout(refreshTimer); for (const value of internalRequests.values()) { clearTimeout(value.timer); value.reject(Error('客户端已关闭，历史引用会在下次打开时同步')); } internalRequests.clear(); });
+  app.once('will-quit', () => { clearInterval(approvalTimer); statistics.stop(); approvalProcessor.stop(); humanApprovals.stop(); watcher.close(); clearTimeout(refreshTimer); for (const value of internalRequests.values()) { clearTimeout(value.timer); value.reject(Error('客户端已关闭，历史引用会在下次打开时同步')); } internalRequests.clear(); });
   if (process.env.CODEX_FAST_EXTENSION_TEST === '1') setTimeout(() => {
     fs.writeFileSync(path.join(store.root, '.diagnostics.json'), JSON.stringify({ menu: Menu.getApplicationMenu()?.items.map(item => ({ label: item.label, id: item.id })) }, null, 2));
   }, 10000);

@@ -8,6 +8,8 @@ import './style.css';
 import TodosPanel from './todos.jsx';
 import CollaborationPanel from './collaboration.jsx';
 import SkillsPanel from './skills.jsx';
+import InformationStatsPanel from './information-stats.jsx';
+import CodexMemoryPanel from './codex-memory.jsx';
 import { CanvasHistory, canvasContent, canvasHistoryShortcut, isEditingTarget } from './canvas-history.js';
 import { CanvasDraft } from './canvas-draft.js';
 
@@ -319,6 +321,8 @@ function CanvasApp() {
   if (page === 'todos') return <TodosPanel key={threadId || 'personal'} {...panelProps}/>;
   if (page === 'collaboration') return <CollaborationPanel key={threadId || 'settings'} {...panelProps}/>;
   if (page === 'skills') return <SkillsPanel {...panelProps}/>;
+  if (page === 'information-stats') return <InformationStatsPanel key={threadId || 'global'} {...panelProps}/>;
+  if (page === 'codex-memory') return <CodexMemoryPanel {...panelProps}/>;
   if (page === 'updates' && notes) return <Notes notes={notes} close={close} />;
   return <main className={`canvas-app ${mode}`}>
     <header className="topbar"><span className="canvas-symbol">▧</span><strong>无限画布</strong><span className="badge">Forge</span><div className="spacer"/><button onClick={onMode} title={mode === 'right' ? '展开画布' : '在右侧栏打开'} aria-label={mode === 'right' ? '展开画布' : '在右侧栏打开'}>{mode === 'right' ? '⛶' : '◧'}</button><button onClick={close} aria-label="关闭面板">×</button></header>

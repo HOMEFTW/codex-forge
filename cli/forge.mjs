@@ -33,7 +33,20 @@ try {
       fs.writeFileSync(destination+'.release.json',JSON.stringify(result,null,2),{flag:'wx'});break;
     }
     case 'create': {if(!id)throw Error('需要新目录');const destination=path.resolve(id);if(fs.existsSync(destination))throw Error('目标目录已存在');fs.cpSync(path.join(project,'examples','hello-forge'),destination,{recursive:true});result={created:destination,next:'编辑 plugin.json 中的 id/name，然后运行 validate 和 install。'};break;}
-    default:console.log('Codex Forge CLI\n  validate <directory>\n  create <new-directory>\n  pack <directory> <output.forge-plugin.json>\n  list\n  install <directory>\n  uninstall <publisher.name>\n  enable|disable <publisher.name>\n  settings <publisher.name> [values.json]\n  --home <Forge data directory>');process.exit(command?1:0);
+    case 'bundle': {
+      const bundles=require('../runtime/forge-bundles.cjs'),action=id||'plan',patchAt=args.indexOf('--patch'),overlayFile=patchAt>=0?args[patchAt+1]:null;
+      if(action==='list'){
+        const seen=new Map(),roots=[path.join(root,'bundles'),path.join(project,'bundles')];
+        for(const directory of roots){if(!fs.existsSync(directory))continue;for(const name of fs.readdirSync(directory).sort()){const file=path.join(directory,name,'bundle.json');if(!fs.existsSync(file))continue;const manifest=JSON.parse(fs.readFileSync(file,'utf8'));seen.set(name,{id:manifest.id,name:manifest.name,version:manifest.version,builtin:directory===path.join(project,'bundles'),directory:path.join(directory,name)});}}
+        result=[...seen.values()];break;
+      }
+      const overlay=overlayFile?[{name:'cli',file:path.resolve(overlayFile),entries:bundles.readJSON(path.resolve(overlayFile),'overlay patch').entries}]:[];
+      const value=bundles.plan({home:root,projectRoot:project,overlay});
+      if(action==='plan'||action==='dump'){result=value;break;}
+      if(action==='apply'){result={sources:value.sources.map(item=>item.name),...bundles.apply(registry(),value)};break;}
+      throw Error('bundle 支持 list / plan / apply');
+    }
+    default:console.log('Codex Forge CLI\n  validate <directory>\n  create <new-directory>\n  pack <directory> <output.forge-plugin.json>\n  list\n  install <directory>\n  uninstall <publisher.name>\n  enable|disable <publisher.name>\n  settings <publisher.name> [values.json]\n  bundle list|plan|apply [--patch <file>]\n  --home <Forge data directory>');process.exit(command?1:0);
   }
   console.log(JSON.stringify(result,null,2));
 }catch(error){console.error(error.message);process.exitCode=1;}

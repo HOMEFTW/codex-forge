@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin: 0; font: 12px/1.4 system-ui, sans-serif; }
+    button { font: inherit; padding: 4px 10px; border: 1px solid currentColor; border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: default; }
+  </style>
+</head>
+<body>
+  <button id="greet" disabled>问候当前会话</button>
+  <script>
+    const forge = window.CodexForge, button = document.getElementById('greet');
+    let context = null;
+    forge.events.on('ready', value => {
+      context = value || null;
+      button.disabled = false;
+      button.title = context?.threadId ? '当前会话：' + context.threadId : '当前没有打开会话';
+    });
+    forge.events.on('context.changed', value => {
+      context = value || null;
+      button.title = context?.threadId ? '当前会话：' + context.threadId : '当前没有打开会话';
+    });
+    button.onclick = async () => {
+      const settings = await forge.settings.get();
+      await forge.output.append(settings.greeting || 'Hello from Codex Forge!', { title: '问候', level: 'info' });
+    };
+  </script>
+</body>
+</html>

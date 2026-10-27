@@ -5,7 +5,11 @@ const os = require('node:os');
 const crypto = require('node:crypto');
 const { AGENTS, validateAgentConfig } = require('./agent-cli.cjs');
 const terminal = new Set(['completed', 'failed', 'cancelled', 'interrupted']);
-const approvalDefaults = Object.freeze({ claude: 'auto', grok: 'auto', dsh: 'codex' });
+// Missing per-agent approval settings keep the conservative 0.1.0 behavior:
+// Claude/Grok stay on their own CLI default (which asks before running tools)
+// and only DSH enters the Codex approval path. Choosing 'auto' stays available
+// in the collaboration panel, but it is never the silent default.
+const approvalDefaults = Object.freeze({ claude: 'native', grok: 'native', dsh: 'codex' });
 const check = (value, message) => { if (!value) throw new Error(message); };
 function identifier(value) { check(typeof value === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(value), '无效的对话或任务 ID'); return value; }
 function defaultRoot() { return process.env.CODEX_FAST_COLLABORATION_DIR || path.join(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'fast-collaboration'); }
@@ -45,9 +49,8 @@ class CollaborationStore {
   config() {
     const value = json(path.join(this.root, 'settings.json'), { schemaVersion: 1, concurrency: 1, agents: {} });
     // Existing r4 settings predate the per-agent approval selector. Keep an
-    // explicit user choice, while migrating missing values to the requested
-    // defaults: Claude/Grok try their native automatic approval first; DSH
-    // enters the Codex approval path first.
+    // explicit user choice; missing values fall back to CLI-native approval for
+    // Claude/Grok and to the Codex path for DSH.
     return { schemaVersion: 1, concurrency: value.concurrency || 1, agents: Object.fromEntries(Object.keys(AGENTS).map(agent => [agent, validateAgentConfig({ approvalMode: approvalDefaults[agent], ...(value.agents?.[agent] || {}) })])) };
   }
   configure(value) {

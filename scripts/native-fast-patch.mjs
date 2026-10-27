@@ -18,3 +18,9 @@ export function patchFastAccess(source, { version = 'legacy' } = {}) {
   assert.equal(source.split(adapter.original).length, 2, `Fast adapter does not match the official client (${version})`);
   return source.replace(adapter.original, adapter.replacement);
 }
+
+export function patchModelCatalogArgs(source) {
+  const anchor = 'return e';
+  assert.equal(source.split(anchor).length, 2, 'Model catalog adapter requires exactly one argument return');
+  return source.replace(anchor, 'if(t.CODEX_FORGE_MODEL_CATALOG)e.push(`-c`,`model_catalog_json=`+JSON.stringify(t.CODEX_FORGE_MODEL_CATALOG));return e');
+}

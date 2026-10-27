@@ -1,9 +1,13 @@
-# Forge API 1
+# Forge API 2
+
+随 Codex Forge 0.3.0 发布。插件清单、`forge.apiVersion`、上下文和能力查询的 API 版本均为 `2`；清单与更新协议的 `schemaVersion` 保持各自版本，不随 API 主版本一起递增。
+
+从 API 1 迁移：将 `plugin.json` 的 `apiVersion` 改为 `2`，将 Forge 兼容范围改为经过测试的 `>=0.3.0 <0.4.0`，更新 SDK，并验证能力声明、UI 插槽、权限及已有交互。API 1 清单仍可读取用于诊断，但版本不匹配时不会启用；不会自动修改已安装第三方插件。DSH 导入器按当前宿主 API 生成清单。
 
 插件目录必须包含 `plugin.json`。`id` 使用 `publisher.name`；`forge.*` 保留给内置插件。`compatibility.codex` 和 `compatibility.forge` 是非空数组，数组项之间是“或”；单项空格分隔的比较条件是“且”。支持精确三/四段数字版本、`>= <= > < = ^ ~` 和 `||`，不接受隐式通配或预发布字符串。
 
 ```json
-{"schemaVersion":1,"apiVersion":1,"id":"example.panel","name":"示例","version":"0.2.0","compatibility":{"codex":["26.1021.2667.0","26.1016.8622.0"],"forge":[">=0.2.0 <0.3.0"]},"permissions":["panels"],"contributes":{"panels":[{"id":"main","title":"示例","entry":"panel.html"}]}}
+{"schemaVersion":1,"apiVersion":2,"id":"example.panel","name":"示例","version":"0.3.0","compatibility":{"codex":["26.1021.2667.0","26.1016.8622.0"],"forge":[">=0.3.0 <0.4.0"]},"permissions":["panels"],"contributes":{"panels":[{"id":"main","title":"示例","entry":"panel.html"}]}}
 ```
 
 宿主向 iframe 注入 `window.CodexForge`。`entry` 是可选的浏览器 JS 命令入口。面板 HTML 应自包含，使用内联脚本和样式；可在发布前用自己的构建器打包。没有 Node、任意 IPC、文件系统、同源权限或自动消息发送权限。允许的网络源必须通过 `network` 和 `networkOrigins` 声明；面板不能导航宿主。API 仍按来源窗口和插件安装记录校验身份。
@@ -31,11 +35,57 @@
 
 `contributes.settings.properties` 使用 `{type,title,default,enum,minimum,maximum,maxLength}`，支持字符串、数字和布尔值。设置界面自动集中到原生“Codex Forge 插件设置”；插件管理的设置按钮携带插件 ID 深链接，用户不必自行查找。
 
-`capabilities.get()` 对应 DSH 的 capability seam 思路：插件先读取宿主实际提供的能力，再决定是否显示入口。权限仍由清单和宿主逐请求校验，能力查询不会绕过权限。
+`capabilities.get()` 对应 DSH 的 capability seam 思路：插件先读取宿主实际提供的能力与自己的 `denied` 列表，再决定是否显示入口。声明与授权仍由宿主逐请求校验，能力查询不会绕过权限。
 
-DSH bundle 兼容由宿主的只读桥接层负责：Forge 可发现 ACP profile 中带有 `dsh.bundle.patch` 的原生
-组合包并展示其 peer 兼容诊断，协作任务复用 DSH 官方 ACP。安装、启停、patch 组合、构建脚本和版本豁免
-仍必须通过 DSH 原生 `plugin-manager` 完成；Forge 插件不能直接执行或改写 DSH profile。
+宿主在每次派发前校验两件事：`permissions`（用户安装时审阅的授权）与 `capabilities`（插件声明使用的宿主服务）。`capabilities` 省略时按 `permissions` 推断；显式声明后**只授予声明过的能力**，调用未声明的服务会直接失败，错误文本会指出要补哪一项：
+
+```json
+"capabilities": [
+  {"name": "storage", "version": 1},
+  {"name": "output", "version": 1, "optional": true}
+]
+```
+
+可用能力：`conversation`（修改标题）、`composer`、`output`、`browser`、`storage`、`settings`、`events`、`panels`、`ui`（注册按钮）、`dsh`（导入的 DSH 浏览器插件兼容请求）。`context.get`、`metadata.get`、`capabilities.get` 不需要声明。`capabilities.get()` 返回 `capabilities`（本插件声明）、`available`（宿主提供的能力版本）、`denied`（未授予的方法与修复提示）；声明了宿主不提供的版本时插件会被停用并说明原因。
+
+## UI 贡献点（slot）
+
+宿主声明位置与基数，插件只能往已声明位置注册；渲染层按 `data-forge-slot="<id>"` 锚点挂 iframe，锚点不存在时静默跳过。
+
+| slot | 基数 | 位置 |
+| --- | --- | --- |
+| `conversation.header.action` | list | 会话头动作区 |
+| `sidebar.right.body` | list | 右侧标签 body |
+| `tool.card.view` | keyed | 工具调用卡片，必须带 `key` |
+
+```json
+"contributes": {
+  "slots": [
+    {"slot": "command.menu.item", "id": "menu", "view": "menu.html"},
+    {"slot": "tool.card.view", "id": "card", "key": "tool-x", "view": "card.html"}
+  ]
+}
+```
+
+slot 条目需要 `ui` 权限，`view` 必须是包内 HTML。list 允许多个插件共存；keyed 按 `key` 去重，冲突时后来者被跳过并记录在 `forge:slots` 的 `conflicts` 里，不会覆盖先启用者。
+
+`sidebar.right.body` 已用 ARIA 锚点（`[role="tabpanel"]`）实测可用；`conversation.header.action` 与 `tool.card.view` 的锚点暂为 `null`，插件可以声明但不会渲染，等实测后填入选择器即可生效。锚点不存在时插件不会加载失败。`capabilities.get()` 会返回当前宿主提供的 slot 清单。
+
+## 诊断与脚本（开发者工具）
+
+内置的“开发者工具”插件（`forge.devtools`）提供三类能力，都需要 `devtools` 权限：
+
+- `diagnostics.get()`：读取宿主渲染进程的只读诊断——每个 slot 的 anchor、命中数量、常见原生选择器（`[role="menubar"]`、`[role="tabpanel"]`、`[data-codex-composer-root]` 等）与页面节点数。
+- `devtools.eval(code)`：在宿主渲染进程的全局作用域执行脚本（等同于 DevTools Console），支持 `await`，30 秒超时、单次 20000 字符上限，返回值序列化成 JSON（Element 会转成 tag/cls/text/html 摘要）。
+- 面板同时显示宿主版本、当前插件的 capabilities 与 denied 表，以及 `ready`、`context.changed` 等内置事件日志。
+
+给某个 slot 选锚点时，先打开这个内置插件看目标 slot 的命中数；要确认某个选择器能不能命中，直接在“脚本”里跑 `return document.querySelectorAll('...').length`。
+
+`devtools.eval` 等于完全控制宿主页面，只应授权给自己信任的插件；`forge.devtools` 是内置插件，安装后默认启用。
+
+`runtime/dsh-compat.cjs` 为 Forge 提供 DSH 浏览器 UI 兼容层。通过插件管理中的“导入 DSH 插件”选择含 `package.json`、`exports["./client"]` 和预构建 `__ModuleLoader__` 客户端的目录；“导入 DSH 市场”仅接受 `dshmarket`，并单独声明 `dsh.manage` 管理权限。导入会复制浏览器 JS、可选 CSS 和许可证到 Forge，默认停用；审阅权限并启用后，可直接打开右侧插件页面，无需重启。
+
+适配器提供 React、UI primitives、locale、theme 读取、少量 slots 和可撤销 effect；`dsh.request()` 使用 `dsh` 能力，市场管理另需宿主导入记录及 `dsh.manage`。市场支持目录浏览、从 npm 导入浏览器包、启停、卸载、备注、收藏、屏蔽和分组。下载先验证 npm 完整性摘要，再解包导入；不会执行 npm lifecycle、DSH 服务端入口或 Cordis patch，也不读取外部 DSH profile。依赖额外客户端服务、服务端 API、主题切换、原位更新、备份/恢复等功能暂不支持，并返回明确错误。此兼容层与协作提供方的 DSH 审批会话相互独立。范围见 [DSH 对照](DEEPSEEK-HARNESS-MAPPING.md)。
 
 协作 MCP 同时提供 Codeg 兼容的委派工具：`delegate_to_agent` 使用
 `{agent_type, task, working_dir?}`，`get_delegation_status` 使用
@@ -44,6 +94,8 @@ DSH bundle 兼容由宿主的只读桥接层负责：Forge 可发现 ACP profile
 对话的用户授权和 Forge 工作目录隔离约束。
 
 协作默认按对话关闭。只有当前对话中捕获到真实用户的明确协作请求后，才允许启动任务；如果请求来自提示词而用户尚未勾选当前对话，宿主会先提交 `collaboration-authorization` 手动审批，批准后自动启用该对话，拒绝或过期则保持关闭。模型输出、其他会话和工具参数不能代替这次用户授权。
+
+协作任务的要求和完成结果会通过受标记的对话数据回写当前原生线程；这些内容仅供显示和上下文参考，不会被当作新的 Codex 用户指令重复执行。回写带有持久收据，应用重启或文件监听刷新不会重复插入。
 
 插件间事件是 Forge 对 DSH 类型化事件的受限浏览器实现。事件先在清单中声明，再由宿主逐请求校验；它只传递 JSON 数据，不提供宿主 Service、文件系统或模型调用。需要持久事实时应使用插件自己的 `storage` 或宿主已有的会话 API，不能把事件当作可靠日志。
 

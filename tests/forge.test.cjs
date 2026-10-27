@@ -23,6 +23,30 @@ test('manifest rejects undeclared settings, reserved namespace, path escape and 
 test('manifest accepts the DSH-inspired scoped events capability',t=>{
  const {source}=setup(t);const m=base();m.permissions.push('events');m.entry='main.js';m.contributes.events=[{name:'plugin.test.example.status'}];fs.writeFileSync(path.join(source,'main.js'),'void 0');fs.writeFileSync(path.join(source,'plugin.json'),JSON.stringify(m));assert.equal(validate(JSON.parse(fs.readFileSync(path.join(source,'plugin.json'),'utf8')),source).permissions.includes('events'),true);m.contributes.events=[{name:'plugin.other.status'}];assert.throws(()=>validate(m,source),/事件必须属于本插件/);
 });
+test('manifest validates capability declarations and infers them for legacy plugins',t=>{
+ const {source}=setup(t);const m=base();
+ assert.deepEqual(validate(m,source).capabilities.map(c=>c.name),['settings','storage'],'legacy manifests infer capabilities from permissions');
+ m.capabilities=[{name:'torrent'}];assert.throws(()=>validate(m,source),/未知能力/);
+ m.capabilities=[{name:'settings'},{name:'settings'}];assert.throws(()=>validate(m,source),/能力重复/);
+ m.capabilities=[{name:'settings',version:2}];assert.throws(()=>validate(m,source),/版本无效/);
+ m.permissions=['storage'];m.capabilities=[{name:'settings'}];assert.throws(()=>validate(m,source),/需要 settings 权限/);
+ m.permissions=['settings'];m.capabilities=[{name:'settings',reason:'x'}];assert.throws(()=>validate(m,source),/未知能力字段/);
+ m.capabilities=[{name:'settings',version:1,optional:true}];const ok=validate(m,source);
+ assert.equal(ok.capabilities[0].optional,true);assert.equal(ok.capabilities.length,1,'declared list replaces the inferred one');
+});
+test('manifest accepts the devtools permission used by the built-in inspector',t=>{
+ const {source}=setup(t);const m=base();m.permissions=['storage','settings','devtools'];assert.throws(()=>validate(m,source),/内置/);m.id='forge.devtools';delete m.update;assert.equal(validate(m,source,{builtin:true}).permissions.includes('devtools'),true);
+});
+test('manifest validates UI slot declarations',t=>{
+ const {source}=setup(t);const m=base();m.permissions=['storage','settings','ui'];fs.writeFileSync(path.join(source,'slot.html'),'<!doctype html>');
+ m.contributes.slots=[{slot:'conversation.header.action',id:'entry',view:'slot.html'}];assert.equal(validate(m,source).contributes.slots.length,1);
+ m.contributes.slots=[{slot:'nope',id:'entry',view:'slot.html'}];assert.throws(()=>validate(m,source),/未知 slot/);
+ m.contributes.slots=[{slot:'tool.card.view',id:'entry',view:'slot.html'}];assert.throws(()=>validate(m,source),/需要 key/);
+ m.contributes.slots=[{slot:'conversation.header.action',id:'entry',key:'x',view:'slot.html'}];assert.throws(()=>validate(m,source),/不接受 key/);
+ m.contributes.slots=[{slot:'conversation.header.action',id:'entry',view:'slot.html'},{slot:'conversation.header.action',id:'entry2',view:'slot.html'}];assert.throws(()=>validate(m,source),/重复声明/);
+ m.contributes.slots=[{slot:'conversation.header.action',id:'entry',view:'missing.html'}];assert.throws(()=>validate(m,source),/ENOENT|no such file/i);
+ m.permissions=['storage','settings'];m.contributes.slots=[{slot:'conversation.header.action',id:'entry',view:'slot.html'}];assert.throws(()=>validate(m,source),/需要 ui 权限/);
+});
 test('permissions and dependency disablement propagate without deleting data',t=>{
  const {source,registry}=setup(t);registry.install(source);registry.setEnabled('test.example',true);assert.throws(()=>registry.permission('test.example','browser'),/未声明/);
  const m=base();m.id='test.dependent';m.dependencies={'test.example':'^0.1.0'};fs.writeFileSync(path.join(source,'plugin.json'),JSON.stringify(m));registry.install(source);registry.setEnabled(m.id,true);assert(registry.status(m.id).enabled);registry.setEnabled('test.example',false);assert(!registry.status(m.id).enabled);
@@ -106,6 +130,17 @@ test('Forge updater launches from the versioned payload root',t=>{
  assert.equal(result.scheduled,true);assert.deepEqual(invocation.args,['/i',installer,'/passive','/norestart']);assert.equal(invocation.file,'msiexec.exe');
  assert.throws(()=>launchUpdate({file:installer,sha256},path.join(root,'missing'),undefined,()=>({unref(){}})),/已安装/);
 });
+test('Forge updater re-hashes the staged MSI before handing it to Windows Installer',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'forge-launch-hash-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const installer=path.join(root,'update.msi'),original=Buffer.from('original-msi-payload');
+ fs.writeFileSync(installer,original);fs.writeFileSync(path.join(root,'forge-payload.json'),'{}');
+ const sha256=crypto.createHash('sha256').update(original).digest('hex');
+ fs.writeFileSync(installer+'.json',JSON.stringify({file:installer,sha256}));
+ fs.writeFileSync(installer,'tampered-after-staging');
+ let spawns=0;
+ assert.throws(()=>launchUpdate({file:installer,sha256},root,undefined,()=>{spawns++;return{unref(){}}}),/SHA-256/);
+ assert.equal(spawns,0,'a tampered MSI must never reach Windows Installer');
+});
 test('Forge update check cannot approve a newer build when the official feed is unavailable',async()=>{
  const config={version:'0.1.0',codexVersion:'26.1021.2667.0',codexBuildVersion:'26.1021.3705.0',githubRepository:'test/forge'};
  const release={schemaVersion:3,platform:'win32-x64',apiVersion:1,forgeVersion:'0.1.1',codexVersion:'26.1021.2667.0',codexBuildVersion:'26.1021.4000.0',repository:'test/forge',url:'https://github.com/test/forge/releases/download/v0.1.1/Setup.msi',sha256:'d'.repeat(64),bytes:10,portableUrl:'https://github.com/test/forge/releases/download/v0.1.1/Setup-Portable.zip',portableSha256:'e'.repeat(64),portableBytes:10,distribution:'msi-portable',containsOfficialClient:false};
@@ -120,6 +155,8 @@ test('Forge matching checks third party ranges and failed official feed cannot a
  const {recheckPlan}=require('../runtime/forge-updates.cjs');
  assert.throws(()=>recheckPlan({...release,compatible:true},{config,plugins:[base()],native:{version:release.codexVersion}}),/Example/);
  assert(recheckPlan({...release,compatible:true},{config,plugins:[],native:{version:release.codexVersion}}));
+  const customRepository={...release,repository:'custom/forge',url:'https://github.com/custom/forge/releases/download/v0.1.1/Setup.msi',portableUrl:'https://github.com/custom/forge/releases/download/v0.1.1/Setup-Portable.zip'};
+  assert(recheckPlan({...customRepository,compatible:true},{config:{...config,repository:'custom/forge'},plugins:[],native:{version:release.codexVersion}}));
  const result=await checkUpdates({config,plugins:[],readJSON:async url=>{if(url.includes('oaistatic'))throw Error('offline');if(url.includes('api.github'))return [{assets:[{name:'codex-forge-release.json',browser_download_url:'https://github.com/test/forge/releases/download/v0.1.1/manifest.json'}]}];return release;}});assert.equal(result.plan,null);assert.equal(result.native.status,'unavailable');
 });
 test('Forge update check falls back from GitHub API 403 to the public latest manifest', async () => {

@@ -71,15 +71,15 @@ test('registers once and opens each fixed page as a native tab without replacing
   scope.tabs.set('ordinary', { tabId: 'ordinary', tabType: { kind: 'browser' } });
   f.context.fastWorkspaceRegisterTabs();
   assert.equal(f.sandbox.QL.size, 1);
-  for (const page of ['canvas', 'todos', 'collaboration', 'skills', 'updates']) {
+  for (const page of ['canvas', 'todos', 'collaboration', 'skills', 'updates', 'information-stats', 'codex-memory']) {
     const reply = f.request({ action: 'open', page, mode: 'right', threadId: 'a' });
     assert.equal(reply.error, undefined);
     assert.equal(reply.result.tabId, 'fast-workspace:' + page);
     assert.equal(reply.result.mode, 'right');
   }
-  assert.equal(scope.tabs.size, 6);
+  assert.equal(scope.tabs.size, 8);
   f.request({ action: 'open', page: 'canvas', mode: 'right', threadId: 'a' });
-  assert.equal(scope.tabs.size, 6, 'reopening a page uses its existing stable native tab');
+  assert.equal(scope.tabs.size, 8, 'reopening a page uses its existing stable native tab');
   const opens = f.calls.filter(item => item.method === 'openTab');
   assert(opens.every(item => item.options.replaceTabId === undefined && item.options.isPreview === false));
   assert(opens.every(item => item.options.requiresWorkspaceReady === false && item.options.allowDuringThreadCreation === true));
@@ -170,4 +170,19 @@ test('rejects foreign windows, arbitrary pages and actions, invalid modes and na
   scope.tabs.set('fast-workspace:canvas', { tabId: 'fast-workspace:canvas', tabType: { kind: 'browser' } });
   assert.equal(typeof f.request({ action: 'open', page: 'canvas', mode: 'right' }).error, 'string');
   assert.equal(scope.tabs.get('fast-workspace:canvas').tabType.kind, 'browser');
+});
+
+test('current patch rewrites whole native identifiers instead of substrings', async () => {
+  const { patchNativeTabs, currentNativeSymbols } = await import('../scripts/native-tabs-patch.mjs');
+  const source = currentNativeSymbols.registryAnchor + currentNativeSymbols.scopeAnchor;
+  const extension = [
+    'function fastWorkspaceRegisterTabs(){return 1}',
+    'function fastWorkspaceRememberScope(scope){return scope}',
+    "const marker='xcbx anbx inbound',registry=QL.get('fast-workspace'),register=ZL,controller=aR.tabById$;",
+  ].join('\n');
+  const patched = patchNativeTabs(source, extension, { version: 'current' });
+  assert.match(patched, /'xcbx anbx inbound'/, 'two-letter symbols must not rewrite unrelated substrings');
+  assert.match(patched, /mH\.get\('fast-workspace'\)/);
+  assert.match(patched, /pH,/);
+  assert.match(patched, /CH\.tabById/);
 });

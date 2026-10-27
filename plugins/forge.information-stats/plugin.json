@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "apiVersion": 2,
+  "version": "0.3.0",
+  "compatibility": {
+    "codex": [
+      "26.1016.8622.0",
+      "26.1021.2667.0"
+    ],
+    "forge": [
+      ">=0.3.0 <0.4.0"
+    ]
+  },
+  "permissions": [
+    "panels",
+    "conversation.read",
+    "sidebar"
+  ],
+  "capabilities": [
+    {
+      "name": "panels",
+      "version": 1
+    },
+    {
+      "name": "ui",
+      "version": 1
+    }
+  ],
+  "changelog": [
+    {
+      "version": "0.3.0",
+      "date": "2026-10-27",
+      "items": [
+        "升级至 Codex Forge 0.3.0 / Forge API 2。"
+      ]
+    },
+    {
+      "version": "0.2.4",
+      "date": "2026-10-27",
+      "items": [
+        "新增速度统计、模型指纹诊断与左侧简要信息卡。"
+      ]
+    }
+  ],
+  "id": "forge.information-stats",
+  "name": "信息统计插件",
+  "description": "Agent 速度、ModelTrace 数字指纹与 is-gpt-nerfed 一致性诊断。",
+  "contributes": {
+    "panels": [
+      {
+        "id": "main",
+        "title": "信息统计",
+        "builtinPage": "information-stats",
+        "placement": "right"
+      }
+    ],
+    "sidebar": [
+      {
+        "id": "open",
+        "title": "信息统计",
+        "panel": "main"
+      }
+    ]
+  }
+}

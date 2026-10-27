@@ -177,7 +177,10 @@ class CollaborationService {
     }
     const waitMs = args.wait_ms;
     check(waitMs === undefined || (Number.isInteger(waitMs) && waitMs >= 0 && waitMs <= 60000), 'wait_ms 应为 0 到 60000 毫秒');
-    const deadline = waitMs === undefined || waitMs === 0 ? (waitMs === 0 ? Infinity : Date.now()) : Date.now() + waitMs;
+    // An omitted wait or an explicit zero is an immediate status poll.  A
+    // zero timeout must never turn into an unbounded wait, otherwise a client
+    // using the documented `wait_ms: 0` form can hang forever on a running job.
+    const deadline = waitMs === undefined ? Date.now() : Date.now() + waitMs;
     const read = () => ids.map(id => {
       let job;
       try { job = this.store.reconcile(this.store.job(identifier(id))); }
@@ -282,7 +285,7 @@ class CollaborationService {
         check(AGENTS[agent] && thread.agents.includes(agent), '该智能体不在用户本次授权范围内');
         check(typeof args.task === 'string' && args.task.trim() && args.task.length <= 200000, '任务需为 1 到 200000 字符');
         const agentConfig = await this.selectedConfig(agent, args, context); resolveCommand(agent, agentConfig, this.nodePath);
-        return this.enqueue(args, context, agentConfig);
+        return this.enqueue(args, context, agentConfig, { source: 'trusted-user-collaboration' });
       }
       case 'read': {
         const job = this.checkedJob(args, context), afterSeq = args.afterSeq ?? 0;

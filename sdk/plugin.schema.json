@@ -1,16 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Codex Forge API 1 Plugin",
+  "title": "Codex Forge API 2 Plugin",
   "type": "object",
   "required": ["schemaVersion","apiVersion","id","name","version","compatibility","permissions"],
   "properties": {
-    "schemaVersion":{"const":1},"apiVersion":{"const":1},
+    "schemaVersion":{"const":1},"apiVersion":{"const":2},
     "id":{"type":"string","pattern":"^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$"},
     "name":{"type":"string","minLength":1,"maxLength":100},
     "version":{"type":"string","pattern":"^\\d+\\.\\d+\\.\\d+$"},
     "description":{"type":"string","maxLength":20000},
     "compatibility":{"type":"object","required":["codex","forge"],"properties":{"codex":{"$ref":"#/$defs/ranges"},"forge":{"$ref":"#/$defs/ranges"}}},
-    "permissions":{"type":"array","uniqueItems":true,"items":{"enum":["panels","sidebar","toolbar","composer","conversation.read","conversation.title","output","browser","storage","settings","network","events"]}},
+    "permissions":{"type":"array","uniqueItems":true,"items":{"enum":["panels","sidebar","toolbar","composer","ui","devtools","conversation.read","conversation.title","output","browser","storage","settings","network","events"]}},
+    "capabilities":{"type":"array","maxItems":32,"items":{"type":"object","required":["name"],"additionalProperties":false,"properties":{"name":{"enum":["conversation","composer","output","browser","storage","settings","events","panels","ui"]},"version":{"type":"integer","minimum":1},"optional":{"type":"boolean"}}}},
     "entry":{"type":"string"},
     "dependencies":{"type":"object","additionalProperties":{"type":"string"}},
     "networkOrigins":{"type":"array","items":{"type":"string","format":"uri","pattern":"^https://"}},
@@ -18,6 +19,7 @@
     "contributes":{"type":"object","properties":{
       "commands":{"type":"array","items":{"$ref":"#/$defs/command"}},
       "events":{"type":"array","items":{"$ref":"#/$defs/event"}},
+      "slots":{"type":"array","maxItems":32,"items":{"type":"object","required":["slot","id","view"],"additionalProperties":false,"properties":{"slot":{"enum":["conversation.header.action","sidebar.right.body","tool.card.view"]},"id":{"type":"string"},"key":{"type":"string","maxLength":80},"view":{"type":"string"}}}},
       "panels":{"type":"array","items":{"$ref":"#/$defs/panel"}},
       "sidebar":{"type":"array","items":{"$ref":"#/$defs/button"}},
       "toolbar":{"type":"array","items":{"$ref":"#/$defs/button"}},

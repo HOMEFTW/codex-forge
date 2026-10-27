@@ -52,7 +52,7 @@ function preparePayload() {
   if (fs.existsSync(forgeOnly)) fs.rmSync(forgeOnly, { recursive: true, force: true });
   fs.mkdirSync(payload, { recursive: true });
   for (const item of [
-    'forge.config.json', 'adapters', 'runtime', 'assets/codex-forge.ico', 'dist/fast-extension',
+    'forge.config.json', 'adapters', 'runtime', 'bundles', 'assets/codex-forge.ico', 'dist/fast-extension',
     'dist/CodexForge.exe', 'dist/CodexForge.exe.config', 'scripts/build-client.mjs',
     'scripts/native-tabs-patch.mjs', 'scripts/native-fast-patch.mjs', 'scripts/native-settings-patch.mjs',
     'scripts/Launch-Codex-Forge.ps1', 'scripts/verify-official.ps1', 'README.md', 'LICENSE', 'docs',
@@ -63,17 +63,19 @@ function preparePayload() {
 
   const files = walk(payload);
   assertForgeOnly(files);
+  const payloadFiles = files.map(file => ({
+    path: file.relative,
+    bytes: fs.statSync(file.absolute).size,
+    sha256: fileHash(file.absolute)
+  }));
   const manifest = {
     schemaVersion: 1,
     product: 'Codex Forge',
     forgeVersion: version,
     apiVersion: config.apiVersion,
     containsOfficialClient: false,
-    files: files.map(file => ({
-      path: file.relative,
-      bytes: fs.statSync(file.absolute).size,
-      sha256: fileHash(file.absolute)
-    }))
+    files: payloadFiles,
+    payloadDigest: hash(payloadFiles.map(file => `${file.path}\0${file.bytes}\0${file.sha256}`).sort().join('\n'))
   };
   fs.writeFileSync(path.join(payload, 'forge-payload.json'), JSON.stringify(manifest, null, 2));
   fs.writeFileSync(path.join(forgeOnly, 'bootstrap.json'), JSON.stringify({ directory: `forge/${version}` }));
@@ -150,7 +152,7 @@ function createWixSource(files, sourceRoot) {
       const componentId = wixId('CMP', file.relative);
       const fileId = wixId('FIL', file.relative);
       const removeCurrent = directory === '' && file.relative === 'CodexForge.exe'
-        ? '<RemoveFile Id="RemoveCurrentJson" Name="current.json" On="install" /><RemoveFile Id="RemovePreviousCurrentJson" Name="current.json.previous" On="install" />'
+        ? '<RemoveFile Id="RemoveCurrentJson" Name="current.json" On="uninstall" /><RemoveFile Id="RemovePreviousCurrentJson" Name="current.json.previous" On="uninstall" />'
         : '';
       return `<Component Id="${componentId}" Guid="${sha1Guid(`component:${file.relative}`)}"><File Id="${fileId}" Source="${xml(path.join(sourceRoot, file.relative))}" />${removeCurrent}<RegistryValue Root="HKCU" Key="Software\\HOMEFTW\\Codex Forge\\Files" Name="${componentId}" Type="integer" Value="1" KeyPath="yes" /></Component>`;
     }).join('');
@@ -214,14 +216,16 @@ function resolveTool() {
 }
 
 function runOrThrow(file, args, label, env = process.env) {
-  const result = spawnSync(file, args, { cwd: root, encoding: 'utf8', windowsHide: true, env });
-  if (result.status !== 0) throw Error(`${label}失败（${result.status}）：${result.stdout || ''}${result.stderr || ''}`);
+  // The confined Windows sandbox blocks Node's piped child stdio, so inherit the
+  // console instead. WiX/tar output still shows up in the build log.
+  const result = spawnSync(file, args, { cwd: root, stdio: 'inherit', windowsHide: true, env });
+  if (result.status !== 0) throw Error(`${label}失败（${result.status}）`);
   return result;
 }
 
 function cleanGeneratedOutput() {
   fs.mkdirSync(output, { recursive: true });
-  const generated = /^(?:Codex-Forge-|Codex Forge$|codex-forge-release\.json$|SHA256SUMS\.txt$|probe[^/]*|direct[^/]*|debug\.log$|.*\.(?:msi|zip)$)/i;
+  const generated = /^(?:Codex-Forge-|codex-forge-release\.json$|SHA256SUMS\.txt$|probe[^/]*|direct[^/]*|debug\.log$|.*\.(?:msi|zip)$)/i;
   for (const entry of fs.readdirSync(output, { withFileTypes: true })) {
     if (!generated.test(entry.name) && !entry.name.toLowerCase().endsWith('.wixpdb')) continue;
     fs.rmSync(path.join(output, entry.name), { recursive: entry.isDirectory(), force: true });

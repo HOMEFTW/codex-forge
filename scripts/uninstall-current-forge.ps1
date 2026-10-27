@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$Root,
     [switch]$Force,
     [switch]$WhatIf
@@ -104,7 +104,7 @@ try {
     Write-Verbose ('读取卸载注册表失败：' + $_.Exception.Message)
 }
 
-Write-Host ('将卸载：' + $installRoot)
+Write-Host ('将卸载：' + $installRoot + $(if ($isTopLevelRoot) { '（整个安装根）' } else { '（单个版本目录）' }))
 Write-Host '不会删除用户配置、登录信息、历史记录或 .codex 数据。'
 if ($uninstallProductCode) { Write-Host ('检测到 MSI 产品：' + $uninstallProductCode) }
 if ($WhatIf) {
@@ -133,9 +133,9 @@ if ($remaining.Count -gt 0) { throw 'Codex Forge 仍在运行，请先退出客�
 if ($uninstallProductCode) {
     $msi = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/x', $uninstallProductCode, '/passive', '/norestart') -Wait -PassThru -WindowStyle Hidden
     if ($msi.ExitCode -notin @(0, 1605, 1614)) { throw ('Windows Installer 卸载失败，退出码：' + $msi.ExitCode) }
-} elseif ($isTopLevelRoot -or $Force) {
-    Remove-Item -LiteralPath $installRoot -Recurse -Force
 } else {
+    # 没有 MSI 产品码时只能按目录删除。-Force 不影响删除范围，只跳过交互确认，
+    # 所以这里不再按 $isTopLevelRoot 分支 —— 之前两个分支完全相同，属于死逻辑。
     Remove-Item -LiteralPath $installRoot -Recurse -Force
 }
 

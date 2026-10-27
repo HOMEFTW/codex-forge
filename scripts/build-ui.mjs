@@ -12,9 +12,10 @@ fs.copyFileSync(path.join(root,'assets','codex-forge.ico'),path.join(destination
 fs.copyFileSync(path.join(root,'forge.config.json'),path.join(destination,'forge.config.json'));
 fs.cpSync(path.join(root, 'bundled-skills'), path.join(destination, 'bundled-skills'), { recursive: true });
 const result = await build({ entryPoints: [path.join(root, 'ui', 'app.jsx')], bundle: true, minify: true, metafile: true, outfile: path.join(destination, 'ui', 'app.js'), format: 'iife', target: ['chrome140'], define: { 'process.env.NODE_ENV': '"production"' }, legalComments: 'linked' });
+const dshResult = await build({ entryPoints: [path.join(root, 'ui', 'dsh-client.jsx')], bundle: true, minify: true, metafile: true, outfile: path.join(destination, 'ui', 'dsh-client.js'), format: 'iife', target: ['chrome140'], jsx: 'automatic', alias: { clsx: path.join(root, 'ui', 'dsh-classnames.js') }, define: { 'process.env.NODE_ENV': '"production"' }, legalComments: 'linked' });
 fs.copyFileSync(path.join(root, 'ui', 'index.html'), path.join(destination, 'ui', 'index.html'));
 const dependencies = new Set();
-for (const input of Object.keys(result.metafile.inputs)) {
+for (const input of new Set([...Object.keys(result.metafile.inputs), ...Object.keys(dshResult.metafile.inputs)])) {
   const absolute = path.resolve(input), marker = path.sep + 'node_modules' + path.sep, at = absolute.lastIndexOf(marker);
   if (at < 0) continue;
   const parts = absolute.slice(at + marker.length).split(path.sep), count = parts[0].startsWith('@') ? 2 : 1;
@@ -27,5 +28,6 @@ for (const moduleRoot of dependencies) {
   const license = fs.readdirSync(moduleRoot).find(file => /^licen[cs]e/i.test(file));
   if (license) licenses += fs.readFileSync(path.join(moduleRoot, license), 'utf8') + '\n\n';
 }
+licenses += '\nDSH UI primitives (MIT)\n' + fs.readFileSync(path.join(root, 'vendor', 'dsh-ui-primitives', 'LICENSE'), 'utf8');
 fs.writeFileSync(path.join(destination, 'THIRD-PARTY-NOTICES.txt'), licenses);
 console.log('Built ' + destination);

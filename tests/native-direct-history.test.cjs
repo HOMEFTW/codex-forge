@@ -52,3 +52,17 @@ test('Codex context receives marked external references once, without duplicatin
   await new NativeDirectHistory(new CollaborationStore(root)).sync(native.id, call); assert.equal(calls.length, 1, 'injection receipts persist across app restarts');
   assert.equal(store.thread(native.id).nativeInjected['job-1'].result, true);
 });
+test('collaboration task requirements and results appear in the current native conversation', async t => {
+  const base = path.resolve(__dirname, '../output/native-history-tests'); fs.mkdirSync(base, { recursive: true }); const root = fs.mkdtempSync(path.join(base, 'case-collaboration-')); t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const store = new CollaborationStore(root), history = new NativeDirectHistory(store), threadId = 'collaboration-thread';
+  const native = { id: threadId, source: 'vscode', modelProvider: 'provider', model: 'model', cwd: root, createdAt: 1, updatedAt: 2, recencyAt: 2, path: path.join(root, 'sessions/native.jsonl'), preview: '', name: null, turns: [] };
+  history.remember(native); store.saveThread({ ...store.thread(threadId), enabled: true, source: 'trusted-user-prompt', agents: ['claude'] });
+  store.saveJob({ id: 'collab-job', threadId, agent: 'claude', agentConfig: {}, source: 'trusted-user-collaboration', task: '创建一个 SVG 鹈鹕动画', cwd: root, status: 'completed', createdAt: new Date().toISOString(), finishedAt: new Date().toISOString(), finalText: '已创建 pelican-bike.html' });
+  const calls = [], call = async (method, args) => { calls.push({ method, args }); return {}; };
+  await history.sync(threadId, call);
+  assert.equal(calls.length, 1); assert.equal(calls[0].args.items.length, 2);
+  assert.equal(calls[0].args.items[0].role, 'assistant'); assert.match(calls[0].args.items[0].content[0].text, /协作要求/); assert.match(calls[0].args.items[0].content[0].text, /鹈鹕动画/);
+  assert.match(calls[0].args.items[1].content[0].text, /已创建 pelican-bike\.html/);
+  await history.sync(threadId, call); assert.equal(calls.length, 1, '协作任务回写收据可跨重启复用');
+  assert.equal(store.thread(threadId).nativeInjected['collab-job'].task, true); assert.equal(store.thread(threadId).nativeInjected['collab-job'].result, true);
+});

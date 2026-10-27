@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>Forge 开发者工具</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin: 0; padding: 14px; font: 12px/1.5 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; }
+    header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    header strong { font-size: 14px; }
+    .spacer { flex: 1; }
+    button { font: inherit; padding: 4px 10px; border: 1px solid currentColor; border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: default; }
+    h3, summary { font-size: 12px; font-weight: 600; }
+    details { margin: 12px 0; padding-top: 8px; border-top: 1px solid rgba(127,127,127,.2); }
+    summary { cursor: pointer; opacity: .85; }
+    table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+    th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid rgba(127,127,127,.2); vertical-align: top; }
+    th { font-weight: 600; opacity: .7; }
+    code { font-family: ui-monospace, Consolas, monospace; font-size: 11px; word-break: break-all; }
+    .ok { color: #2f8a4f; } .warn { color: #b07d18; } .bad { color: #b43b3b; }
+    .muted { opacity: .65; overflow-wrap: anywhere; }
+    textarea.code { width: 100%; box-sizing: border-box; min-height: 96px; font: 11px/1.5 ui-monospace, Consolas, monospace; padding: 8px; border: 1px solid rgba(127,127,127,.35); border-radius: 6px; background: transparent; color: inherit; resize: vertical; }
+    pre.result { margin: 6px 0 0; padding: 8px; min-height: 24px; max-height: 280px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.5 ui-monospace, Consolas, monospace; background: rgba(127,127,127,.08); border-radius: 6px; }
+    .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+    .samples { gap: 6px; }
+    .samples button { font-size: 11px; padding: 3px 8px; }
+  </style>
+</head>
+<body>
+  <header><strong>Forge 开发者工具</strong><span class="spacer"></span><button id="refresh">刷新诊断</button><button id="copy">复制报告</button></header>
+  <p id="meta" class="muted">正在读取…</p>
+
+  <details open>
+    <summary>UI slot 与锚点</summary>
+    <table><thead><tr><th>slot</th><th>anchor</th><th>命中</th><th>状态</th></tr></thead><tbody id="slots"></tbody></table>
+  </details>
+
+  <details open>
+    <summary>常见原生选择器</summary>
+    <table><thead><tr><th>名称</th><th>selector</th><th>命中</th></tr></thead><tbody id="probes"></tbody></table>
+  </details>
+
+  <details open>
+    <summary>脚本</summary>
+    <textarea id="code" class="code" spellcheck="false">return document.querySelectorAll('[role]').length</textarea>
+    <div class="row">
+      <button id="run">执行（Ctrl+Enter）</button>
+      <button id="clearResult">清空结果</button>
+      <span id="timing" class="muted"></span>
+    </div>
+    <pre id="result" class="result">脚本在宿主渲染进程的全局作用域执行，支持 await；返回值会序列化后显示。</pre>
+    <div class="row samples">
+      <button data-sample="roles">所有 role</button>
+      <button data-sample="testids">所有 data-testid</button>
+      <button data-sample="tabs">右栏 tab 结构</button>
+      <button data-sample="composer">composer 祖先链</button>
+      <button data-sample="header">会话头候选</button>
+      <button data-sample="slots">slot 命中数</button>
+    </div>
+  </details>
+
+  <details open>
+    <summary>宿主与插件</summary>
+    <pre id="info" class="result">正在读取…</pre>
+  </details>
+
+  <details>
+    <summary>事件日志</summary>
+    <pre id="events" class="result">等待事件…</pre>
+  </details>
+
+  <script>
+    const forge = window.CodexForge;
+    const $ = (id) => document.getElementById(id);
+    const history = [];
+    let latest = null;
+
+    const samples = {
+      roles: "return [...new Set([...document.querySelectorAll('[role]')].map(e => e.getAttribute('role')))]",
+      testids: "return [...new Set([...document.querySelectorAll('[data-testid]')].map(e => e.getAttribute('data-testid')))]",
+      tabs: "const d = el => ({ tag: el.tagName, role: el.getAttribute('role'), cls: String(el.className || '').slice(0, 80), text: (el.textContent || '').trim().slice(0, 40) });\nreturn [...document.querySelectorAll('[role=\"tabpanel\"]')].map(d)",
+      composer: "const d = el => el ? { tag: el.tagName, role: el.getAttribute('role'), cls: String(el.className || '').slice(0, 60), kids: el.children.length, text: (el.textContent || '').trim().slice(0, 30) } : null;\nconst out = [];\nlet n = document.querySelector('[data-codex-composer-root]');\nfor (let i = 0; i < 7 && n; i++) { out.push({ level: i, self: d(n), first: d(n.firstElementChild), parent: d(n.parentElement) }); n = n.parentElement; }\nreturn out",
+      header: "return [...document.querySelectorAll('h1, h2, [role=\"heading\"]')].slice(0, 20).map(el => ({ tag: el.tagName, role: el.getAttribute('role'), cls: String(el.className || '').slice(0, 60), text: (el.textContent || '').trim().slice(0, 40), parent: el.parentElement ? el.parentElement.tagName + '.' + String(el.parentElement.className || '').slice(0, 60) : null }))",
+      slots: "return [...document.querySelectorAll('[role=\"tabpanel\"]')].length",
+    };
+
+    function row(cells) {
+      const tr = document.createElement('tr');
+      for (const cell of cells) {
+        const td = document.createElement('td');
+        if (cell instanceof Node) td.append(cell); else td.textContent = cell;
+        tr.append(td);
+      }
+      return tr;
+    }
+    function code(text) { const el = document.createElement('code'); el.textContent = text; return el; }
+
+    async function loadDiagnostics() {
+      try {
+        const data = await forge.diagnostics.get();
+        if (data.error) { $('meta').textContent = data.error; return; }
+        latest = data;
+        $('meta').textContent = data.title + ' · ' + data.href + ' · ' + data.nodes + ' 个节点 · ' + data.at;
+        const slots = $('slots'); slots.replaceChildren();
+        for (const slot of data.slots) {
+          const status = slot.anchor === null ? ['未配置', 'warn'] : slot.matches > 0 ? ['可用', 'ok'] : ['未命中', 'bad'];
+          const tr = row([code(slot.id), slot.anchor ? code(slot.anchor) : '（待实测）', String(slot.matches), status[0]]);
+          tr.lastElementChild.className = status[1];
+          slots.append(tr);
+        }
+        const probes = $('probes'); probes.replaceChildren();
+        for (const probe of data.probes) probes.append(row([probe.name, code(probe.selector), String(probe.matches)]));
+        history.push({ kind: 'diagnostics', at: data.at, data });
+      } catch (error) { $('meta').textContent = '读取失败：' + error.message; }
+    }
+
+    async function loadInfo() {
+      try {
+        const caps = await forge.capabilities.get();
+        $('info').textContent = JSON.stringify(caps, null, 2);
+        history.push({ kind: 'capabilities', at: new Date().toISOString(), data: caps });
+      } catch (error) { $('info').textContent = '读取失败：' + error.message; }
+    }
+
+    async function runScript() {
+      const code = $('code').value;
+      if (!code.trim()) return;
+      $('timing').textContent = '执行中…';
+      $('run').disabled = true;
+      try {
+        const data = await forge.devtools.eval(code);
+        $('timing').textContent = data.error ? '失败' : '完成 · ' + data.ms + 'ms';
+        $('result').textContent = data.error ? data.error : JSON.stringify(data.result, null, 2);
+        history.push({ kind: 'script', at: new Date().toISOString(), code, data });
+      } catch (error) {
+        $('timing').textContent = '失败';
+        $('result').textContent = error.message;
+      } finally { $('run').disabled = false; }
+    }
+
+    const events = [];
+    for (const name of ['ready', 'context.changed', 'settings.changed', 'output.changed']) {
+      forge.events.on(name, (value) => {
+        let text = '';
+        try { text = JSON.stringify(value); } catch { text = String(value); }
+        events.push({ at: new Date().toLocaleTimeString(), name, text: text.slice(0, 240) });
+        if (events.length > 20) events.shift();
+        $('events').textContent = events.map(item => item.at + '  ' + item.name + '  ' + item.text).join('\n');
+      });
+    }
+
+    $('refresh').onclick = () => { loadDiagnostics(); loadInfo(); };
+    $('run').onclick = runScript;
+    $('clearResult').onclick = () => { $('result').textContent = ''; $('timing').textContent = ''; };
+    $('code').addEventListener('keydown', (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); runScript(); }
+    });
+    for (const button of document.querySelectorAll('[data-sample]')) {
+      button.onclick = () => { $('code').value = samples[button.dataset.sample]; $('code').focus(); };
+    }
+    $('copy').onclick = () => {
+      const report = JSON.stringify({ diagnostics: latest, history, events }, null, 2);
+      const area = document.createElement('textarea');
+      area.value = report; area.style.cssText = 'position:fixed;opacity:0';
+      document.body.append(area); area.select();
+      try { document.execCommand('copy'); $('copy').textContent = '已复制'; }
+      catch { $('copy').textContent = '请手动复制'; }
+      setTimeout(() => { $('copy').textContent = '复制报告'; }, 1500);
+      area.remove();
+    };
+
+    forge.events.on('ready', () => { loadDiagnostics(); loadInfo(); });
+    loadDiagnostics();
+    loadInfo();
+  </script>
+</body>
+</html>

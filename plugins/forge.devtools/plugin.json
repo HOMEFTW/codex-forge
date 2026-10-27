@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "apiVersion": 2,
+  "version": "0.3.0",
+  "compatibility": {
+    "codex": [
+      "26.1016.8622.0",
+      "26.1021.2667.0"
+    ],
+    "forge": [
+      ">=0.3.0 <0.4.0"
+    ]
+  },
+  "permissions": [
+    "panels",
+    "sidebar",
+    "ui",
+    "devtools"
+  ],
+  "capabilities": [
+    {
+      "name": "panels",
+      "version": 1
+    },
+    {
+      "name": "ui",
+      "version": 1
+    }
+  ],
+  "id": "forge.devtools",
+  "name": "开发者工具",
+  "description": "开发者调试面板：采集宿主 DOM 的 slot 锚点与常见原生选择器命中情况，查看宿主版本与能力，并可在宿主渲染进程执行调试脚本（等同于 DevTools Console）。只返回诊断数据，不上传任何内容。",
+  "contributes": {
+    "panels": [
+      {
+        "id": "main",
+        "title": "开发者工具",
+        "entry": "panel.html"
+      }
+    ],
+    "sidebar": [
+      {
+        "id": "open",
+        "title": "开发者工具",
+        "panel": "main"
+      }
+    ]
+  },
+  "changelog": [
+    {
+      "version": "0.3.0",
+      "date": "2026-10-27",
+      "items": [
+        "升级至 Codex Forge 0.3.0 / Forge API 2。"
+      ]
+    },
+    {
+      "version": "0.2.1",
+      "date": "2026-10-26",
+      "items": [
+        "首个版本：采集 slot 锚点命中情况、常见原生选择器与页面节点数。"
+      ]
+    }
+  ]
+}

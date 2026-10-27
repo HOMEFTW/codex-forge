@@ -9,7 +9,9 @@ const columns = [
 ];
 const statusLabels = { pending: '待办', todo: '待办', queued: '排队中', in_progress: '进行中', preparing: '准备中', running: '运行中', awaiting_input: '等待输入', review: '待审阅', merging: '合并中', blocked: '阻塞', failed: '失败', completed: '已完成', done: '完成', canceled: '已取消' };
 const columnFor = status => columns.find(column => column.statuses.has(status))?.id || 'todo';
-const columnForItem = item => item.deferredUntil && Date.parse(item.deferredUntil) > Date.now() ? 'done' : columnFor(item.status);
+// Deferring changes when a task should be revisited; it does not complete the
+// task. Keep it in its status column so the board and progress counter agree.
+const columnForItem = item => columnFor(item.status);
 const localDateValue = iso => { if (!iso) return ''; const date = new Date(iso); if (Number.isNaN(date.getTime())) return ''; const pad = value => String(value).padStart(2, '0'); return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`; };
 const isoFromLocal = value => value ? new Date(value).toISOString() : null;
 export default function TodosPanel({ api, threadId, mode, onMode, onClose }) {
@@ -17,7 +19,8 @@ export default function TodosPanel({ api, threadId, mode, onMode, onClose }) {
   const [busy, setBusy] = useState(false), [lastDeleted, setLastDeleted] = useState(null), [removing, setRemoving] = useState([]), [restoring, setRestoring] = useState(false);
   const session = useRef(null), removingIds = useRef(new Set());
   if (!session.current) session.current = new TodoSession({ api, onDocument: setDoc, onError: setError, onBusy: setBusy });
-  const target = scope === 'personal' ? 'personal' : threadId;
+  const effectiveScope = threadId && scope === 'conversation' ? 'conversation' : 'personal';
+  const target = effectiveScope === 'personal' ? 'personal' : threadId;
   useEffect(() => {
     setLastDeleted(null); session.current.setTarget(target);
     return api.subscribe(value => { if (value.type === 'refresh') session.current.load(); });
@@ -61,7 +64,7 @@ export default function TodosPanel({ api, threadId, mode, onMode, onClose }) {
     if (await apply([{ op: 'add', title: text }])) setTitle(value => value.trim() === text ? '' : value);
   }
   return <main className="fast-workspace"><header className="topbar"><strong>待办清单</strong><span className="badge">FAST r4</span><span className="spacer"/><button onClick={onMode} aria-label={mode === 'right' ? '展开面板' : '在右侧栏打开'}>{mode === 'right' ? '⛶' : '◧'}</button><button onClick={onClose} aria-label="关闭面板">×</button></header>
-    <div className="workspace-body"><div className="workspace-controls"><select aria-label="待办范围" value={scope} onChange={e => setScope(e.target.value)}><option value="conversation" disabled={!threadId}>当前对话</option><option value="personal">个人清单</option></select><select aria-label="待办筛选" value={filter} onChange={e => setFilter(e.target.value)}><option value="active">未完成</option><option value="all">全部看板</option><option value="completed">已完成</option>{columns.map(column => <option key={column.id} value={column.id}>{column.label}</option>)}</select></div>
+    <div className="workspace-body"><div className="workspace-controls"><select aria-label="待办范围" value={effectiveScope} onChange={e => setScope(e.target.value)}><option value="conversation" disabled={!threadId}>当前对话</option><option value="personal">个人清单</option></select><select aria-label="待办筛选" value={filter} onChange={e => setFilter(e.target.value)}><option value="active">未完成</option><option value="all">全部看板</option><option value="completed">已完成</option>{columns.map(column => <option key={column.id} value={column.id}>{column.label}</option>)}</select></div>
     <div className="todo-add"><input aria-label="新待办" value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); add(); } }} maxLength={500} placeholder="添加一项待办…"/><button type="button" onClick={add} className="primary" disabled={!doc || !title.trim() || busy}>添加</button></div>
     {error && <p className="error" role="alert">{error}</p>}
     {lastDeleted?.target === target && <div className="todo-delete-notice" role="status"><span>已删除“{lastDeleted.item.title}”</span><button onClick={restore} disabled={restoring}>{restoring ? '恢复中…' : '撤销删除'}</button><button onClick={() => setLastDeleted(null)} aria-label="关闭待办删除提示">×</button></div>}

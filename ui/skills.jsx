@@ -57,7 +57,7 @@ export default function SkillsPanel({ api, mode, onMode, onClose }) {
   return <main className="fast-skills" aria-label="技能包配置">
     <header className="fast-skills-header">
       <div><span className="fast-skills-eyebrow">CODEX FAST · r4</span><h1>技能包</h1></div>
-      <div className="fast-skills-actions"><button onClick={refresh} aria-label="刷新技能包">↻</button><button onClick={() => onMode?.(mode === 'expanded' ? 'right' : 'expanded')}>{mode === 'expanded' ? '并排' : '展开'}</button><button onClick={onClose} aria-label="关闭技能包">×</button></div>
+      <div className="fast-skills-actions"><button onClick={refresh} aria-label="刷新技能包">↻</button>{onMode && <button onClick={() => onMode(mode === 'expanded' ? 'right' : 'expanded')}>{mode === 'expanded' ? '并排' : '展开'}</button>}{onClose && <button onClick={onClose} aria-label="关闭技能包">×</button>}</div>
     </header>
     <p className="fast-skills-intro">{data ? `${data.inventory.packs} 组 · ${data.inventory.skills} 项技能 · ${data.inventory.resourceFiles} 个参考资源` : '正在读取内置技能…'}。按智能体启用，模型可在任务需要时读取原文与资源。</p>
     <div className="fast-skills-controls">

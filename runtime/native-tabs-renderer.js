@@ -4,7 +4,7 @@ var fastWorkspaceNativeState;
 
 function fastWorkspaceNativeGetState() {
   if (!fastWorkspaceNativeState) fastWorkspaceNativeState = {
-    pages: { canvas: '无限画布', todos: '待办清单', collaboration: '智能体协作', skills: '技能包', updates: '版本更新', 'forge-updates':'版本更新', 'forge-plugins':'插件管理', 'forge-settings':'Codex Forge 插件设置', 'forge-features':'功能介绍', 'forge-changelog':'升级日志', 'forge-extension-info':'扩展插件介绍与日志', 'forge-output':'插件输出' },
+    pages: { canvas: '无限画布', todos: '待办清单', collaboration: '智能体协作', skills: '技能包', 'information-stats': '信息统计', 'codex-memory': '记忆管理', updates: '版本更新', 'forge-updates':'版本更新', 'forge-plugins':'插件管理', 'forge-settings':'Codex Forge 插件设置', 'forge-features':'功能介绍', 'forge-changelog':'升级日志', 'forge-extension-info':'扩展插件介绍与日志', 'forge-output':'插件输出' },
     scopes: [], scopeIds: new WeakMap(), nextScopeId: 0, listener: null,
   };
   return fastWorkspaceNativeState;

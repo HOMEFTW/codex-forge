@@ -82,8 +82,8 @@ test('disabled by default, model cannot fabricate user permission or change exec
 test('missing approval settings migrate to the requested per-agent defaults', async t => {
   const { service, configure } = setup(t); await configure();
   const config = service.store.config();
-  assert.equal(config.agents.claude.approvalMode, 'auto');
-  assert.equal(config.agents.grok.approvalMode, 'auto');
+  assert.equal(config.agents.claude.approvalMode, 'native');
+  assert.equal(config.agents.grok.approvalMode, 'native');
   assert.equal(config.agents.dsh.approvalMode, 'codex');
 });
 
@@ -91,12 +91,25 @@ test('Codeg delegation aliases preserve task ids, batch status shape and lifecyc
   const { service, configure, authorize } = setup(t); await configure(); await authorize();
   const started = await callTool(service, 'delegate_to_agent', { agent_type: 'claude_code', task: 'codeg alias' }, host);
   assert.match(started.task_id, /^[A-Za-z0-9_-]+$/); assert.equal(started.status, 'running'); assert.equal(started.agent_type, 'claude_code');
+  assert.equal(service.store.job(started.task_id).source, 'trusted-user-collaboration');
   const status = await callTool(service, 'get_delegation_status', { task_ids: [started.task_id], wait_ms: 10000 }, host);
   assert.deepEqual(Object.keys(status), ['tasks']); assert.equal(status.tasks.length, 1); assert.equal(status.tasks[0].task_id, started.task_id); assert.equal(status.tasks[0].status, 'completed'); assert.match(status.tasks[0].text, /codeg alias/);
   const read = await service.dispatch('read', { jobId: started.task_id }, host); assert(read.events.some(event => event.type === 'delegation_started')); assert(read.events.some(event => event.type === 'delegation_completed'));
   const saved = service.store.job(started.task_id); saved.status = 'interrupted'; saved.finishedAt = new Date().toISOString(); saved.error = 'fixture interruption'; service.store.saveJob(saved);
   const resumed = await callTool(service, 'resume_delegation', { task_id: started.task_id, reason: '测试恢复' }, host); assert.equal(resumed.task_id, started.task_id); assert.equal(resumed.status, 'running');
   const resumedStatus = await callTool(service, 'get_delegation_status', { task_ids: [started.task_id], wait_ms: 10000 }, host); assert.equal(resumedStatus.tasks[0].status, 'completed'); assert.match(resumedStatus.tasks[0].text, /codeg alias/);
+});
+
+test('Codeg status with zero wait returns immediately for a running task', async t => {
+  const { service, configure, authorize } = setup(t); await configure('hold'); await authorize();
+  const started = await callTool(service, 'delegate_to_agent', { agent_type: 'claude_code', task: 'zero wait' }, host);
+  await running(service, started.task_id);
+  const began = Date.now();
+  const status = await callTool(service, 'get_delegation_status', { task_ids: [started.task_id], wait_ms: 0 }, host);
+  assert.equal(status.tasks[0].task_id, started.task_id);
+  assert.equal(status.tasks[0].status, 'running');
+  assert.ok(Date.now() - began < 1000, 'wait_ms=0 must not block');
+  await service.dispatch('cancel', { jobId: started.task_id }, host); await finish(service, started.task_id);
 });
 
 test('reported real user prompt enables Claude and panel control has revision guards and revocation', async t => {

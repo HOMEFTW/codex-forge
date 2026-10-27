@@ -10,6 +10,11 @@ fs.writeFileSync(path.join(root,'output/forge-tests.tap'),result.stdout+result.s
 if(result.status!==0){console.error(result.stdout,result.stderr);process.exit(result.status||1);}
 const cases=Number(result.stdout.match(/# tests (\d+)/)?.[1]),passed=Number(result.stdout.match(/# pass (\d+)/)?.[1]),skipped=Number(result.stdout.match(/# skipped (\d+)/)?.[1]||0);
 if(cases<27||passed+skipped!==cases)throw Error('Unexpected test totals');
+// A skipped case is not a passing case. The only permitted skip is the WinForms
+// bootstrap regression on a restricted host, and even that needs an explicit
+// opt-in so a silently skipped suite cannot be reported as a release pass.
+const allowSkip=process.env.FORGE_ALLOW_SKIP==='1';
+if(skipped>0&&!allowSkip)throw Error(`有 ${skipped} 项测试被跳过，未计入通过；确认是受限宿主导致后设置 FORGE_ALLOW_SKIP=1 重跑。`);
 const hashes={};for(const folder of ['runtime','ui','tests'])for(const name of fs.readdirSync(path.join(root,folder))){const file=path.join(root,folder,name);if(fs.statSync(file).isFile())hashes[folder+'/'+name]=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');}
 const report={casesPassed:passed,casesSkipped:skipped,casesTotal:cases,failures:0,exitCode:result.status,sourceSHA256:hashes};
 fs.writeFileSync(path.join(root,'output/forge-tests-result.json'),JSON.stringify(report,null,2));console.log(JSON.stringify({passed,cases,exitCode:result.status}));

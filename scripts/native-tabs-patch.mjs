@@ -18,16 +18,22 @@ export const currentNativeSymbols = {
   routeScope: 'bs(Ux)', fullWidthRead: 'bs(Ux).get(qx)',
 };
 
+// 两个字符的符号（nb/cb）如果按字面量整体替换，会误改 inbound、callback 这类
+// 子串；表达式锚点（E(tb)、Z(cb)）又必须先于标识符替换，否则会被拆开。这里对
+// 标识符使用词边界正则，并对关键符号断言必须命中，避免静默产出坏补丁。
 function rewriteExtension(extension, symbols) {
   if (symbols === legacyNativeSymbols) return extension;
-  const replacements = [
-    ['E(tb)', symbols.routeScope], ['Z(cb)', symbols.fullWidthRead],
-    ['QL', symbols.registryMap], ['ZL', symbols.register], ['aR', symbols.controller],
-    ['nb', symbols.routeUnavailable], ['cb', symbols.fullWidth], ['kCi', symbols.react],
-    ['fB', symbols.openPanel], ['vY', symbols.layout],
-  ];
   let result = extension;
-  for (const [from, to] of replacements) result = result.replaceAll(from, to);
+  for (const [from, to] of [['E(tb)', symbols.routeScope], ['Z(cb)', symbols.fullWidthRead]]) result = result.replaceAll(from, () => to);
+  for (const [from, to, required] of [
+    ['QL', symbols.registryMap, true], ['ZL', symbols.register, true], ['aR', symbols.controller, true],
+    ['nb', symbols.routeUnavailable, false], ['cb', symbols.fullWidth, false], ['kCi', symbols.react, false],
+    ['fB', symbols.openPanel, false], ['vY', symbols.layout, false],
+  ]) {
+    const pattern = new RegExp(`\\b${from}\\b`, 'g'), hits = (result.match(pattern) || []).length;
+    if (required) assert(hits > 0, `Native symbol ${from} missing from the workspace extension`);
+    result = result.replace(pattern, () => to);
+  }
   // Retained-route matching is optional; the current renderer removed these
   // private signals, so avoid carrying unresolved identifiers into its scope.
   result = result.replaceAll("typeof By !== 'undefined' && scope.get(By) === threadId", 'false');

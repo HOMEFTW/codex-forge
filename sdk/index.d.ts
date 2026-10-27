@@ -1,9 +1,10 @@
-export interface Context {threadId:string|null;codexVersion:string;forgeVersion:string;apiVersion:1}
+export interface Context {threadId:string|null;codexVersion:string;forgeVersion:string;apiVersion:2}
 export interface Contribution {id:string;title:string;command?:string;panel?:string}
 export interface ForgeEventMetadata {sourcePluginId?:string;threadId?:string|null}
-export interface ForgeCapabilities {apiVersion:1;codexVersion:string;forgeVersion:string;permissions:string[];events:string[];surfaces:string[]}
+export interface ForgeCapabilities {apiVersion:2;codexVersion:string;forgeVersion:string;permissions:string[];capabilities:{name:string;version:number;optional:boolean}[];available:Record<string,number>;denied:Record<string,string>;slots:{id:string;kind:string;scope:string;label:string}[];events:string[];surfaces:string[]}
+export interface ForgeDiagnostics {at:string;href:string;title:string;nodes:number;slots:{id:string;kind:string;label:string;anchor:string|null;verified:boolean;matches:number;samples:unknown[]}[];probes:{name:string;selector:string;matches:number;samples:unknown[]}[]}
 export interface ForgeAPI {
-  readonly apiVersion:1;
+  readonly apiVersion:2;
   context:{get():Promise<Context>};
   events:{on(name:'ready'|'context.changed'|'settings.changed'|'dispose'|'output.changed'|`plugin.${string}`,listener:(value:any,metadata?:ForgeEventMetadata)=>void):()=>void;emit(name:string,value?:unknown):Promise<{accepted:boolean;name:string}>};
   commands:{register(id:string,handler:(args:any)=>unknown|Promise<unknown>):()=>void};
@@ -18,5 +19,7 @@ export interface ForgeAPI {
   settings:{get<T=Record<string,unknown>>():Promise<T>};
   metadata:{get():Promise<Record<string,unknown>>};
   capabilities:{get():Promise<ForgeCapabilities>};
+  diagnostics:{get():Promise<ForgeDiagnostics>};
+  devtools:{eval(code:string):Promise<{ms:number;result:{type:string;value?:string;truncated?:boolean}}|{error:string}>};
 }
 declare global {interface Window {readonly CodexForge:ForgeAPI}}

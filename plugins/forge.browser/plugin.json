@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "apiVersion": 1,
-  "version": "0.2.0",
+  "apiVersion": 2,
+  "version": "0.3.0",
   "compatibility": {
     "codex": [
       "26.1016.8622.0",
       "26.1021.2667.0"
     ],
     "forge": [
-      ">=0.2.0 <0.3.0"
+      ">=0.3.0 <0.4.0"
     ]
   },
   "permissions": [
@@ -16,12 +16,29 @@
     "settings",
     "conversation.read"
   ],
+  "capabilities": [
+    {
+      "name": "panels",
+      "version": 1
+    },
+    {
+      "name": "settings",
+      "version": 1
+    }
+  ],
   "changelog": [
+    {
+      "version": "0.3.0",
+      "date": "2026-10-27",
+      "items": [
+        "升级至 Codex Forge 0.3.0 / Forge API 2。"
+      ]
+    },
     {
       "version": "0.2.0",
       "date": "2026-10-24",
       "items": [
-        "作为 Codex Forge 内置插件提供，继承 r4 修订3 已有能力。"
+        "适配 26.1021.2667.0 适配器；免登录启动参数与 @oai 组件保持不变。"
       ]
     }
   ],

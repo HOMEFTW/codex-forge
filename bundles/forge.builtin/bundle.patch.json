@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "id": "forge.browser",
+      "enabled": true
+    },
+    {
+      "id": "forge.canvas",
+      "enabled": true
+    },
+    {
+      "id": "forge.collaboration",
+      "enabled": true
+    },
+    {
+      "id": "forge.fast",
+      "enabled": true
+    },
+    {
+      "id": "forge.skills",
+      "enabled": true
+    },
+    {
+      "id": "forge.todos",
+      "enabled": true
+    },
+    {
+      "id": "forge.information-stats",
+      "enabled": true
+    },
+    {
+      "id": "forge.codex-memory",
+      "enabled": true
+    },
+    {
+      "id": "forge.devtools",
+      "enabled": true
+    }
+  ]
+}

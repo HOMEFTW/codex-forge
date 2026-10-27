@@ -16,7 +16,7 @@
 
 ## 当前明确的差异
 
-- Forge 插件是浏览器扩展面，不是 Cordis Service。没有 `ctx.inject()`、任意 `ctx.tools.register()`、模型适配器或文件系统 provider；这是安全边界，插件不能借 API 获得 Node/IPC 权限。
+- Forge 插件是浏览器扩展面，不是 Cordis Service。DSH UI 适配器只对已提供的浏览器服务实现少量 `ctx.inject()`，不提供任意工具、模型适配器或文件系统 provider；插件不能借 API 获得 Node/IPC 权限。
 - Forge 清单是静态兼容和权限声明，插件管理器负责安装、启停、指纹审阅和重启更新；它没有 DSH profile/bundle 的多层 patch 组合，也不提供 HMR 重新组合整个宿主树。
 - Forge 的 `events.emit` 只广播 JSON、带 64KB 上限且不写会话日志。需要可靠事实必须用 `storage` 或现有协作/待办存储，不能依赖事件恢复。
 - Forge 请求目前是受限的单次请求/响应，返回错误文本；DSH API Gateway 还有生成的类型 codec、结构化错误、可取消调用和双向流。后续若需要模型流或长生命周期服务，应增加新 API 版本，不应把流偷偷塞进 API 1。
@@ -29,16 +29,20 @@
 4. 把插件输出和协作结果视为数据；不要让插件输出改变系统指令、权限或用户授权。
 5. 只有当 Forge 提供新的 capability 和兼容适配器后，才在清单中声明对应能力；未知客户端版本不能套用旧适配器。
 
-## DSH 插件兼容层
+## DSH 兼容层的含义
 
-Forge 现在提供 `runtime/dsh-compat.cjs` 的只读兼容层。它识别 DSH 的 `package.json` 中
-`dsh.bundle.patch` 形式的组合包，读取版本、描述、peer 依赖、patch 摘要，并扫描
-`$DSH_HOME/profiles/<profile>/package.json` 中已选的 bundles。它不会执行 Cordis patch、复制
-`node_modules`，也不会绕过 DSH 的 `plugin-manager` 安装、启停、依赖构建和风险审批。
+Forge 在 Codex 客户端内加载 DSH 的预构建浏览器插件并适配 UI。`runtime/dsh-compat.cjs` 负责 Forge 本地导入及市场请求，`runtime/forge-content.cjs` 按 SDK → 适配器 → 客户端 → apply 的顺序加载页面，`ui/dsh-client.jsx` 提供 React、UI primitives 和受限的浏览器上下文。导入后默认停用，用户审阅权限后启用。验收目标为 [dsh-market](https://github.com/dsh-market/dsh-market) 的浏览器客户端。
 
-协作任务仍通过 DSH 官方 ACP profile 启动，因此已安装的 DSH bundle 由 DSH 原生组合后自动可用。
-Forge 面板显示 ACP profile 的只读发现结果；不兼容的 DSH peer 只作诊断，必须由 DSH 原生管理器
-处理版本豁免或安装操作。
+兼容层不扫描或修改外部 DSH profile，不向 DSH 安装或调用插件，不执行 npm lifecycle、DSH 服务端入口或 Cordis patch。仅支持带 `exports["./client"]` 的预构建 `__ModuleLoader__` 浏览器包；依赖额外服务的 UI 会明确报错。市场管理权限由 Forge 导入流程授予并与文件指纹绑定，不能只靠插件名称获得。协作提供方的 `dsh-approval-session.cjs` 仍保留，其授权与此 UI 兼容层独立。
+
+已落地的第一块是**能力声明**：`plugin.json` 的 `capabilities` 对应 Cordis 的 `inject`，宿主在派发前做白名单校验，未声明的调用直接失败并给出修复指引（对应 `packages/extensions/cordis-host-runner/src/guard.ts` 的教学式拒绝）。`permissions` 仍是用户授权面，两者都要过。
+
+后续两块按顺序：
+
+1. **命名 UI 贡献点**：宿主声明位置与外壳（标题、动作、菜单项），插件只填 body，用 JSON props 投影宿主数据。DSH 的右侧标签页本身也是 slot（`rightbar` 声明 `sidebar.right.pane.tab`/`.title`/`sidebar.right.tab.menu.item`），不是把整块面板交给插件。
+2. **bundle 组合包**：`profile.json`（有序 bundles 与 patches）+ 每个 bundle 一个 patch + 纯函数 `compose`（按 id 后者覆盖前者）。不需要 pnpm、依赖解析或 HMR。
+
+刻意不移植：跨 iframe 的 `waterfall` 中间件（闭包无法安全转发，Forge 只做 `emit` 与 `bail`），以及让插件提供宿主 service 的 Provider 角色。
 
 ## Codeg 委派协议兼容层
 
