@@ -6,6 +6,19 @@ function replace(source, from, to, label = from) {
 }
 
 export function patchSettingsVisibility(source, { version = 'legacy' } = {}) {
+  if (version === 'oct23') {
+    source = replace(source, 'case`plugins-settings`:return{visible:p,pending:!1};',
+      'case`plugins-settings`:return{visible:p,pending:!1};case`codex-forge`:return{visible:!0,pending:!1};');
+    source = replace(source, 'lo=[`profile`,`agent`,`personalization`,`mcp-settings`,`plugins-settings`,`file-type-handlers`',
+      'lo=[`profile`,`agent`,`personalization`,`mcp-settings`,`plugins-settings`,`codex-forge`,`file-type-handlers`');
+    source = replace(source, '"plugins-settings":`codexOrWorkLocal`,"file-type-handlers"',
+      '"plugins-settings":`codexOrWorkLocal`,"codex-forge":`codexOrWorkLocal`,"file-type-handlers"');
+    source = replace(source, '}),J=Dt.flatMap(oo),', '}),J=[...Dt.flatMap(oo),{slug:`codex-forge`}],');
+    source = replace(source, 'let X=Dt.find(kt),',
+      'let X=Dt.find(kt)||(i===`codex-forge`?{section:{slug:`codex-forge`},visible:!0,pending:!1,error:!1}:void 0),');
+    return replace(source, 'function Ha(e,t){return e===`cloud-environments`?',
+      'function Ha(e,t){if(e===`codex-forge`)e=`plugins-settings`;return e===`cloud-environments`?');
+  }
   if (version === 'current') {
     source = replace(source,
       'case`plugins-settings`:return{visible:h,pending:!1};',
@@ -39,6 +52,21 @@ export function patchSettingsVisibility(source, { version = 'legacy' } = {}) {
 }
 
 export function patchSettingsPage(source, { version = 'legacy' } = {}) {
+  if (version === 'oct23') {
+    source = replace(source, 'u=hn(e.slug,M,t),',
+      'u=e.slug===`codex-forge`?{id:`codexForge.settings`,defaultMessage:`Codex Forge 插件设置`}:hn(e.slug,M,t),');
+    source = replace(source, 'p=()=>{r||e.appRoute!=null||Yt(e.slug).catch($r)}',
+      'p=()=>{r||e.slug===`codex-forge`||e.appRoute!=null||Yt(e.slug).catch($r)}');
+    source = replace(source, 'm=R?(0,Q.jsx)(dn,{',
+      'm=R?e.slug===`codex-forge`?(0,Q.jsx)(h,{id:`codexForge.settings`,defaultMessage:`Codex Forge 插件设置`}):(0,Q.jsx)(dn,{');
+    source = replace(source, 'slugs:[`plugins-settings`,`file-type-handlers`',
+      'slugs:[`plugins-settings`,`codex-forge`,`file-type-handlers`');
+    const label = 'label:(0,Q.jsx)(dn,{codexMicroDeviceModel:A,showChatGptDataControlsLabel:t,showEnterpriseUsageLabel:M,slug:e.slug})';
+    source = replace(source, label,
+      'label:e.slug===`codex-forge`?(0,Q.jsx)(h,{id:`codexForge.settings`,defaultMessage:`Codex Forge 插件设置`}):(0,Q.jsx)(dn,{codexMicroDeviceModel:A,showChatGptDataControlsLabel:t,showEnterpriseUsageLabel:M,slug:e.slug})');
+    return replace(source, 'Ae=a}let je;',
+      'Ae=a}if(E===`codex-forge`)Ae=(0,$.jsx)(`div`,{\x22data-forge-settings-mount\x22:`true`,\x22data-forge-settings-plugin\x22:new URLSearchParams(l.search).get(`plugin`)||``,style:{width:`100%`,height:`100%`,minHeight:500,display:`flex`}});let je;');
+  }
   if (version === 'current') {
     // The native title table and lazy-route registry contain only native slugs.
     // Navigation resolves the aria-label before rendering label/tooltip JSX.

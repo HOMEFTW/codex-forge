@@ -1,13 +1,13 @@
 # Forge API 2
 
-随 Codex Forge 0.3.0 发布。插件清单、`forge.apiVersion`、上下文和能力查询的 API 版本均为 `2`；清单与更新协议的 `schemaVersion` 保持各自版本，不随 API 主版本一起递增。
+Forge API 2 随 Codex Forge 0.3.0 引入，当前实现随 0.3.1 发布。插件清单、`forge.apiVersion`、上下文和能力查询的 API 版本均为 `2`；清单与更新协议的 `schemaVersion` 保持各自版本，不随 API 主版本一起递增。
 
 从 API 1 迁移：将 `plugin.json` 的 `apiVersion` 改为 `2`，将 Forge 兼容范围改为经过测试的 `>=0.3.0 <0.4.0`，更新 SDK，并验证能力声明、UI 插槽、权限及已有交互。API 1 清单仍可读取用于诊断，但版本不匹配时不会启用；不会自动修改已安装第三方插件。DSH 导入器按当前宿主 API 生成清单。
 
 插件目录必须包含 `plugin.json`。`id` 使用 `publisher.name`；`forge.*` 保留给内置插件。`compatibility.codex` 和 `compatibility.forge` 是非空数组，数组项之间是“或”；单项空格分隔的比较条件是“且”。支持精确三/四段数字版本、`>= <= > < = ^ ~` 和 `||`，不接受隐式通配或预发布字符串。
 
 ```json
-{"schemaVersion":1,"apiVersion":2,"id":"example.panel","name":"示例","version":"0.3.0","compatibility":{"codex":["26.1021.2667.0","26.1016.8622.0"],"forge":[">=0.3.0 <0.4.0"]},"permissions":["panels"],"contributes":{"panels":[{"id":"main","title":"示例","entry":"panel.html"}]}}
+{"schemaVersion":1,"apiVersion":2,"id":"example.panel","name":"示例","version":"0.3.0","compatibility":{"codex":["26.1023.6123.0","26.1021.2667.0","26.1016.8622.0"],"forge":[">=0.3.0 <0.4.0"]},"permissions":["panels"],"contributes":{"panels":[{"id":"main","title":"示例","entry":"panel.html"}]}}
 ```
 
 宿主向 iframe 注入 `window.CodexForge`。`entry` 是可选的浏览器 JS 命令入口。面板 HTML 应自包含，使用内联脚本和样式；可在发布前用自己的构建器打包。没有 Node、任意 IPC、文件系统、同源权限或自动消息发送权限。允许的网络源必须通过 `network` 和 `networkOrigins` 声明；面板不能导航宿主。API 仍按来源窗口和插件安装记录校验身份。

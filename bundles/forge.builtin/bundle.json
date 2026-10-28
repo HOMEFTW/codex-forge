@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "forge.builtin",
   "name": "Codex Forge 内置插件组合",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "声明随 Forge 分发的九个内置插件。用户可在 profile.json 的 patches 里覆盖启用状态或设置。",
   "patch": "bundle.patch.json"
 }

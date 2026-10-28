@@ -1,0 +1,7 @@
+// Reduced executable 26.1023 navigation and content anchors.
+const groups=[{slugs:[`plugins-settings`,`file-type-handlers`]}];
+function renderNavigation(sections,c,R){
+  const H=false,M=false,A=null,N=intl,l=select,ie='windows',D=true,O=true,ze=null;
+  return sections.map(e=>{let t=e.slug===`data-controls`&&H,n=e.slug===c,r=!!e.disabled,a=jn(e.slug,ie),o=n&&e.slug===`pets`,s=o?cr:a.component,u=hn(e.slug,M,t),d=e.slug===`codex-micro`&&A===`creator-micro-v2`?N.formatMessage(ln.creatorMicro):N.formatMessage(u,u.values),f=()=>{r||l(e.slug)},p=()=>{r||e.appRoute!=null||Yt(e.slug).catch($r)},m=R?(0,Q.jsx)(dn,{codexMicroDeviceModel:A,showChatGptDataControlsLabel:t,showEnterpriseUsageLabel:M,slug:e.slug}):ze;return(0,Q.jsx)(i,{content:m,side:`right`,sideOffset:12,disabled:!R&&!r,children:(0,Q.jsx)(Nt,{'aria-label':d,icon:16 in s?(0,Q.jsx)(pe,{className:n?`text-codex-icon-active`:void 0,icon:s}):s,iconAssetSource:o?void 0:a.navigation,isActive:n,disabled:r,'data-settings-panel-slug':O&&!r?e.slug:void 0,hideLabel:D?R:void 0,onClick:f,onFocus:p,onPointerEnter:p,weightClassName:`font-normal`,label:(0,Q.jsx)(dn,{codexMicroDeviceModel:A,showChatGptDataControlsLabel:t,showEnterpriseUsageLabel:M,slug:e.slug}),trailing:!R&&e.appRoute!=null?(0,Q.jsx)(Le,{className:`icon-xs text-secondary opacity-50`}):void 0})},e.slug)});
+}
+function renderContent(E,l){let Ae,a=`native content`;if(E!=null){Ae=a}let je;return Ae;}

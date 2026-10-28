@@ -16,8 +16,8 @@ const target = path.resolve(process.argv[3] || path.join(root, 'release', 'packa
 // 该字段时才回退到符号判断。members 必须由适配器提供：静默回退到 legacy 文件名
 // 会把旧补丁套到新客户端上。
 const nativeVersion = adapter.patchSet || (adapter.nativeSymbols?.registryMap === 'QL' ? 'legacy' : 'current');
-assert(['legacy', 'current'].includes(nativeVersion), `适配器 patchSet 无效：${nativeVersion}`);
-const currentAdapter = nativeVersion === 'current';
+assert(['legacy', 'current', 'oct23'].includes(nativeVersion), `适配器 patchSet 无效：${nativeVersion}`);
+const currentAdapter = nativeVersion !== 'legacy';
 const members = adapter.members;
 assert(members && ['renderer', 'settingsPage', 'visibleSettings', 'network'].every(key => typeof members[key] === 'string' && members[key]), '适配器必须声明 members.renderer/settingsPage/visibleSettings/network');
 const hash = data => crypto.createHash('sha256').update(data).digest('hex');

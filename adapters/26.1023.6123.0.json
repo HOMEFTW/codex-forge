@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "forgeVersion": "0.3.1",
+  "apiVersion": 2,
+  "codexVersion": "26.1023.6123.0",
+  "codexBuildVersion": "26.1023.6621.0",
+  "architecture": "x64",
+  "packageIdentity": "OpenAI.Codex",
+  "publisher": "CN=50BDFD77-8903-4850-9FFE-6E8522F64D5B",
+  "downloadUrl": "https://persistent.oaistatic.com/codex-app-prod/releases/26.1023.6123.0/ChatGPT-x64.msix",
+  "packageBytes": 979149564,
+  "packageSHA256": "9890e869a0d40fc00f396ce48ba05dc45ccb8bb36d151dcd1a2ff23d270f2e4d",
+  "baseASARSHA256": "773eaad4039291c80217d62c97711bb0e4b941fcf4429aaeeb3b04856c4e83ab",
+  "baseExecutableSHA256": "5871c61efd9db4026e30bfef21774ff9e6bd815127fffbb4d04262c42d7cddde",
+  "members": {
+    "renderer": "webview/assets/app-initial-b0cd131b9dba.js",
+    "settingsPage": "webview/assets/settings-page-15fb6142eddb.js",
+    "visibleSettings": "webview/assets/use-visible-settings-sections-a0c3d6615c92.js",
+    "network": ".vite/build/application-network-startup-DMyt3FBI.js"
+  },
+  "patchSet": "oct23",
+  "nativeSymbols": {
+    "registryAnchor": "nri=[`left`,`right`],JH=new Map,rri=",
+    "scopeAnchor": "function yzt(e){let t=(0,bzt.c)(14),{layout:n,fallback:r}=e,i=r!==void 0&&r,a=Or(SS),o=i?ezt:$Rt,s=",
+    "scopeInjection": "function yzt(e){let t=(0,bzt.c)(14),{layout:n,fallback:r}=e,i=r!==void 0&&r,a=Or(SS);fastWorkspaceRememberScope(a);let o=i?ezt:$Rt,s=",
+    "registryMap": "JH",
+    "register": "KH",
+    "controller": "iU",
+    "routeUnavailable": "CS",
+    "fullWidth": "DS",
+    "react": "Yri",
+    "openPanel": "yK",
+    "layout": "c2",
+    "routeScope": "Or(SS)",
+    "fullWidthRead": "Or(SS).get(DS)"
+  }
+}

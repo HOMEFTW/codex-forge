@@ -85,7 +85,7 @@ test('probe refuses a fork whose effective model differs from the active convers
     if(method==='thread/read') return {thread:{id:params.threadId,path:params.threadId==='thread_1'?'C:/sessions/thread_1.jsonl':null,ephemeral:params.threadId!=='thread_1',forkedFromId:params.threadId==='thread_1'?undefined:'thread_1',model:params.threadId==='thread_1'?'gpt-6-sol':'gpt-5.6-sol',modelProvider:'openai',reasoningEffort:'high'}};
     if(method==='thread/turns/list') return {data:[{id:'turn_original',status:'completed'}]};
     if(method==='config/read') return {config:{}};
-    if(method==='thread/fork') return {thread:{id:'fork_1',ephemeral:true,path:null,forkedFromId:'thread_1'}};
+    if(method==='thread/fork') return {model:'gpt-5.6-sol',modelProvider:'openai',reasoningEffort:'high',thread:{id:'fork_1',ephemeral:true,path:null,forkedFromId:'thread_1'}};
     if(method==='turn/start') starts++;
     return {};
   };

@@ -4,6 +4,7 @@ const Module = require('node:module');
 const fs = require('node:fs');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
+const currentCodexVersion = require('../forge.config.json').codexVersion;
 test('native menu opens package notes and IPC rejects other origins and subframes', async t => {
  const output = path.resolve(__dirname, '../output/main-test'); fs.mkdirSync(output, { recursive: true });
  const root = fs.mkdtempSync(path.join(output, 'case-'));
@@ -46,14 +47,14 @@ test('native menu opens package notes and IPC rejects other origins and subframe
   const pluginRoot = path.join(root, 'composer-plugin'); fs.mkdirSync(pluginRoot, { recursive: true });
   fs.writeFileSync(path.join(pluginRoot, 'plugin.json'), JSON.stringify({
     schemaVersion: 1, apiVersion: 2, id: 'test.composer', name: 'Composer fixture', version: '0.1.0',
-    compatibility: { codex: ['26.1021.2667.0'], forge: ['>=0.3.0 <0.4.0'] }, permissions: ['composer'], contributes: {}
+    compatibility: { codex: [currentCodexVersion], forge: ['>=0.3.0 <0.4.0'] }, permissions: ['composer'], contributes: {}
   }));
   services.forge.registry.install(pluginRoot); services.forge.registry.setEnabled('test.composer', true);
   await assert.rejects(handlers.get('forge:api')(event, { id: 'test.composer', method: 'composer.read', args: {}, threadId: 'thread-visible' }), /conversation\.read/);
   const narrowRoot = path.join(root, 'narrow-plugin'); fs.mkdirSync(narrowRoot, { recursive: true });
   fs.writeFileSync(path.join(narrowRoot, 'plugin.json'), JSON.stringify({
     schemaVersion: 1, apiVersion: 2, id: 'test.narrow', name: 'Narrow fixture', version: '0.1.0',
-    compatibility: { codex: ['26.1021.2667.0'], forge: ['>=0.3.0 <0.4.0'] },
+    compatibility: { codex: [currentCodexVersion], forge: ['>=0.3.0 <0.4.0'] },
     permissions: ['panels', 'storage'], capabilities: [{ name: 'panels', version: 1 }], contributes: {}
   }));
   services.forge.registry.install(narrowRoot); services.forge.registry.setEnabled('test.narrow', true);
@@ -73,7 +74,7 @@ test('native menu opens package notes and IPC rejects other origins and subframe
    fs.writeFileSync(path.join(eventPluginRoot, 'main.js'), 'void 0');
    fs.writeFileSync(path.join(eventPluginRoot, 'plugin.json'), JSON.stringify({
      schemaVersion: 1, apiVersion: 2, id: 'test.events', name: 'Events fixture', version: '0.1.0',
-     compatibility: { codex: ['26.1021.2667.0'], forge: ['>=0.3.0 <0.4.0'] }, permissions: ['events'], entry: 'main.js', contributes: { events: [{ name: 'plugin.test.events.status' }] }
+     compatibility: { codex: [currentCodexVersion], forge: ['>=0.3.0 <0.4.0'] }, permissions: ['events'], entry: 'main.js', contributes: { events: [{ name: 'plugin.test.events.status' }] }
    }));
    services.forge.registry.install(eventPluginRoot); services.forge.registry.setEnabled('test.events', true);
    const secondEvent = { sender: secondWin.webContents, senderFrame: { processId: 21, routingId: 1 } };

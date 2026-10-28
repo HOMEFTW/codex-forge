@@ -7,7 +7,7 @@ const { atomic, json } = require('./collaboration-store.cjs');
 const nativeFeed = 'https://persistent.oaistatic.com/codex-app-prod/windows-store-update.json';
 const blockedVersions = new Set(['26.1013.4894.0']);
 async function fetchJSON(url, { limit = 2*1024*1024 } = {}) {
-  const response = await fetch(url, { headers: { Accept:'application/json','User-Agent':'Codex-Forge/0.3.0' }, signal:AbortSignal.timeout(20000) });
+  const response = await fetch(url, { headers: { Accept:'application/json','User-Agent':'Codex-Forge/0.3.1' }, signal:AbortSignal.timeout(20000) });
   if (!response.ok) {
     const retry = response.headers.get('retry-after');
     throw Error(`更新源 HTTP ${response.status}${response.status === 403 ? '（GitHub API 限流或拒绝匿名请求）' : response.status === 404 ? '（私有仓库或尚未发布版本）' : ''}${retry ? `；Retry-After ${retry}` : ''}`);

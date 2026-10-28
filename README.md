@@ -1,10 +1,16 @@
 # Codex Forge
 
-Codex Forge 是 Windows Codex 客户端的第三方插件宿主，为插件提供原生界面入口、统一设置、会话输出和版本兼容检查。当前版本为 **0.3.0 / Forge API 2**，适配官方客户端 **26.1021.2667.0（Windows x64，构建 26.1021.3705.0）**；同时保留 26.1016.8622.0 旧版适配器用于回归。
+Codex Forge 是 Windows Codex 客户端的第三方插件宿主，为插件提供原生界面入口、统一设置、会话输出和版本兼容检查。当前版本为 **0.3.1 / Forge API 2**，适配官方客户端 **26.1023.6123.0（Windows x64，更新源构建 26.1023.6621.0）**；同时保留 26.1021.2667.0 和 26.1016.8622.0 适配器用于回归。
 
-[下载安装包](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.3.0) · [从零开发插件](docs/PLUGIN-DEVELOPMENT-ZERO-TO-ONE.md) · [API 参考](docs/PLUGIN-API.md) · [更新协议](docs/UPDATES.md)
+[下载安装包](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.3.1) · [从零开发插件](docs/PLUGIN-DEVELOPMENT-ZERO-TO-ONE.md) · [API 参考](docs/PLUGIN-API.md) · [更新协议](docs/UPDATES.md)
 
 [DSH 源码对照](docs/DEEPSEEK-HARNESS-MAPPING.md) 记录了 Forge API 对 DeepSeek Harness 的实际借鉴、实现位置和有意保留的边界。
+
+## 0.3.1 更新
+
+- **新版客户端适配**：新增固定版本适配器，更新原生右侧标签、设置入口、Fast 控件及后端注入点；保持 Forge API 2，九个内置插件及示例同步兼容新客户端。
+- **指纹检测修复**：不再用磁盘回合状态选择 `lastTurnId`，避免把运行中的回合误当作已中断回合；直接校验临时分支创建响应，避免后续读取的空来源 ID 覆盖正确结果。
+- **检测清理**：校验失败、取消和异常时释放本次临时分支，检测完成后关闭进程管道；保留模型、提供商、思考强度及临时分支隔离检查。
 
 ## 0.3.0 更新
 
@@ -16,16 +22,16 @@ Codex Forge 是 Windows Codex 客户端的第三方插件宿主，为插件提�
 
 ## 安装与启动
 
-1. 从 Release 下载 `Codex-Forge-0.3.0-Windows.msi`，可对照 `SHA256SUMS.txt` 校验；也可以下载 `Codex-Forge-0.3.0-Windows-Portable.zip` 直接解压运行。
+1. 从 Release 下载 `Codex-Forge-0.3.1-Windows.msi`，可对照 `SHA256SUMS.txt` 校验；也可以下载 `Codex-Forge-0.3.1-Windows-Portable.zip` 直接解压运行。
 2. 双击 MSI 或使用 `msiexec /i` 安装。默认安装在 `%LOCALAPPDATA%\Programs\Codex Forge`，Windows Installer 负责升级和卸载；桌面快捷方式可通过 `CREATEDESKTOPSHORTCUT=0` 关闭。
-3. 安装完成后，准备程序从 OpenAI 官方 HTTPS 地址下载适配的 Codex MSIX（约 919 MiB），检查大小、SHA-256、签名、产品身份、版本及架构，再在本地应用 Forge 适配器。
+3. 安装完成后，准备程序从 OpenAI 官方 HTTPS 地址下载适配的 Codex MSIX（约 934 MiB），检查大小、SHA-256、签名、产品身份、版本及架构，再在本地应用 Forge 适配器。
 4. 准备成功后运行 **CodexForge.exe**。请先退出其他使用相同配置的 Codex 客户端。
 
 **MSI 和便携 ZIP 只包含 Forge，不包含官方客户端、Node、MSIX 或用户凭据。** 首次准备需要网络和约 7 GB 临时可用空间。下载支持续传；准备失败后再次启动 Forge 可重试，日志位于安装目录的 `forge-prepare.log`。安装阶段不下载官方客户端，启动 `CodexForge.exe` 后才开始准备。
 
-从 0.2.x 升级请手动下载 0.3.0 MSI 并运行；旧客户端的 API 1 更新器不能直接接受 API 2 发布清单。已有 API 1 第三方插件会显示版本不兼容，须由作者迁移；用户数据继续保留。
+0.3.0 用户可运行新版 MSI 升级；从 0.2.x 升级请手动下载 0.3.1 MSI 并运行；旧客户端的 API 1 更新器不能直接接受 API 2 发布清单。已有 API 1 第三方插件会显示版本不兼容，须由作者迁移；用户数据继续保留。
 
-发行包使用 MSI 和便携 ZIP。**0.3.0 的 Forge EXE 与 MSI 未进行 Authenticode 签名**，Windows 可能显示未知发布者。`SHA256SUMS.txt` 用于核对下载文件完整性，不替代发布者签名；签名和 Defender 声誉验证尚未完成。
+发行包使用 MSI 和便携 ZIP。**0.3.1 的 Forge EXE 与 MSI 未进行 Authenticode 签名**，Windows 可能显示未知发布者。`SHA256SUMS.txt` 用于核对下载文件完整性，不替代发布者签名；签名和 Defender 声誉验证尚未完成。
 
 如需移除当前运行的 Forge，可在项目目录执行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/uninstall-current-forge.ps1 -WhatIf` 先预览，再去掉 `-WhatIf` 执行。脚本只清理 Forge 安装目录、快捷方式和启动项，保留 `%CODEX_HOME%` 用户数据。
 

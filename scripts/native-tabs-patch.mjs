@@ -18,6 +18,15 @@ export const currentNativeSymbols = {
   routeScope: 'bs(Ux)', fullWidthRead: 'bs(Ux).get(qx)',
 };
 
+export const oct23NativeSymbols = {
+  registryAnchor: 'nri=[`left`,`right`],JH=new Map,rri=',
+  scopeAnchor: 'function yzt(e){let t=(0,bzt.c)(14),{layout:n,fallback:r}=e,i=r!==void 0&&r,a=Or(SS),o=i?ezt:$Rt,s=',
+  scopeInjection: 'function yzt(e){let t=(0,bzt.c)(14),{layout:n,fallback:r}=e,i=r!==void 0&&r,a=Or(SS);fastWorkspaceRememberScope(a);let o=i?ezt:$Rt,s=',
+  registryMap: 'JH', register: 'KH', controller: 'iU', routeUnavailable: 'CS',
+  fullWidth: 'DS', react: 'Yri', openPanel: 'yK', layout: 'c2',
+  routeScope: 'Or(SS)', fullWidthRead: 'Or(SS).get(DS)',
+};
+
 // 两个字符的符号（nb/cb）如果按字面量整体替换，会误改 inbound、callback 这类
 // 子串；表达式锚点（E(tb)、Z(cb)）又必须先于标识符替换，否则会被拆开。这里对
 // 标识符使用词边界正则，并对关键符号断言必须命中，避免静默产出坏补丁。
@@ -43,15 +52,15 @@ function rewriteExtension(extension, symbols) {
 }
 
 export function patchNativeTabs(source, extension, { version = 'legacy', symbols } = {}) {
-  const selected = symbols || (version === 'current' ? currentNativeSymbols : legacyNativeSymbols);
+  const selected = symbols || (version === 'oct23' ? oct23NativeSymbols : version === 'current' ? currentNativeSymbols : legacyNativeSymbols);
   for (const anchor of [selected.registryAnchor, selected.scopeAnchor]) {
     assert.equal(source.split(anchor).length, 2, 'Native workspace anchor changed: ' + anchor);
   }
   assert(extension.includes('function fastWorkspaceRegisterTabs('));
   assert(extension.includes('function fastWorkspaceRememberScope('));
-  const registryReplacement = selected === currentNativeSymbols
-    ? 'Ksi=[`left`,`right`],mH=new Map,fastWorkspaceRegisterTabs(),qsi='
-    : 'FSi=[`left`,`right`],QL=new Map,fastWorkspaceRegisterTabs(),ISi=';
+  const registryMapAnchor = selected.registryMap + '=new Map,';
+  assert.equal(selected.registryAnchor.split(registryMapAnchor).length, 2, 'Native registry map anchor changed');
+  const registryReplacement = selected.registryAnchor.replace(registryMapAnchor, registryMapAnchor + 'fastWorkspaceRegisterTabs(),');
   return source.replace(selected.registryAnchor, registryReplacement)
     .replace(selected.scopeAnchor, selected.scopeInjection)
     + '\n/* FAST_NATIVE_WORKSPACE_TABS */\n' + rewriteExtension(extension, selected);

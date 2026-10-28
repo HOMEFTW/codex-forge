@@ -8,7 +8,7 @@ using System.Reflection;
 [assembly: AssemblyTitle("Codex Forge")]
 [assembly: AssemblyProduct("Codex Forge")]
 [assembly: AssemblyDescription("Codex Forge plugin host launcher")]
-[assembly: AssemblyVersion("0.3.0.0")]
+[assembly: AssemblyVersion("0.3.1.0")]
 internal static class Launcher {
     static string Quote(string value) { return "\""+value.Replace("\"", "\\\"")+"\""; }
     // MSI 的 MajorUpgrade 会先卸载旧版本，旧的 current.json 可能仍指向已被替换的

@@ -19,7 +19,7 @@ using System.Reflection;
 
 [assembly: AssemblyTitle("Codex Forge Bootstrap")]
 [assembly: AssemblyProduct("Codex Forge")]
-[assembly: AssemblyVersion("0.3.0.0")]
+[assembly: AssemblyVersion("0.3.1.0")]
 
 internal static class BootstrapCore {
     static BootstrapCore() {
@@ -94,7 +94,7 @@ internal static class BootstrapCore {
                 if(offset>expected){File.Delete(partial);offset=0;}
                 if(offset==expected)break;
                 using(var request=new HttpRequestMessage(HttpMethod.Get,Text(adapter,"downloadUrl"))) {
-                request.Headers.UserAgent.ParseAdd("Codex-Forge/0.3.0");if(offset>0)request.Headers.Range=new System.Net.Http.Headers.RangeHeaderValue(offset,null);
+                request.Headers.UserAgent.ParseAdd("Codex-Forge/0.3.1");if(offset>0)request.Headers.Range=new System.Net.Http.Headers.RangeHeaderValue(offset,null);
                     using(var response=await http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,token)) {
                         Need(response.StatusCode==HttpStatusCode.OK||response.StatusCode==HttpStatusCode.PartialContent,"官方客户端下载失败：HTTP "+(int)response.StatusCode);
                         if(response.StatusCode==HttpStatusCode.OK)offset=0;
