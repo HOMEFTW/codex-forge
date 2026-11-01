@@ -50,7 +50,7 @@ test('normalization keeps GPT-6.1 separate and numerical samples are validated',
   assert.throws(()=>analyze([{text:'no numbers',expected_count:320}]),/没有可用回答/);
 });
 
-test('probe collects three sequential replies only from verified ephemeral forks', async () => {
+test('probe collects three sequential replies only from verified fresh ephemeral threads', async () => {
   let listener, fork=0;
   const calls=[], forkParams=[];
   const call=async(method,params={})=>{
@@ -59,7 +59,7 @@ test('probe collects three sequential replies only from verified ephemeral forks
       ephemeral:params.threadId!=='thread_1',forkedFromId:params.threadId==='thread_1'?undefined:'thread_1',model:'gpt-6-sol',modelProvider:'openai',reasoningEffort:'high'}};
     if(method==='thread/turns/list') return {data:[{id:'turn_original',status:'completed'}]};
     if(method==='config/read') return {config:{mcp_servers:{sample:{enabled:true}}}};
-    if(method==='thread/fork') { forkParams.push(params); const id='fork_'+(++fork); return {thread:{id,ephemeral:true,path:null,forkedFromId:'thread_1',model:'gpt-6-sol',modelProvider:'openai',reasoningEffort:'high'}}; }
+    if(method==='thread/start') { forkParams.push(params); const id='probe_'+(++fork); return {model:params.model,modelProvider:params.modelProvider,reasoningEffort:'high',thread:{id,ephemeral:true,path:null,forkedFromId:null,model:params.model,modelProvider:params.modelProvider,reasoningEffort:'high'}}; }
     if(method==='turn/start') {
       const id='turn_'+fork, count=Number(params.input[0].text.match(/(?:choose |选择 )(\d+)/)?.[1]);
       setImmediate(()=>{
@@ -71,27 +71,27 @@ test('probe collects three sequential replies only from verified ephemeral forks
     }
     return {};
   };
-  const outputs=await probeWithRpc({call,subscribe:fn=>{listener=fn;return()=>{listener=null;}},threadId:'thread_1',model:'gpt-6-sol',provider:'openai',effort:'high',cwd:'C:/project'});
+  const outputs=await probeWithRpc({call,subscribe:fn=>{listener=fn;return()=>{listener=null;}},threadId:'thread_1',model:'gpt-6-sol',provider:'openai',effort:'high',cwd:'C:/project',probeCwd:os.tmpdir()});
   assert.equal(outputs.length,3);
   assert(outputs.every(output=>JSON.parse(output.text).length===output.expected_count));
   assert.equal(forkParams.length,3);
-  assert(forkParams.every(params=>params.ephemeral&&params.config['features.multi_agent']===false&&params.config['mcp_servers.sample.enabled']===false&&!('sandbox' in params)&&!('approvalPolicy' in params)));
+  assert(forkParams.every(params=>params.ephemeral&&params.config['features.multi_agent']===false&&params.config['mcp_servers.sample.enabled']===false&&params.sandbox==='read-only'&&params.approvalPolicy==='never'&&!('threadId' in params)));
   assert.equal(calls.filter(method=>method==='turn/start').length,3);
 });
 
-test('probe refuses a fork whose effective model differs from the active conversation', async () => {
+test('probe refuses a fresh thread whose effective model differs from the active conversation', async () => {
   let starts=0;
   const call=async(method,params={})=>{
     if(method==='thread/read') return {thread:{id:params.threadId,path:params.threadId==='thread_1'?'C:/sessions/thread_1.jsonl':null,ephemeral:params.threadId!=='thread_1',forkedFromId:params.threadId==='thread_1'?undefined:'thread_1',model:params.threadId==='thread_1'?'gpt-6-sol':'gpt-5.6-sol',modelProvider:'openai',reasoningEffort:'high'}};
     if(method==='thread/turns/list') return {data:[{id:'turn_original',status:'completed'}]};
     if(method==='config/read') return {config:{}};
-    if(method==='thread/fork') return {model:'gpt-5.6-sol',modelProvider:'openai',reasoningEffort:'high',thread:{id:'fork_1',ephemeral:true,path:null,forkedFromId:'thread_1'}};
+    if(method==='thread/start') return {model:'gpt-5.6-sol',modelProvider:params.modelProvider,reasoningEffort:'high',thread:{id:'probe_1',ephemeral:true,path:null,forkedFromId:null,model:'gpt-5.6-sol',modelProvider:params.modelProvider,reasoningEffort:'high'}};
     if(method==='turn/start') starts++;
     return {};
   };
-  await assert.rejects(probeWithRpc({call,subscribe:()=>()=>{},threadId:'thread_1',model:'gpt-6-sol',provider:'openai',effort:'high',cwd:'C:/project'}),/模型设置/);
+  await assert.rejects(probeWithRpc({call,subscribe:()=>()=>{},threadId:'thread_1',model:'gpt-6-sol',provider:'openai',effort:'high',cwd:'C:/project',probeCwd:os.tmpdir()}),/模型设置/);
   assert.equal(starts,0);
-  assert.throws(()=>verifyFork({thread:{id:'fork_1',ephemeral:true,path:null,forkedFromId:'thread_1',model:'gpt-6.1-sol',modelProvider:'openai',reasoningEffort:'high'}},{threadId:'thread_1',model:'gpt-6-sol',provider:'openai',effort:'high'}),/模型设置/);
+  assert.throws(()=>verifyFork({model:'gpt-6.1-sol',modelProvider:'openai',reasoningEffort:'high',thread:{id:'probe_1',ephemeral:true,path:null,forkedFromId:null,model:'gpt-6.1-sol',modelProvider:'openai',reasoningEffort:'high'}},{threadId:'thread_1',model:'gpt-6-sol',provider:'openai',effort:'high'}),/模型设置/);
 });
 
 test('imports the upstream is-gpt-nerfed ledger fields and rejects another provider', async t => {

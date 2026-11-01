@@ -1,10 +1,19 @@
 # Codex Forge
 
-Codex Forge 是 Windows Codex 客户端的第三方插件宿主，为插件提供原生界面入口、统一设置、会话输出和版本兼容检查。当前版本为 **0.3.1 / Forge API 2**，适配官方客户端 **26.1023.6123.0（Windows x64，更新源构建 26.1023.6621.0）**；同时保留 26.1021.2667.0 和 26.1016.8622.0 适配器用于回归。
+Codex Forge 是 Windows Codex 客户端的第三方插件宿主，为插件提供原生界面入口、统一设置、会话输出和版本兼容检查。**0.3.2** 适配官方客户端 **26.1027.3384.0（Windows x64，更新源构建 26.1027.6604.0）**，保持 **Forge API 2**；同时保留三个旧版适配器用于回归。
 
-[下载安装包](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.3.1) · [从零开发插件](docs/PLUGIN-DEVELOPMENT-ZERO-TO-ONE.md) · [API 参考](docs/PLUGIN-API.md) · [更新协议](docs/UPDATES.md)
+[下载安装包](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.3.2) · [从零开发插件](docs/PLUGIN-DEVELOPMENT-ZERO-TO-ONE.md) · [API 参考](docs/PLUGIN-API.md) · [更新协议](docs/UPDATES.md)
 
 [DSH 源码对照](docs/DEEPSEEK-HARNESS-MAPPING.md) 记录了 Forge API 对 DeepSeek Harness 的实际借鉴、实现位置和有意保留的边界。
+
+## 0.3.2 更新
+
+- **新版客户端适配**：新增 `26.1027.3384.0` 固定适配器，更新主页面工作区、设置导航、Fast 控件及新版后端模块；九个内置插件和示例同步加入兼容声明。
+- **主页面按钮**：在新版客户端实际承载聊天工作区的模块中登记原生侧栏，冷启动和切换对话后均可打开左栏及工具栏的 Forge 页面，无需先进入设置。
+- **指纹检测隔离**：三份样本分别使用独立临时会话及空工作目录，不复制主任务历史与项目指令；保持当前模型、提供商与思考强度，继续拒绝实际工具调用。计划、压缩和评审状态事件不再误报为工具调用。
+- **异常清理**：关闭检测进程后清理临时目录，避免 Windows 目录占用覆盖原始错误。
+
+验证覆盖自动回归、实际官方模块构建及新版 CLI 的本地模拟协议。测试环境中，适配版与未修改的官方版都在窗口出现前以 `0x80000003` 退出，尚未完成真实桌面点击验收；详见[验证记录](docs/VALIDATION.md)。
 
 ## 0.3.1 更新
 
@@ -22,16 +31,16 @@ Codex Forge 是 Windows Codex 客户端的第三方插件宿主，为插件提�
 
 ## 安装与启动
 
-1. 从 Release 下载 `Codex-Forge-0.3.1-Windows.msi`，可对照 `SHA256SUMS.txt` 校验；也可以下载 `Codex-Forge-0.3.1-Windows-Portable.zip` 直接解压运行。
+1. 从 Release 下载 `Codex-Forge-0.3.2-Windows.msi`，可对照 `SHA256SUMS.txt` 校验；也可以下载 `Codex-Forge-0.3.2-Windows-Portable.zip` 直接解压运行。
 2. 双击 MSI 或使用 `msiexec /i` 安装。默认安装在 `%LOCALAPPDATA%\Programs\Codex Forge`，Windows Installer 负责升级和卸载；桌面快捷方式可通过 `CREATEDESKTOPSHORTCUT=0` 关闭。
-3. 安装完成后，准备程序从 OpenAI 官方 HTTPS 地址下载适配的 Codex MSIX（约 934 MiB），检查大小、SHA-256、签名、产品身份、版本及架构，再在本地应用 Forge 适配器。
+3. 安装完成后，准备程序从 OpenAI 官方 HTTPS 地址下载适配的 Codex MSIX（约 958 MiB），检查大小、SHA-256、签名、产品身份、版本及架构，再在本地应用 Forge 适配器。
 4. 准备成功后运行 **CodexForge.exe**。请先退出其他使用相同配置的 Codex 客户端。
 
 **MSI 和便携 ZIP 只包含 Forge，不包含官方客户端、Node、MSIX 或用户凭据。** 首次准备需要网络和约 7 GB 临时可用空间。下载支持续传；准备失败后再次启动 Forge 可重试，日志位于安装目录的 `forge-prepare.log`。安装阶段不下载官方客户端，启动 `CodexForge.exe` 后才开始准备。
 
-0.3.0 用户可运行新版 MSI 升级；从 0.2.x 升级请手动下载 0.3.1 MSI 并运行；旧客户端的 API 1 更新器不能直接接受 API 2 发布清单。已有 API 1 第三方插件会显示版本不兼容，须由作者迁移；用户数据继续保留。
+0.3.0 / 0.3.1 用户可运行新版 MSI 升级；从 0.2.x 升级请手动下载 0.3.2 MSI 并运行；旧客户端的 API 1 更新器不能直接接受 API 2 发布清单。已有 API 1 第三方插件会显示版本不兼容，须由作者迁移；用户数据继续保留。
 
-发行包使用 MSI 和便携 ZIP。**0.3.1 的 Forge EXE 与 MSI 未进行 Authenticode 签名**，Windows 可能显示未知发布者。`SHA256SUMS.txt` 用于核对下载文件完整性，不替代发布者签名；签名和 Defender 声誉验证尚未完成。
+发行包使用 MSI 和便携 ZIP。**0.3.2 的 Forge EXE 与 MSI 未进行 Authenticode 签名**，Windows 可能显示未知发布者。`SHA256SUMS.txt` 用于核对下载文件完整性，不替代发布者签名；签名和 Defender 声誉验证尚未完成。
 
 如需移除当前运行的 Forge，可在项目目录执行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/uninstall-current-forge.ps1 -WhatIf` 先预览，再去掉 `-WhatIf` 执行。脚本只清理 Forge 安装目录、快捷方式和启动项，保留 `%CODEX_HOME%` 用户数据。
 
@@ -47,7 +56,7 @@ GitHub 仓库与 Release 已公开，无需登录即可查看源码、下载安�
 | --- | --- |
 | Fast 与模型配置 | API Key / 无需登录的自定义提供商可以使用原生 Fast 控件，保留受管限制；发送时由原生后端转换为 `service_tier: priority`。不开放 API Ultrafast。 |
 | GPT-6.1-Sol 独立 500K | 启动时基于用户模型目录（或 `models_cache.json`）生成 Forge 专用覆盖目录，仅将 `gpt-6.1-sol` 设置为 500,000（95% 可用窗口为 475,000），传给原生后端与检测进程。缺少该条目时沿用 GPT-6-Sol 能力描述；其他模型和原配置文件不改写。无可用目录时输出启动诊断。 |
-| 信息统计 | 左栏底部速度/指纹卡片，确认不符时红字提示；右侧概览、检测、历史三视图，显示端到端速度、加权均速、缓存/推理 Token、日志上下文占用及模型/思考强度/窗口变更。三组临时分支数字检测由用户手动启动。 |
+| 信息统计 | 左栏底部速度/指纹卡片，确认不符时红字提示；右侧概览、检测、历史三视图，显示端到端速度、加权均速、缓存/推理 Token、日志上下文占用及模型/思考强度/窗口变更。三组独立临时会话数字检测由用户手动启动。 |
 | 记忆管理 | 搜索双记忆目录，按来源、分类及时间/名称筛选；自定义备注新建、重命名、删除、冲突保护与面板内草稿保留；生成摘要和历史保持只读。 |
 | 内置浏览器 | 继承 r3 免登录配置，通过启动参数启用 `desktop.conversationDetailMode="STEPS_COMMANDS"`；保留完整 `@oai` 浏览器组件。该选项可在插件设置中关闭。 |
 | 无限画布 | 节点、连线、图片、缩放、撤销/重做、删除/恢复，画布描述/颜色/预览，以及可折叠、可配置网格的分组节点；模型可读取与编辑。 |

@@ -27,6 +27,15 @@ export const oct23NativeSymbols = {
   routeScope: 'Or(SS)', fullWidthRead: 'Or(SS).get(DS)',
 };
 
+export const oct27NativeSymbols = {
+  registryAnchor: 'Y6r=[`left`,`right`],BB=new Map,X6r=',
+  scopeAnchor: 'function Xzt(e){let t=(0,Zzt.c)(10),{layout:n,fallback:r}=e,i=r!==void 0&&r,a=Is(qx),o=i?jzt:Azt,s=',
+  scopeInjection: 'function Xzt(e){let t=(0,Zzt.c)(10),{layout:n,fallback:r}=e,i=r!==void 0&&r,a=Is(qx);fastWorkspaceRememberScope(a);let o=i?jzt:Azt,s=',
+  registryMap: 'BB', register: 'zB', controller: 'YB', routeUnavailable: 'Jx',
+  fullWidth: 'Qx', react: 'Bs()', openPanel: 'YU', layout: 'c2',
+  routeScope: 'Is(qx)', fullWidthRead: 'Is(qx).get(Qx)',
+};
+
 // 两个字符的符号（nb/cb）如果按字面量整体替换，会误改 inbound、callback 这类
 // 子串；表达式锚点（E(tb)、Z(cb)）又必须先于标识符替换，否则会被拆开。这里对
 // 标识符使用词边界正则，并对关键符号断言必须命中，避免静默产出坏补丁。
@@ -51,8 +60,8 @@ function rewriteExtension(extension, symbols) {
   return result;
 }
 
-export function patchNativeTabs(source, extension, { version = 'legacy', symbols } = {}) {
-  const selected = symbols || (version === 'oct23' ? oct23NativeSymbols : version === 'current' ? currentNativeSymbols : legacyNativeSymbols);
+export function patchNativeTabs(source, extension, { version = 'legacy', symbols, exportScope = false } = {}) {
+  const selected = symbols || (version === 'oct27' ? oct27NativeSymbols : version === 'oct23' ? oct23NativeSymbols : version === 'current' ? currentNativeSymbols : legacyNativeSymbols);
   for (const anchor of [selected.registryAnchor, selected.scopeAnchor]) {
     assert.equal(source.split(anchor).length, 2, 'Native workspace anchor changed: ' + anchor);
   }
@@ -63,5 +72,21 @@ export function patchNativeTabs(source, extension, { version = 'legacy', symbols
   const registryReplacement = selected.registryAnchor.replace(registryMapAnchor, registryMapAnchor + 'fastWorkspaceRegisterTabs(),');
   return source.replace(selected.registryAnchor, registryReplacement)
     .replace(selected.scopeAnchor, selected.scopeInjection)
-    + '\n/* FAST_NATIVE_WORKSPACE_TABS */\n' + rewriteExtension(extension, selected);
+    + '\n/* FAST_NATIVE_WORKSPACE_TABS */\n' + rewriteExtension(extension, selected)
+    + (exportScope ? '\nexport { fastWorkspaceRememberScope };\n' : '');
+}
+
+// Recent chat layouts live in app-primary. The layout registration in
+// app-initial is only mounted by some routes (including Settings/loading).
+export function patchNativeWorkspace(source, { version, renderer } = {}) {
+  const anchors = {
+    oct23: ['workspaceWidth:u}=e,d=Fi(ND),f=me(),p,m;', 'workspaceWidth:u}=e,d=Fi(ND),f=(fastWorkspaceRememberScope(d),me()),p,m;'],
+    oct27: ['workspaceWidth:d}=e,f=rf(fT),p=Zt(),m,h;', 'workspaceWidth:d}=e,f=rf(fT),p=(fastWorkspaceRememberScope(f),Zt()),m,h;'],
+  };
+  assert(anchors[version], 'Unsupported native workspace module');
+  assert.match(renderer, /^webview\/assets\/app-initial-[\w-]+\.js$/);
+  const [anchor, replacement] = anchors[version];
+  assert.equal(source.split(anchor).length, 2, 'Native chat workspace anchor changed');
+  return 'import { fastWorkspaceRememberScope } from ' + JSON.stringify('./' + renderer.split('/').at(-1)) + ';\n'
+    + source.replace(anchor, replacement);
 }

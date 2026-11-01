@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "forgeVersion": "0.3.1",
+  "forgeVersion": "0.3.2",
   "apiVersion": 2,
   "codexVersion": "26.1023.6123.0",
   "codexBuildVersion": "26.1023.6621.0",
@@ -14,6 +14,7 @@
   "baseExecutableSHA256": "5871c61efd9db4026e30bfef21774ff9e6bd815127fffbb4d04262c42d7cddde",
   "members": {
     "renderer": "webview/assets/app-initial-b0cd131b9dba.js",
+    "workspaceRenderer": "webview/assets/app-primary-8eba40dc50b2.js",
     "settingsPage": "webview/assets/settings-page-15fb6142eddb.js",
     "visibleSettings": "webview/assets/use-visible-settings-sections-a0c3d6615c92.js",
     "network": ".vite/build/application-network-startup-DMyt3FBI.js"

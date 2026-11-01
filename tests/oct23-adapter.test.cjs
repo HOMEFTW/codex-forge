@@ -11,7 +11,6 @@ const normalize=value=>JSON.parse(JSON.stringify(value));
 test('oct23 adapter pins the official MSIX identity, build, digest and private symbol profile',async()=>{
   const {oct23NativeSymbols}=await import('../scripts/native-tabs-patch.mjs');
   const config=JSON.parse(fs.readFileSync(path.join(__dirname,'../forge.config.json'),'utf8'));
-  assert.equal(config.codexVersion,adapter.codexVersion);
   assert.equal(adapter.codexVersion,'26.1023.6123.0');
   assert.equal(adapter.codexBuildVersion,'26.1023.6621.0');
   assert.equal(adapter.patchSet,'oct23');
@@ -107,4 +106,39 @@ test('oct23 workspace registration, model-statistics tab and full-width mode use
   const node=scope.JH.get('fast-workspace').Component({page:'information-stats'});
   assert.equal(node.props['data-fast-native-mode'],'expanded');
   assert.throws(()=>scope.fastWorkspaceNativeDispatch({action:'open',page:'canvas',threadId:'other'}),/对应对话/);
+});
+
+test('cold chat layout opens sidebar and toolbar pages before visiting settings and after changing threads',async()=>{
+  const {patchNativeTabs,patchNativeWorkspace}=await import('../scripts/native-tabs-patch.mjs');
+  const extension=fs.readFileSync(path.join(__dirname,'../runtime/native-tabs-renderer.js'),'utf8');
+  const patched=patchNativeTabs(adapter.nativeSymbols.registryAnchor+adapter.nativeSymbols.scopeAnchor,extension,{version:'oct23',exportScope:true});
+  assert.match(patched,/export \{ fastWorkspaceRememberScope \}/);
+  // Preserve the real app-primary hook prefix; the remaining JSX is irrelevant
+  // to route capture. Deliberately never render yzt or a Settings component.
+  const chat='function BLt(e){let {workspaceWidth:u}=e,d=Fi(ND),f=me(),p,m;return {scope:d,width:u,value:f}}';
+  const workspace=patchNativeWorkspace(chat,{version:'oct23',renderer:adapter.members.renderer});
+  assert.match(workspace,/import \{ fastWorkspaceRememberScope \} from "\.\/app-initial-b0cd131b9dba.js"/);
+  const full=Symbol('full'),unavailable=Symbol('unavailable'),tabById=Symbol('tabById'),listeners=new Map(),replies=[];
+  let active;
+  const window={addEventListener:(name,fn)=>listeners.set(name,fn),postMessage:reply=>replies.push(reply)};
+  const scope={window,JH:new Map(),CS:unavailable,DS:full,ND:{},Fi:()=>active,me:()=> 'native hook value',yK:()=>true,c2:(r,content,mode)=>{r.full=mode.mode==='full';return true;}};
+  scope.KH=(kind,Component,options)=>{const value={kind,Component,...options};scope.JH.set(kind,value);return value;};
+  scope.iU={tabById$:tabById,openTab:(r,tabType,options)=>r.tabs.set(options.id,{tabId:options.id,tabType,props:options.props})};
+  vm.runInNewContext(patched.split('/* FAST_NATIVE_WORKSPACE_TABS */')[1].replace('export { fastWorkspaceRememberScope };','')+'\n'+chat,scope);
+  scope.fastWorkspaceRegisterTabs();
+  active={value:{conversationId:'cold-thread'},get:()=>false};
+  scope.BLt({workspaceWidth:1200});
+  assert.throws(()=>scope.fastWorkspaceNativeDispatch({action:'open',page:'canvas',threadId:'cold-thread'}),/对应对话/,'old hook does not capture the cold chat route');
+  vm.runInNewContext(workspace.replace(/^import[^\n]+\n/,''),scope);
+  for(const id of ['thread_1','thread_2']){
+    active={value:{conversationId:id},tabs:new Map(),full:false,get(signal,key){return signal===full?this.full:signal===unavailable?false:signal===tabById?this.tabs.get(key):undefined;}};
+    assert.equal(scope.BLt({workspaceWidth:1200}).value,'native hook value');
+    for(const page of ['canvas','todos','collaboration','skills','information-stats','codex-memory','forge-plugins','forge-updates']){
+      listeners.get('message')({source:window,data:{fastWorkspaceNativeRequest:{id:id+page,action:'open',page,threadId:id}}});
+      assert.equal(replies.at(-1).fastWorkspaceNativeReply.error,undefined);
+      assert(active.tabs.has('fast-workspace:'+page));
+    }
+  }
+  assert.throws(()=>patchNativeWorkspace(chat+chat,{version:'oct23',renderer:adapter.members.renderer}),/anchor changed/);
+  assert.throws(()=>patchNativeWorkspace(workspace,{version:'oct23',renderer:adapter.members.renderer}),/anchor changed/);
 });

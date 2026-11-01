@@ -6,6 +6,19 @@ function replace(source, from, to, label = from) {
 }
 
 export function patchSettingsVisibility(source, { version = 'legacy' } = {}) {
+  if (version === 'oct27') {
+    source = replace(source, 'case`plugins-settings`:return{visible:p,pending:!1};',
+      'case`plugins-settings`:return{visible:p,pending:!1};case`codex-forge`:return{visible:!0,pending:!1};');
+    source = replace(source, 'co=[`profile`,`agent`,`personalization`,`mcp-settings`,`plugins-settings`,`file-type-handlers`',
+      'co=[`profile`,`agent`,`personalization`,`mcp-settings`,`plugins-settings`,`codex-forge`,`file-type-handlers`');
+    source = replace(source, '"plugins-settings":`codexOrWorkLocal`,"file-type-handlers"',
+      '"plugins-settings":`codexOrWorkLocal`,"codex-forge":`codexOrWorkLocal`,"file-type-handlers"');
+    source = replace(source, '}),G=kt.flatMap(ao),', '}),G=[...kt.flatMap(ao),{slug:`codex-forge`}],');
+    source = replace(source, 'let J=kt.find(q),',
+      'let J=kt.find(q)||(i===`codex-forge`?{section:{slug:`codex-forge`},visible:!0,pending:!1,error:!1}:void 0),');
+    return replace(source, 'function za(e,t){return e===`cloud-environments`?',
+      'function za(e,t){if(e===`codex-forge`)e=`plugins-settings`;return e===`cloud-environments`?');
+  }
   if (version === 'oct23') {
     source = replace(source, 'case`plugins-settings`:return{visible:p,pending:!1};',
       'case`plugins-settings`:return{visible:p,pending:!1};case`codex-forge`:return{visible:!0,pending:!1};');
@@ -52,6 +65,20 @@ export function patchSettingsVisibility(source, { version = 'legacy' } = {}) {
 }
 
 export function patchSettingsPage(source, { version = 'legacy' } = {}) {
+  if (version === 'oct27') {
+    source = replace(source, 'l=vn(e.slug,D,t),',
+      'l=e.slug===`codex-forge`?{id:`codexForge.settings`,defaultMessage:`Codex Forge 插件设置`}:vn(e.slug,D,t),');
+    source = replace(source, 'f=()=>{r||e.appRoute!=null||Qt(e.slug).catch(ti)}',
+      'f=()=>{r||e.slug===`codex-forge`||e.appRoute!=null||Qt(e.slug).catch(ti)}');
+    source = replace(source, 'p=L?(0,Q.jsx)(mn,{',
+      'p=L?e.slug===`codex-forge`?(0,Q.jsx)(V,{id:`codexForge.settings`,defaultMessage:`Codex Forge 插件设置`}):(0,Q.jsx)(mn,{');
+    source = replace(source, 'slugs:[`plugins-settings`,`file-type-handlers`',
+      'slugs:[`plugins-settings`,`codex-forge`,`file-type-handlers`');
+    source = replace(source, 'label:(0,Q.jsx)(mn,{codexMicroDeviceModel:E,showChatGptDataControlsLabel:t,showEnterpriseUsageLabel:D,slug:e.slug})',
+      'label:e.slug===`codex-forge`?(0,Q.jsx)(V,{id:`codexForge.settings`,defaultMessage:`Codex Forge 插件设置`}):(0,Q.jsx)(mn,{codexMicroDeviceModel:E,showChatGptDataControlsLabel:t,showEnterpriseUsageLabel:D,slug:e.slug})');
+    return replace(source, 'Oe=o}let ke;',
+      'Oe=o}if(C===`codex-forge`)Oe=(0,$.jsx)(`div`,{\x22data-forge-settings-mount\x22:`true`,\x22data-forge-settings-plugin\x22:new URLSearchParams(f.search).get(`plugin`)||``,style:{width:`100%`,height:`100%`,minHeight:500,display:`flex`}});let ke;');
+  }
   if (version === 'oct23') {
     source = replace(source, 'u=hn(e.slug,M,t),',
       'u=e.slug===`codex-forge`?{id:`codexForge.settings`,defaultMessage:`Codex Forge 插件设置`}:hn(e.slug,M,t),');
