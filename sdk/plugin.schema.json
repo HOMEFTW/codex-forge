@@ -34,6 +34,6 @@
     "event":{"type":"object","required":["name"],"properties":{"name":{"type":"string","pattern":"^plugin\\.[a-z][a-z0-9.-]*\\.[a-z][a-z0-9_.:-]{0,79}$"},"title":{"type":"string","maxLength":100}}},
     "button":{"type":"object","required":["id","title"],"properties":{"id":{"type":"string"},"title":{"type":"string"},"panel":{"type":"string"},"command":{"type":"string"}},"anyOf":[{"required":["panel"]},{"required":["command"]}]},
     "panel":{"type":"object","required":["id","title","entry"],"properties":{"id":{"type":"string"},"title":{"type":"string"},"entry":{"type":"string"},"placement":{"enum":["right","expanded"]},"placementReason":{"type":"string","minLength":6}},"allOf":[{"if":{"properties":{"placement":{"const":"expanded"}},"required":["placement"]},"then":{"required":["placementReason"]}}]},
-    "setting":{"type":"object","required":["type","title"],"properties":{"type":{"enum":["string","number","boolean"]},"title":{"type":"string"},"default":{},"enum":{"type":"array"},"minimum":{"type":"number"},"maximum":{"type":"number"},"maxLength":{"type":"integer"}}}
+    "setting":{"type":"object","required":["type","title"],"properties":{"type":{"enum":["string","number","boolean","array"]},"title":{"type":"string"},"default":{},"enum":{"type":"array"},"minimum":{"type":"number"},"maximum":{"type":"number"},"maxLength":{"type":"integer"},"items":{"type":"object","required":["type"],"properties":{"type":{"const":"string"},"maxLength":{"type":"integer","minimum":1}}},"maxItems":{"type":"integer","minimum":1,"maximum":1000}}}
   }
 }

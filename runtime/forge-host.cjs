@@ -78,6 +78,10 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
       case 'checkPluginUpdate': { const result=await pluginUpdates.checkPluginUpdate(registry,args.id);pluginPlans.set(args.id,result);broadcast();return result; }
       case 'stagePluginUpdate': { const result=await pluginUpdates.stagePluginUpdate(registry,pluginPlans.get(args.id));broadcast();return result; }
       case 'settings': return registry.settings(args.id);
+      case 'fastModels': {
+        check(args.enableTerra === undefined || typeof args.enableTerra === 'boolean', 'Terra 开关无效');
+        return require('./model-catalog.cjs').modelOptions({ settings: { enableTerra: args.enableTerra !== false } });
+      }
       case 'saveSettings': { const result = registry.settings(args.id, args.value); broadcast(); return result; }
       case 'install': {
         const selected = await dialog.showOpenDialog(state.win, { title: '安装 Codex Forge 插件', properties: ['openDirectory'] });

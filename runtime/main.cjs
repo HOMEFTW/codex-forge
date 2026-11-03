@@ -14,13 +14,9 @@ const { NativeApprovals } = require('./native-approvals.cjs');
 const { InformationStats } = require('./information-stats.cjs');
 const { runInformationProbe } = require('./information-probe.cjs');
 const { CodexMemory } = require('./codex-memory.cjs');
-const { prepareModelCatalog } = require('./model-catalog.cjs');
+const { applyFastModelSettings } = require('./model-catalog.cjs');
 const defaultTarget = () => ({ agent: 'codex', model: '', reasoningEffort: '' });
 function install() {
-  if (process.versions.electron) {
-    try { process.env.CODEX_FORGE_MODEL_CATALOG = prepareModelCatalog({ root: process.env.CODEX_FORGE_HOME }).path; }
-    catch (error) { delete process.env.CODEX_FORGE_MODEL_CATALOG; console.error('[Forge 500K]', error.message); }
-  }
   const { app, BrowserWindow, ipcMain, Menu, MenuItem, dialog, shell } = require('electron');
   ipcMain.on('forge:startup-flags', event => {
     const frame = event.senderFrame, main = event.sender.mainFrame;
@@ -349,6 +345,10 @@ function install() {
     fs.writeFileSync(path.join(store.root, '.diagnostics.json'), JSON.stringify({ menu: Menu.getApplicationMenu()?.items.map(item => ({ label: item.label, id: item.id })) }, null, 2));
   }, 10000);
   forge = require('./forge-host.cjs').installForge({ipcMain,dialog,host,threadContext,nativeCall,nativeMessage:(state,message)=>{if(!state.bridge) throw Error('原生连接尚未就绪'); return state.bridge.handler(state.bridge.event,message);},open,notify,states,collaboration});
+  if (process.versions.electron) {
+    try { const result = applyFastModelSettings({ registry: forge.registry }); if (result.visibilityFallback) console.warn('[Forge models] 模型目录已变化，已恢复默认模型显示；请检查 Fast 与模型配置设置。'); }
+    catch (error) { console.error('[Forge models]', error.message); }
+  }
   return { forge, states, store, todos, collaboration, contexts, skills, directHistory, addMenu };
 }
 module.exports = { install };

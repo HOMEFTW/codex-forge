@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "apiVersion": 2,
-  "version": "0.3.2",
+  "version": "0.3.3",
   "compatibility": {
     "codex": [
       "26.1027.3384.0",
@@ -29,6 +29,13 @@
     }
   ],
   "changelog": [
+    {
+      "version": "0.3.3",
+      "date": "2026-11-03",
+      "items": [
+        "新增模型显示控制与 GPT-6.1-Terra / Fast 开关；保存后重启生效。"
+      ]
+    },
     {
       "version": "0.3.2",
       "date": "2026-11-01",
@@ -60,7 +67,7 @@
   ],
   "id": "forge.fast",
   "name": "Fast 与模型配置",
-  "description": "API Key/自定义提供商的 Fast 能力；保持模型、提供商及上下文目录配置。",
+  "description": "原生模型显示控制、GPT-6.1-Terra 与 Fast 支持；设置统一保存，重启后生效。",
   "contributes": {
     "settings": {
       "properties": {
@@ -72,6 +79,21 @@
             "fast"
           ],
           "default": "fast"
+        },
+        "enableTerra": {
+          "type": "boolean",
+          "title": "启用 GPT-6.1-Terra 模型与 Fast 支持",
+          "default": true
+        },
+        "hiddenModels": {
+          "type": "array",
+          "title": "隐藏的模型",
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "maxItems": 200,
+          "default": []
         }
       }
     }

@@ -1,6 +1,6 @@
 # Forge API 2
 
-Forge API 2 随 Codex Forge 0.3.0 引入，当前实现随 0.3.2 发布。插件清单、`forge.apiVersion`、上下文和能力查询的 API 版本均为 `2`；清单与更新协议的 `schemaVersion` 保持各自版本，不随 API 主版本一起递增。
+Forge API 2 随 Codex Forge 0.3.0 引入，当前实现随 0.3.3 发布。插件清单、`forge.apiVersion`、上下文和能力查询的 API 版本均为 `2`；清单与更新协议的 `schemaVersion` 保持各自版本，不随 API 主版本一起递增。
 
 从 API 1 迁移：将 `plugin.json` 的 `apiVersion` 改为 `2`，将 Forge 兼容范围改为经过测试的 `>=0.3.0 <0.4.0`，更新 SDK，并验证能力声明、UI 插槽、权限及已有交互。API 1 清单仍可读取用于诊断，但版本不匹配时不会启用；不会自动修改已安装第三方插件。DSH 导入器按当前宿主 API 生成清单。
 
@@ -33,7 +33,7 @@ Forge API 2 随 Codex Forge 0.3.0 引入，当前实现随 0.3.2 发布。插件
 
 静态按钮在 `contributes.sidebar/toolbar/composer` 中声明；动态注册使用相同 `{id,title,command}` 或 `{id,title,panel}` 结构。安装后默认停用。停用卸载会销毁运行时与贡献点；卸载保留独立设置。代码或清单被手动修改后，重新加载会要求审阅并重新启用。
 
-`contributes.settings.properties` 使用 `{type,title,default,enum,minimum,maximum,maxLength}`，支持字符串、数字和布尔值。设置界面自动集中到原生“Codex Forge 插件设置”；插件管理的设置按钮携带插件 ID 深链接，用户不必自行查找。
+`contributes.settings.properties` 使用 `{type,title,default,enum,minimum,maximum,maxLength}`，支持字符串、数字、布尔值；0.3.3 起还支持字符串数组（`type: "array", items: {type: "string", maxLength: 200}, maxItems: 200, default: []`）。数组拒绝重复项、空字符串和非字符串，默认最多 200 项，每项默认最长 200 字符；`maxItems` 可设为 1–1000。使用数组的第三方插件应声明 Forge `>=0.3.3 <0.4.0`，API 版本仍为 2。设置界面自动集中到原生“Codex Forge 插件设置”；插件管理的设置按钮携带插件 ID 深链接，用户不必自行查找。
 
 `capabilities.get()` 对应 DSH 的 capability seam 思路：插件先读取宿主实际提供的能力与自己的 `denied` 列表，再决定是否显示入口。声明与授权仍由宿主逐请求校验，能力查询不会绕过权限。
 

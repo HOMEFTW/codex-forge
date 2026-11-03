@@ -4,7 +4,7 @@
   "apiVersion": 2,
   "id": "example.hello",
   "name": "Hello Forge",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "演示原生标签、输入框、独立存储、会话输出、浏览器和统一设置。",
   "compatibility": {
     "codex": [
@@ -119,6 +119,13 @@
     }
   },
   "changelog": [
+    {
+      "version": "0.3.3",
+      "date": "2026-11-03",
+      "items": [
+        "随 Codex Forge 0.3.3 发布，保持 Forge API 2。"
+      ]
+    },
     {
       "version": "0.3.2",
       "date": "2026-11-01",

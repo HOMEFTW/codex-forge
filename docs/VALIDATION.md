@@ -1,4 +1,20 @@
-# 0.3.2 验证记录（2026-11-01）
+# 0.3.3 验证记录（2026-11-03）
+
+- “Fast 与模型配置”统一管理默认速度、Terra 补齐与模型隐藏。设置校验拒绝全部隐藏、重复或非法数组项，失败不覆盖旧值；停用与重新启用保留设置。启动时目录变化导致全隐藏会恢复默认列表并输出诊断，读取异常会清理继承的旧目录参数。
+- `node scripts/run-tests.mjs`：266 项通过，0 失败、0 跳过；`npm run build`、Windows 启动器/准备程序编译、教程 create/validate/install/settings/command/pack/uninstall 流程通过。升级匹配覆盖 0.3.0、0.3.1、0.3.2 → 0.3.3，API 保持 2。
+- Playwright 在独立 localhost 页面加载真实 Forge React 设置组件和隔离的 ForgeRegistry：模型勾选、保存后重载、恢复默认、最后一项保护、Terra 关闭导致空列表时禁止保存、速度持久化、停用提示、380px 深色布局通过；原生隐藏的内部模型未暴露。
+- 真实随包 CLI + localhost Responses 模拟接口，从插件持久化设置生成目录和启动参数：隐藏 `gpt-6-sol` 后原生 `model/list(includeHidden:false)` 不返回该项，`includeHidden:true` 保留描述，已有会话仍能请求该模型；恢复默认后重新可选。Terra Fast → 普通 → Sol Fast → Terra Fast 四回合模型与档位准确，停用插件后 Terra 补齐消失、Sol 恢复可选且请求不带 priority。
+- 沿用官方客户端 26.1027.3384.0 / Feed 26.1027.6604.0，未安装或重启当前客户端。浏览器组件验证不代表原生桌面点击验收；同版桌面进程此前的 `0x80000003` 启动限制仍未解除。没有真实凭据或付费请求，未验证服务商实际可用性、延迟或长上下文接收。
+
+## Terra 前置验证（2026-11-03，现合入 0.3.3）
+
+- 模型目录增加 `gpt-6.1-terra` 原生列表项和 `priority` / Fast 档位。已有描述保留自定义上下文、推理能力和服务档位；缺少时从兼容 Terra/Sol 描述补齐，在 Sol 的 500K 覆盖前取值，避免将该覆盖扩散到 Terra。推理档位依据[官方模型说明](https://developers.openai.com/api/docs/models/gpt-6.1-terra)，原生 Fast 配置依据[配置参考](https://developers.openai.com/codex/config-reference/)。
+- `node scripts/run-tests.mjs`：260 项通过、0 失败、0 跳过；`npm run build` 通过。新增回归覆盖列表可见性、API 可用性、Fast 档位、原始文件不变、已有描述与档位保留、重复加载、Terra-only 目录及上下文隔离。
+- 使用本机安装版随包 CLI 和 localhost 模拟 Responses 接口验证：`model/list` 返回可见 Terra 与 Fast；同一会话依次执行 Terra Fast、Terra 普通速度、Sol Fast、Terra Fast，请求模型与档位均匹配。Terra 使用兼容描述的 272,000 默认上下文，报告 258,400 可用窗口；没有自动扩大至 API 模型的最大窗口。没有真实凭据或付费请求，未验证提供商实际接收及延迟。
+- 本机 0.3.2 的两个运行时文件与准备程序 payload 已备份更新，并同步文件清单和摘要；425 个 payload 文件以及 3,971 个安装文件、22,422 个 ASAR 成员、22,457 个完整性块校验通过。实际生成的模型目录与本地协议测试目录逐字节一致，用户 `config.toml` 和原模型缓存未修改。
+- 此前没有重启当前客户端；新目录在下次完整启动时加载。验证覆盖原生模型列表协议和实际请求参数，尚未进行重启后的桌面菜单点击或真实服务商请求。此前保留源码版本 0.3.2 / API 2，现统一合入 0.3.3；GitHub 历史 0.3.2 附件未替换。
+
+## 0.3.2 验证记录（2026-11-01）
 
 - 官方稳定更新源：构建 `26.1027.6604.0`、发布标识 `26.1027.51404`。实际 x64 MSIX 身份为 `OpenAI.Codex / 26.1027.3384.0`，OpenAI 发布者签名为 Valid；包大小 1,004,631,986 字节，SHA-256 为 `d442a3d7d5c229f45e5e11995711ac2619c8dbc89e3fa2bc185287dc8db8e76e`。固定版本官方 URL 返回 200，大小与已验证包一致。
 - 新增独立 `oct27` 适配器，保留三个旧版适配器。适配聊天工作区、布局登记、原生标签、设置导航与深链接、Fast 控件及改为 webpack 分块的本地后端启动模块。Forge、npm/lockfile、启动器、准备程序、四个适配器、九个内置插件、示例、组合包及开发文档统一为 0.3.2；Forge API 保持 2。

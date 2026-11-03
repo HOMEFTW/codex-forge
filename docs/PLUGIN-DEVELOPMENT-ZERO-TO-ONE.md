@@ -1,6 +1,6 @@
 # 从零开发一个 Codex Forge 插件
 
-本教程用 JavaScript 和 HTML 创建一个能在原生右侧标签中显示、读取统一设置、向当前会话输出、编辑输入草稿及打开内置浏览器的插件。目标环境：Windows x64，Codex Forge 0.3.2 / API 2，目标客户端 26.1027.3384.0（同时保留三个旧版兼容声明）。
+本教程用 JavaScript 和 HTML 创建一个能在原生右侧标签中显示、读取统一设置、向当前会话输出、编辑输入草稿及打开内置浏览器的插件。目标环境：Windows x64，Codex Forge 0.3.3 / API 2，目标客户端 26.1027.3384.0（同时保留三个旧版兼容声明）。
 
 ## 1. 获取源码与创建项目
 
@@ -31,7 +31,7 @@ node cli/forge.mjs create ./my-first-plugin
   "apiVersion": 2,
   "id": "yourname.first-plugin",
   "name": "我的第一个插件",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "在当前会话插入问候，显示可折叠输出，并打开内置浏览器。",
   "compatibility": {
     "codex": ["26.1027.3384.0", "26.1023.6123.0", "26.1021.2667.0", "26.1016.8622.0"],
@@ -62,7 +62,7 @@ node cli/forge.mjs create ./my-first-plugin
       }
     }
   },
-  "changelog": [{"version": "0.3.2", "date": "2026-11-01", "items": ["适配 Codex Forge 0.3.2 / API 2。"]}]
+  "changelog": [{"version": "0.3.3", "date": "2026-11-03", "items": ["适配 Codex Forge 0.3.3 / API 2。"]}]
 }
 ```
 
@@ -206,7 +206,7 @@ if (capabilities.permissions.includes('events')) {
 
 ```powershell
 node cli/forge.mjs validate ./my-first-plugin
-node cli/forge.mjs pack ./my-first-plugin ./first-plugin-0.3.2.forge-plugin.json
+node cli/forge.mjs pack ./my-first-plugin ./first-plugin-0.3.3.forge-plugin.json
 ```
 
 输出包必须在源目录之外，目标文件不能已存在。打包器拒绝链接、`.git`、`node_modules`；插件最多 1,000 文件、20 MiB 解包内容。打包产生两个文件：包本身及其 `.release.json` 清单。

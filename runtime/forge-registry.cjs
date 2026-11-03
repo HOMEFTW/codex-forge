@@ -10,8 +10,9 @@ function fingerprint(root) {
   walk(root); return hash.digest('hex');
 }
 class ForgeRegistry {
-  constructor({ root, bundledRoot = path.join(__dirname, 'plugins'), versions }) {
+  constructor({ root, bundledRoot = path.join(__dirname, 'plugins'), versions, codexHome }) {
     this.root = root; this.bundledRoot = bundledRoot; this.versions = versions; this.entries = new Map(); this.errors = [];
+    this.codexHome = codexHome;
     fs.mkdirSync(path.join(root, 'plugins'), { recursive: true }); fs.mkdirSync(path.join(root, 'storage'), { recursive: true });
     this.stateFile = path.join(root, 'plugins.json'); this.reload();
   }
@@ -64,7 +65,11 @@ class ForgeRegistry {
   }
   settings(id, value) {
     const entry = this.get(id, false), file = path.join(this.root, 'storage', id + '.settings.json');
-    if (value !== undefined) atomic(file, validateSettings(entry.manifest, value));
+    if (value !== undefined) {
+      const validated = validateSettings(entry.manifest, value);
+      if (id === 'forge.fast') require('./model-catalog.cjs').validateModelSelection(validated, { codexHome: this.codexHome });
+      atomic(file, validated);
+    }
     return validateSettings(entry.manifest, json(file, {}));
   }
   permission(id, name) { const e = this.get(id); check(e.manifest.permissions.includes(name), '插件未声明权限：'+name); return e; }

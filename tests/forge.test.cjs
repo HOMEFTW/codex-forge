@@ -1,6 +1,6 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto');
 const {satisfies,compatibility}=require('../runtime/forge-versions.cjs');
-const {validate}=require('../runtime/forge-manifest.cjs');
+const {validate,validateSettings}=require('../runtime/forge-manifest.cjs');
 const {ForgeRegistry}=require('../runtime/forge-registry.cjs');
 const updates=require('../runtime/forge-plugin-updates.cjs');
 const {matchUpdate,checkUpdates,stageUpdate,launchUpdate}=require('../runtime/forge-updates.cjs');
@@ -22,6 +22,18 @@ test('manifest rejects undeclared settings, reserved namespace, path escape and 
 });
 test('manifest accepts the DSH-inspired scoped events capability',t=>{
  const {source}=setup(t);const m=base();m.permissions.push('events');m.entry='main.js';m.contributes.events=[{name:'plugin.test.example.status'}];fs.writeFileSync(path.join(source,'main.js'),'void 0');fs.writeFileSync(path.join(source,'plugin.json'),JSON.stringify(m));assert.equal(validate(JSON.parse(fs.readFileSync(path.join(source,'plugin.json'),'utf8')),source).permissions.includes('events'),true);m.contributes.events=[{name:'plugin.other.status'}];assert.throws(()=>validate(m,source),/事件必须属于本插件/);
+});
+
+test('string-array settings validate schema, defaults and values without sharing mutable arrays',t=>{
+ const {source}=setup(t),m=base();
+ m.contributes.settings.properties.models={title:'Models',type:'array',items:{type:'string',maxLength:10},maxItems:2,default:[]};
+ validate(m,source);
+ const value={models:['one','two']},saved=validateSettings(m,value);saved.models.push('three');
+ assert.deepEqual(value.models,['one','two']);
+ const defaults=validateSettings(m,{});defaults.models.push('one');assert.deepEqual(m.contributes.settings.properties.models.default,[]);
+ for(const invalid of ['one',[1],[''],['one','one'],['one','two','three'],['01234567890']])assert.throws(()=>validateSettings(m,{models:invalid}),/设置/);
+ m.contributes.settings.properties.models.items.type='number';assert.throws(()=>validate(m,source),/字符串元素/);
+ m.contributes.settings.properties.models.items.type='string';m.contributes.settings.properties.models.maxItems=1001;assert.throws(()=>validate(m,source),/长度/);
 });
 test('manifest validates capability declarations and infers them for legacy plugins',t=>{
  const {source}=setup(t);const m=base();

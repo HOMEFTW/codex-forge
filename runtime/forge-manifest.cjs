@@ -92,7 +92,11 @@ function validate(input, root, { builtin = false } = {}) {
     check(commands.has(item.command) || views.has(item.panel), '按钮必须引用本插件命令或面板');
   }
   for (const [key, field] of Object.entries(c.settings?.properties || {})) {
-    check(localId.test(key) && ['string', 'boolean', 'number'].includes(field.type), '设置仅支持 string/boolean/number');
+    check(localId.test(key) && ['string', 'boolean', 'number', 'array'].includes(field.type), '设置仅支持 string/boolean/number/string array');
+    if (field.type === 'array') {
+      check(field.items?.type === 'string' && !field.enum, '数组设置仅支持字符串元素');
+      check(field.maxItems === undefined || Number.isInteger(field.maxItems) && field.maxItems > 0 && field.maxItems <= 1000, '数组设置长度无效');
+    }
     check(typeof field.title === 'string', '设置字段需要标题');
     if (field.enum) check(Array.isArray(field.enum) && field.enum.length <= 50 && field.enum.every(v => typeof v === field.type), '设置枚举类型不匹配');
   }
@@ -112,11 +116,12 @@ function validateSettings(manifest, value) {
   for (const [key, field] of Object.entries(fields)) {
     const v = Object.hasOwn(value, key) ? value[key] : field.default;
     if (v === undefined) continue;
-    check(typeof v === field.type && (field.type !== 'number' || Number.isFinite(v)), '设置类型不符：'+key);
+    check(field.type === 'array' ? Array.isArray(v) : typeof v === field.type && (field.type !== 'number' || Number.isFinite(v)), '设置类型不符：'+key);
+    if (field.type === 'array') check(v.length <= (field.maxItems || 200) && v.every(item => typeof item === 'string' && item.length > 0 && item.length <= (field.items?.maxLength || 200)) && new Set(v).size === v.length, '字符串数组设置无效：'+key);
     check(!field.enum || field.enum.includes(v), '设置值不在选项内：'+key);
     if (typeof v === 'string') check(v.length <= (field.maxLength || 10000), '设置值过长');
     if (typeof v === 'number') check((field.minimum === undefined || v >= field.minimum) && (field.maximum === undefined || v <= field.maximum), '设置数值超出范围');
-    result[key] = v;
+    result[key] = Array.isArray(v) ? [...v] : v;
   }
   return result;
 }

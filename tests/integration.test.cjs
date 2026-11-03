@@ -20,10 +20,27 @@ test('native menu opens package notes and IPC rejects other origins and subframe
  const oldLoad = Module._load, oldRoot = process.env.CODEX_FAST_CANVAS_DIR;
  const oldForgeRoot=process.env.CODEX_FORGE_HOME;process.env.CODEX_FORGE_HOME=path.join(root,'forge');t.after(()=>{if(oldForgeRoot===undefined)delete process.env.CODEX_FORGE_HOME;else process.env.CODEX_FORGE_HOME=oldForgeRoot;});
  process.env.CODEX_FAST_CANVAS_DIR = root;
+ const oldCodexHome = process.env.CODEX_HOME;
+ process.env.CODEX_HOME = path.join(root, 'codex'); fs.mkdirSync(process.env.CODEX_HOME);
+ fs.writeFileSync(path.join(process.env.CODEX_HOME, 'models_cache.json'), JSON.stringify({ models: [
+   { slug: 'gpt-6-sol', display_name: 'Sol', visibility: 'list', base_instructions: 'private prompt' },
+   { slug: 'internal', visibility: 'hide' }
+ ] }));
+ t.after(() => { if (oldCodexHome === undefined) delete process.env.CODEX_HOME; else process.env.CODEX_HOME = oldCodexHome; });
  Module._load = function(name, ...args) { return name === 'electron' ? fake : oldLoad.call(this, name, ...args); };
  try {
   const services = require('../runtime/main.cjs').install();
   const event = { sender: win.webContents, senderFrame: { processId: 20, routingId: 1 } };
+  const manage = (method, args = {}) => handlers.get('forge:manage')(event, { method, args });
+  const models = await manage('fastModels', { enableTerra: true });
+  assert.deepEqual(models.map(model => model.id), ['gpt-6-sol', 'gpt-6.1-sol', 'gpt-6.1-terra']);
+  assert(models.every(model => Object.keys(model).sort().join(',') === 'fast,id,name'));
+  assert(!(await manage('fastModels', { enableTerra: false })).some(model => model.id === 'gpt-6.1-terra'));
+  await assert.rejects(manage('fastModels', { enableTerra: 'false' }), /Terra 开关无效/);
+  const selected = await manage('saveSettings', { id: 'forge.fast', value: { hiddenModels: ['gpt-6-sol'] } });
+  assert.deepEqual(selected.hiddenModels, ['gpt-6-sol']);
+  await assert.rejects(manage('saveSettings', { id: 'forge.fast', value: { hiddenModels: models.map(model => model.id) } }), /至少/);
+  assert.deepEqual((await manage('settings', { id: 'forge.fast' })).hiddenModels, ['gpt-6-sol']);
   const savedFast = process.env.CODEX_FORGE_FAST; process.env.CODEX_FORGE_FAST = '1';
   handlers.get('forge:startup-flags')(event); assert.equal(event.returnValue.fastEnabled, true);
   const untrusted = { ...event, senderFrame: { processId: 20, routingId: 2 } }; handlers.get('forge:startup-flags')(untrusted); assert.equal(untrusted.returnValue.fastEnabled, false);
