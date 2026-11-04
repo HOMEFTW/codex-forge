@@ -1,6 +1,6 @@
 # Nexus 宿主服务与独立插件
 
-Codex Forge **0.4.3 / API 3** 提供本地知识库服务 `nexus`。星枢 Nexus 的界面、渲染依赖和插件清单属于独立工程 `forge-nexus`，插件 ID 为 `homeftw.nexus`，不属于 Forge 内置插件，也不随 Forge MSI、便携 ZIP 或 Release 附件发行。
+Codex Forge **0.4.4 / API 3** 提供本地知识库服务 `nexus`。星枢 Nexus 的界面、渲染依赖和插件清单属于独立工程 `forge-nexus`，插件 ID 为 `homeftw.nexus`，不属于 Forge 内置插件，也不随 Forge MSI、便携 ZIP 或 Release 附件发行。
 
 ## 安装与使用
 

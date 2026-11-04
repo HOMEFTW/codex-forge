@@ -1,5 +1,15 @@
 # Forge 验证记录
 
+## 0.4.4 搜索与插件启用修复（2026-11-04）
+
+- **搜索根因与复现**：隔离客户端点击搜索正常，输入 `forge` 后复现 `TypeError: Cannot read properties of undefined (reading 'values')` 及“ChatGPT 遇到了问题”。新增 Forge 设置项进入原生命令菜单后，`xWQh` 的标题/图标查询仍只认识原生 slug。为该工厂添加精确摘要和两处映射补丁，当前适配器共固定 15 个前端工厂。
+- **插件启用复现**：旧插件仅声明旧 Codex 版本，导入兼容新版的 ZIP 后仍处于暂存阶段；此时启用按钮原先校验旧清单并报不兼容。现在 UI 标明当前/待生效版本并禁用待更新插件的启用按钮，管理 API 返回 `PLUGIN_UPDATE_PENDING`。不提前执行新包或绕过权限/兼容校验，重启替换后可正常启用。
+- `node scripts/run-tests.mjs`：0.4.4 全套 **339 项通过，0 失败，0 跳过**；三个新增回归先在修复前失败，修复后通过。`npm run build`、启动器编译与差异空白检查通过。受限宿主的嵌套 7-Zip/WinForms 启动失败后，在正常权限下执行同一套测试全部通过。证据：本地 `output/forge-tests.tap` 和 `output/forge-tests-result.json`。
+- 实际 0.4.4 隔离 Electron 客户端验证搜索 `forge`、`设置`、无匹配字符串、关闭再打开、点击 Forge 设置结果及返回；星枢 0.2.1 停用、启用、打开面板通过，渲染错误为 0。证据：`output/playwright/search-plugin-native-fix-result.json`、`search-after-query.png` 和 `search-after-navigation.png`。
+- 浏览器集成运行真实 ForgePanel、管理 API 和 ZIP，复现旧清单不兼容→导入兼容新版→“重启后启用”不可点击→宿主重新初始化→正常启用；设置、存储保留，权限重审与降级拒绝仍通过，页面错误为 0。文件选择器采用测试替身。证据：`output/playwright/plugin-overwrite-fix-result.json`。
+- 隔离客户端固定官方 ASAR/EXE 构建和完整性验证通过：4,053 个文件、19,395 个 ASAR 成员、19,427 个块。证据：`output/release-044-integrity.json`。本机正式插件的只读检查显示星枢 0.2.1 已兼容且启用；本轮针对复现的暂存阶段误报修复，不把所有版本错误均归为同一原因。
+- 本轮升为 Forge 0.4.4 / API 3，独立插件版本和官方客户端目标不变。未安装、重启用户当前客户端，未修改其对话或插件数据；未执行 MSI 安装/卸载或真实提供商请求。
+
 ## 0.4.3 独立插件覆盖升级与完整视图修订（2026-11-04）
 
 - 本次保持 Forge `0.4.3`、API `3`、官方客户端 `26.1029.7803.0`，未更改独立插件工程或版本。新增 14 项覆盖安装回归；全套 **336 项通过，0 失败，0 跳过**。受限宿主最初阻止 7-Zip/WinForms 子进程，改在正常权限下运行同一测试集后全部通过。

@@ -23,9 +23,10 @@ test('oct29 adapter pins official identity and every Rspack Fast copy',()=>{
   assert.equal(adapter.codexVersion,'26.1029.7803.0');assert.equal(adapter.patchSet,'oct29');
   assert.equal(adapter.packageIdentity,'OpenAI.Codex');assert.equal(adapter.packageBytes,1052222680);
   assert.equal(adapter.packageSHA256,'19487892b7e27c74e75c6422088e91b35b4291ed485045f82a1984a13b22d128');
-  assert.equal(adapter.rspackModules.length,14);
-  assert.equal(new Set(adapter.rspackModules.map(m=>m.member)).size,14);
+  assert.equal(adapter.rspackModules.length,15);
+  assert.equal(new Set(adapter.rspackModules.map(m=>m.member)).size,15);
   assert.deepEqual(adapter.rspackModules.filter(m=>m.id==='ipV4').map(m=>m.sha256).sort(),fixture.fast.map(digest).sort());
+  assert.equal(adapter.rspackModules.find(m=>m.id==='xWQh').sha256,digest(fixture.search));
 });
 
 test('oct29 HTML permits only the Forge frame scheme and preserves every other CSP directive',async()=>{
@@ -112,6 +113,39 @@ test('oct29 settings navigation renders titles and icons in both widths and does
     await Promise.resolve();assert.deepEqual(selected,['codex-forge','plugins-settings']);assert.deepEqual(prefetched,['plugins-settings','plugins-settings']);
     assert(scope.groups()[0].slugs.includes('codex-forge'));
   }
+});
+
+test('oct29 search renders Forge settings and navigates without losing native command behavior',async()=>{
+  const {patchRspackFactory}=await patch();
+  function render(source,slug,onNavigate){
+    const messages=[],titles=[],icons=[];let closed=0;
+    const modules=new Proxy({}, {get:(_target,id)=>({
+      ABep:{jsx:(type,props)=>({type,...props})},QosV:{c:()=>[]},
+      y5DF:{gh:()=> 'scope'},OWtl:{u:{}},wwME:{V:()=>({platform:'windows'})},
+      Wf1j:{A:()=>({formatMessage:(message,values)=>(titles.push([message,values]),message.defaultMessage)})},
+      Y6nA:{G:slug=>slug==='plugins-settings'?{id:'native.plugins',defaultMessage:'Plugins'}:undefined},
+      cuNJ:{y:(slug,platform)=>(icons.push([slug,platform]),slug==='plugins-settings'?{component:'plugin-icon'}:undefined)},
+      Itrj:{y:'command'},TL6G:{O1:{dispatchHostMessage:message=>messages.push(message)}},
+    }[id]||{})});
+    const require=id=>modules[id];require.d=(target,getters)=>{for(const [key,get] of Object.entries(getters))Object.defineProperty(target,key,{get});};
+    const exports={};
+    source=source.replace('VisibleSettingsCommandMenuSectionItems:()=>S','VisibleSettingsCommandMenuSectionItems:()=>S,__testItem:()=>I');
+    vm.runInNewContext('({'+source+'}).xWQh')({},exports,require);
+    const node=exports.__testItem({close:()=>closed++,section:{slug},onNavigate});
+    node.onSelect();
+    return normalize({node:{title:node.title,value:node.value,LeftIcon:node.LeftIcon},messages,closed,icons,titles});
+  }
+  // The official lookup has no descriptor for the Forge slug.
+  assert.throws(()=>render(fixture.search,'codex-forge'),/values/);
+  const patched=patchRspackFactory(fixture.search,'xWQh');
+  const actual=render(patched,'codex-forge');
+  assert.equal(actual.node.title,'Codex Forge 插件设置');assert.equal(actual.node.LeftIcon,'plugin-icon');
+  assert.deepEqual(actual.messages,[{type:'navigate-to-route',path:'/settings/codex-forge'}]);assert.equal(actual.closed,1);
+  const navigated=[];assert.equal(render(patched,'codex-forge',route=>navigated.push(route)).closed,0);
+  assert.deepEqual(navigated,['/settings/codex-forge']);
+  assert.deepEqual(render(patched,'plugins-settings'),render(fixture.search,'plugins-settings'));
+  assert.throws(()=>patchRspackFactory(patched,'xWQh'),/anchor changed/);
+  assert.throws(()=>patchRspackFactory(fixture.search+fixture.search,'xWQh'),/anchor changed/);
 });
 
 test('oct29 visibility retains Forge and preserves native hidden, unknown and pending route behavior',async()=>{

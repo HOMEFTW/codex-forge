@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "forgeVersion": "0.4.3",
+  "forgeVersion": "0.4.4",
   "apiVersion": 3,
   "codexVersion": "26.1029.7803.0",
   "codexBuildVersion": "26.1029.7803.0",
@@ -100,6 +100,13 @@
       "start": 51665,
       "end": 52317,
       "sha256": "3a28d05bce8d180a3adb608c546d186d9cf6d6d28412daf6631edc11b282d255"
+    },
+    {
+      "id": "xWQh",
+      "member": "webview/assets/async/744415.31ce52e870.js",
+      "start": 109,
+      "end": 4015,
+      "sha256": "74a6e1b8db2228c8f1a26d77180d8838d102c24eb8643f54d397a39080870e8d"
     },
     {
       "id": "MeKU",

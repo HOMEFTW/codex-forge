@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "apiVersion": 3,
-  "version": "0.4.3",
+  "version": "0.4.4",
   "compatibility": {
     "codex": [
       "26.1029.7803.0",
@@ -51,6 +51,13 @@
     ]
   },
   "changelog": [
+    {
+      "version": "0.4.4",
+      "date": "2026-11-04",
+      "items": [
+        "随 Forge 0.4.4 修复搜索崩溃与独立插件覆盖升级的启用提示；保持 API 3 和客户端基线。"
+      ]
+    },
     {
       "version": "0.4.3",
       "date": "2026-11-04",

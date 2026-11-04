@@ -60,7 +60,14 @@ class ForgeRegistry {
   get(id, active = true) { const e = this.entries.get(id); check(e, '插件不存在', 'PLUGIN_NOT_FOUND'); if (active) check(this.status(id).enabled, '插件未启用或不兼容', 'PLUGIN_DISABLED'); return e; }
   setEnabled(id, enabled) {
     check(typeof enabled === 'boolean', '启用值无效'); const entry = this.get(id, false), state = this.state();
-    if (enabled) { const match = compatibility(entry.manifest, this.versions); check(match.compatible, match.reasons.join('；')); }
+    if (enabled) {
+      const pending = json(path.join(this.root, 'pending-updates.json'), {})[id];
+      // A queued package is not the installed version. Review and activate it
+      // only after replacement; applyPending reaches here with its fingerprint.
+      if (pending && pending.fingerprint !== entry.fingerprint && !this.status(id).enabled)
+        check(false, `插件 ${pending.version} 已准备好，当前仍为 ${entry.manifest.version}；请重启客户端完成覆盖升级，再审阅权限并启用。`, 'PLUGIN_UPDATE_PENDING');
+      const match = compatibility(entry.manifest, this.versions); check(match.compatible, match.reasons.join('；'));
+    }
     state.plugins[id] = { ...state.plugins[id], enabled, fingerprint: entry.fingerprint }; atomic(this.stateFile, state);
     return this.list();
   }

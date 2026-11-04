@@ -98,3 +98,25 @@ test('unreviewed changed code is not silently re-enabled by a manual upgrade', t
   assert.equal(f.registry.status(id).enabled, false); f.write(); f.registry.install(f.source); assert.equal(apply(f.registry).status, 'installed');
   assert.equal(f.registry.status(id).enabled, false);
 });
+
+test('enabling an incompatible old plugin with a compatible pending upgrade explains the restart', t => {
+  const f = setup(t);
+  const nextCodex = '99.0.0.0'; f.registry.versions.codex = nextCodex;
+  f.write({ compatibility: { ...f.manifest.compatibility, codex: [nextCodex] } });
+  f.registry.install(f.source);
+  assert.throws(() => f.registry.setEnabled(id, true), error => error.code === 'PLUGIN_UPDATE_PENDING' && /1\.1\.0.*重启/.test(error.message));
+  assert.equal(f.registry.get(id, false).manifest.version, '1.0.0');
+  assert.equal(apply(f.registry).status, 'installed');
+  f.registry.setEnabled(id, true); assert.equal(f.registry.status(id).enabled, true);
+  assert.deepEqual(f.registry.status(id).reasons, []);
+  assert.deepEqual(f.registry.storage(id, 'get', 'note'), { text: '保留数据' });
+});
+
+test('a disabled plugin cannot review a queued package as if it were already installed', t => {
+  const f = setup(t); f.registry.setEnabled(id, false); f.write(); f.registry.install(f.source);
+  const before = f.registry.state();
+  assert.throws(() => f.registry.setEnabled(id, true), error => error.code === 'PLUGIN_UPDATE_PENDING');
+  assert.deepEqual(f.registry.state(), before);
+  assert.equal(apply(f.registry).status, 'installed'); assert.equal(f.registry.status(id).enabled, false);
+  f.registry.setEnabled(id, true); assert.equal(f.registry.status(id).enabled, true);
+});

@@ -4,7 +4,7 @@
   "apiVersion": 3,
   "id": "example.hello",
   "name": "Hello Forge",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "演示原生标签、输入框、独立存储、会话输出、浏览器和统一设置。",
   "compatibility": {
     "codex": [
@@ -121,6 +121,13 @@
     }
   },
   "changelog": [
+    {
+      "version": "0.4.4",
+      "date": "2026-11-04",
+      "items": [
+        "随 Forge 0.4.4 修复搜索崩溃与独立插件覆盖升级的启用提示；保持 API 3 和客户端基线。"
+      ]
+    },
     {
       "version": "0.4.3",
       "date": "2026-11-04",

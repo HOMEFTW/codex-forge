@@ -65,6 +65,12 @@ export function patchRspackFactory(source, id, extension) {
     case 'Noba':
       source = replace(source, 'nn=nt.flatMap(em),', 'nn=[...nt.flatMap(em),{slug:"codex-forge"}],');
       return replace(source, 'let nr=nt.find(eb),', 'let nr=nt.find(eb)||(eM==="codex-forge"?{section:{slug:"codex-forge"},visible:true,pending:false,error:false}:void 0),');
+    case 'xWQh':
+      // The command menu consumes the same augmented settings list, but its
+      // title/icon lookups are separate from the settings navigation component.
+      source = replace(source, 'let e=(0,b.G)(R.slug);',
+        'let e=R.slug==="codex-forge"?{id:"codexForge.settings",defaultMessage:"Codex Forge 插件设置"}:(0,b.G)(R.slug);');
+      return replace(source, 't=(0,A.y)(R.slug,M),', 't=(0,A.y)(R.slug==="codex-forge"?"plugins-settings":R.slug,M),');
     case 'MeKU':
       // nC has already called all hooks before its redirect/loading branches.
       return replace(source, 'shouldRenderRouteContent:p}=r;if(h){',

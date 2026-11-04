@@ -2,7 +2,7 @@
 
 Codex Forge 是面向 Windows Codex 客户端的第三方插件宿主，将模型配置、信息统计、记忆管理、画布、待办和智能体协作集中到原生界面中。它为内置及独立插件提供统一的安装管理、设置入口、会话输出和版本兼容检查。
 
-当前版本 **0.4.3 / Forge API 3**，适配官方客户端 **26.1029.7803.0（Windows x64，MSIX 身份版本）**。本项目不是 OpenAI 官方插件 API。
+当前版本 **0.4.4 / Forge API 3**，适配官方客户端 **26.1029.7803.0（Windows x64，MSIX 身份版本）**。本项目不是 OpenAI 官方插件 API。
 
 [下载安装包](https://github.com/HOMEFTW/codex-forge/releases/latest) · [更新日志与版本索引](docs/CHANGELOG.md) · [从零开发插件](docs/PLUGIN-DEVELOPMENT-ZERO-TO-ONE.md) · [API 参考](docs/PLUGIN-API.md)
 
@@ -33,7 +33,7 @@ Codex Forge 是面向 Windows Codex 客户端的第三方插件宿主，将模�
 
 ## 安装与启动
 
-1. 从 [最新 Release](https://github.com/HOMEFTW/codex-forge/releases/latest) 下载 `Codex-Forge-0.4.3-Windows.msi`，可对照 `SHA256SUMS.txt` 校验；也可以下载 `Codex-Forge-0.4.3-Windows-Portable.zip` 直接解压运行。
+1. 从 [最新 Release](https://github.com/HOMEFTW/codex-forge/releases/latest) 下载 `Codex-Forge-0.4.4-Windows.msi`，可对照 `SHA256SUMS.txt` 校验；也可以下载 `Codex-Forge-0.4.4-Windows-Portable.zip` 直接解压运行。
 2. 双击 MSI 或使用 `msiexec /i` 安装。默认安装在 `%LOCALAPPDATA%\Programs\Codex Forge`，Windows Installer 负责升级和卸载；桌面快捷方式可通过 `CREATEDESKTOPSHORTCUT=0` 关闭。
 3. 安装完成后，准备程序从 OpenAI 官方 HTTPS 地址下载该 Forge 版本适配的 Codex MSIX（约 1 GiB），检查大小、SHA-256、签名、产品身份、版本及架构，再在本地应用 Forge 适配器。
 4. 准备成功后运行 **CodexForge.exe**。请先退出其他使用相同配置的 Codex 客户端。
