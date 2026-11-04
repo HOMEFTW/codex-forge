@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { patchSettingsPage, patchSettingsVisibility } from './native-settings-patch.mjs';
 import { patchNativeTabs, patchNativeWorkspace } from './native-tabs-patch.mjs';
 import { patchFastAccess, patchModelCatalogArgs, patchOct27Network } from './native-fast-patch.mjs';
+import { patchRspackMember, patchRspackIndex } from './native-rspack-patch.mjs';
 const root = path.resolve(import.meta.dirname, '..');
 const config=JSON.parse(fs.readFileSync(path.join(root,'forge.config.json'),'utf8'));
 const adapter=JSON.parse(fs.readFileSync(path.join(root,'adapters',config.codexVersion+'.json'),'utf8'));
@@ -16,10 +17,11 @@ const target = path.resolve(process.argv[3] || path.join(root, 'release', 'packa
 // 该字段时才回退到符号判断。members 必须由适配器提供：静默回退到 legacy 文件名
 // 会把旧补丁套到新客户端上。
 const nativeVersion = adapter.patchSet || (adapter.nativeSymbols?.registryMap === 'QL' ? 'legacy' : 'current');
-assert(['legacy', 'current', 'oct23', 'oct27', 'oct27b'].includes(nativeVersion), `适配器 patchSet 无效：${nativeVersion}`);
+assert(['legacy', 'current', 'oct23', 'oct27', 'oct27b', 'oct29'].includes(nativeVersion), `适配器 patchSet 无效：${nativeVersion}`);
 const currentAdapter = nativeVersion !== 'legacy';
 const members = adapter.members;
-assert(members && ['renderer', 'settingsPage', 'visibleSettings', 'network'].every(key => typeof members[key] === 'string' && members[key]), '适配器必须声明 members.renderer/settingsPage/visibleSettings/network');
+assert(members && (nativeVersion === 'oct29' ? ['network'] : ['renderer', 'settingsPage', 'visibleSettings', 'network']).every(key => typeof members[key] === 'string' && members[key]), '适配器必须声明原生模块');
+const rspackMembers = nativeVersion === 'oct29' ? [...new Set(adapter.rspackModules.map(item => item.member))] : [];
 if (['oct23', 'oct27', 'oct27b'].includes(nativeVersion)) assert(members.workspaceRenderer, '适配器必须声明主页面工作区模块');
 const hash = data => crypto.createHash('sha256').update(data).digest('hex');
 const payloadManifest = JSON.parse(fs.readFileSync(path.join(root, 'forge-payload.json'), 'utf8'));
@@ -47,7 +49,8 @@ for (const { member, entry, offset } of all) {
   const original = base.subarray(8 + oldHeaderSize + offset, 8 + oldHeaderSize + offset + entry.size);
   let changed = original;
   if(!process.env.FAST_NO_PATCH && member === 'webview/index.html'){
-    const anchor='frame-src &#39;self&#39;';assert.equal(original.toString().split(anchor).length,2);changed=Buffer.from(original.toString().replace(anchor,anchor+' codex-forge:'));
+    if(nativeVersion==='oct29') changed=Buffer.from(patchRspackIndex(original.toString()));
+    else { const anchor='frame-src &#39;self&#39;';assert.equal(original.toString().split(anchor).length,2);changed=Buffer.from(original.toString().replace(anchor,anchor+' codex-forge:')); }
   } else if (!process.env.FAST_NO_PATCH && member === '.vite/build/early-bootstrap.js') {
     const guard = (process.env.FAST_EXTENSION_DEBUG ? 'require("node:fs").writeFileSync(require("node:path").join(process.env.CODEX_HOME,"early-reached.txt"),"reached");try{' : '') + 'require(require("node:path").join(process.resourcesPath,"fast-extension/main.cjs")).install();' + (process.env.FAST_EXTENSION_DEBUG ? '}catch(error){require("node:fs").writeFileSync(require("node:path").join(process.env.CODEX_HOME,"extension-error.txt"),error.stack);throw error}' : '') + '\n';
     changed = Buffer.from(guard + original.toString());
@@ -55,6 +58,8 @@ for (const { member, entry, offset } of all) {
     const version = hash(fs.readFileSync(path.join(root, 'dist/fast-extension/ui/app.js'))).slice(0, 16);
     const preload = fs.readFileSync(path.join(root,'runtime','forge-preload.cjs'),'utf8')+'\n'+fs.readFileSync(path.join(root, 'runtime', 'host-preload.cjs'), 'utf8').replaceAll('__FAST_UI_VERSION__', version) + '\n' + fs.readFileSync(path.join(root, 'runtime', 'host-workspace.cjs'), 'utf8');
     changed = Buffer.concat([original, Buffer.from('\n' + preload)]);
+  } else if (!process.env.FAST_NO_PATCH && rspackMembers.includes(member)) {
+    changed = Buffer.from(patchRspackMember(original.toString(), member, adapter.rspackModules, fs.readFileSync(path.join(root, 'runtime/native-tabs-renderer.js'), 'utf8')));
   } else if (!process.env.FAST_NO_PATCH && member === members.renderer) {
     let renderer=original.toString();
     if (!currentAdapter) {
@@ -69,7 +74,7 @@ for (const { member, entry, offset } of all) {
     changed=Buffer.from(patchSettingsPage(original.toString(),{version:nativeVersion}));
   } else if(!process.env.FAST_NO_PATCH && member===members.visibleSettings) {
     changed=Buffer.from(patchSettingsVisibility(original.toString(),{version:nativeVersion}));
-  } else if (!process.env.FAST_NO_PATCH && member === members.network && ['oct27', 'oct27b'].includes(nativeVersion)) {
+  } else if (!process.env.FAST_NO_PATCH && member === members.network && ['oct27', 'oct27b', 'oct29'].includes(nativeVersion)) {
     changed = Buffer.from(patchOct27Network(original.toString()));
   } else if (!process.env.FAST_NO_PATCH && member === members.network) {
     const sourceText = original.toString(), start = sourceText.indexOf(`function ${currentAdapter ? 'Oc' : 'rc'}(`), end = sourceText.indexOf(`function ${currentAdapter ? 'kc' : 'ic'}(`, start);
@@ -91,7 +96,7 @@ for (const { member, entry, offset } of all) {
 }
 const expectedMembers = process.env.FAST_NO_PATCH ? [] : [
   'webview/index.html', '.vite/build/early-bootstrap.js', '.vite/build/preload.js',
-  members.renderer, members.settingsPage, members.visibleSettings, members.network,
+  ...(nativeVersion === 'oct29' ? rspackMembers : [members.renderer, members.settingsPage, members.visibleSettings]), members.network,
   ...(members.workspaceRenderer ? [members.workspaceRenderer] : []),
 ];
 assert.deepEqual(modifications.map(item => item.member).sort(), expectedMembers.sort(), 'Native patch member set changed');

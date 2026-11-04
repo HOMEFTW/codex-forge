@@ -2,7 +2,7 @@
 
 Codex Forge 是面向 Windows Codex 客户端的第三方插件宿主，将模型配置、信息统计、记忆管理、画布、待办和智能体协作集中到原生界面中。它为内置及独立插件提供统一的安装管理、设置入口、会话输出和版本兼容检查。
 
-当前版本 **0.4.2 / Forge API 3**，适配官方客户端 **26.1027.6604.0（Windows x64，MSIX 身份版本）**。本项目不是 OpenAI 官方插件 API。
+当前版本 **0.4.3 / Forge API 3**，适配官方客户端 **26.1029.7803.0（Windows x64，MSIX 身份版本）**。本项目不是 OpenAI 官方插件 API。
 
 [下载安装包](https://github.com/HOMEFTW/codex-forge/releases/latest) · [更新日志与版本索引](docs/CHANGELOG.md) · [从零开发插件](docs/PLUGIN-DEVELOPMENT-ZERO-TO-ONE.md) · [API 参考](docs/PLUGIN-API.md)
 
@@ -25,7 +25,7 @@ Codex Forge 是面向 Windows Codex 客户端的第三方插件宿主，将模�
 
 ## 插件管理与扩展
 
-在“插件管理”中直接导入 **ZIP、7z 或 `.forge-plugin.json`**，也可以从本地插件目录安装。导入后审阅权限并启用；卸载保留插件设置。插件可在左侧栏等位置注册入口及专用图标。
+在“插件管理”中直接导入 **ZIP、7z 或 `.forge-plugin.json`**，也可以从本地插件目录安装。首次安装后审阅权限并启用；已有同 ID 插件可直接导入新版或同版本修订包覆盖升级，重启后生效，保留设置和数据，权限变化需重新启用。插件可在左侧栏等位置注册入口及专用图标。
 
 插件管理支持启停、卸载以及 GitHub / 私有 HTTPS 服务器更新；安装和更新时检查 Codex、Forge、API 与依赖兼容性。新增权限需要重新启用，内置插件随 Forge 更新。“升级”入口会检查官方客户端与 Forge 的发布，并匹配经过验证的版本组合。
 
@@ -33,9 +33,9 @@ Codex Forge 是面向 Windows Codex 客户端的第三方插件宿主，将模�
 
 ## 安装与启动
 
-1. 从 [最新 Release](https://github.com/HOMEFTW/codex-forge/releases/latest) 下载 `Codex-Forge-0.4.2-Windows.msi`，可对照 `SHA256SUMS.txt` 校验；也可以下载 `Codex-Forge-0.4.2-Windows-Portable.zip` 直接解压运行。
+1. 从 [最新 Release](https://github.com/HOMEFTW/codex-forge/releases/latest) 下载 `Codex-Forge-0.4.3-Windows.msi`，可对照 `SHA256SUMS.txt` 校验；也可以下载 `Codex-Forge-0.4.3-Windows-Portable.zip` 直接解压运行。
 2. 双击 MSI 或使用 `msiexec /i` 安装。默认安装在 `%LOCALAPPDATA%\Programs\Codex Forge`，Windows Installer 负责升级和卸载；桌面快捷方式可通过 `CREATEDESKTOPSHORTCUT=0` 关闭。
-3. 安装完成后，准备程序从 OpenAI 官方 HTTPS 地址下载适配的 Codex MSIX（约 958 MiB），检查大小、SHA-256、签名、产品身份、版本及架构，再在本地应用 Forge 适配器。
+3. 安装完成后，准备程序从 OpenAI 官方 HTTPS 地址下载该 Forge 版本适配的 Codex MSIX（约 1 GiB），检查大小、SHA-256、签名、产品身份、版本及架构，再在本地应用 Forge 适配器。
 4. 准备成功后运行 **CodexForge.exe**。请先退出其他使用相同配置的 Codex 客户端。
 
 **MSI 和便携 ZIP 只包含 Forge，不包含官方客户端、Node、MSIX 或用户凭据。** 首次准备需要网络和约 7 GB 临时可用空间。下载支持续传；准备失败后再次启动 Forge 可重试，日志位于安装目录的 `forge-prepare.log`。安装阶段不下载官方客户端，启动 `CodexForge.exe` 后才开始准备。

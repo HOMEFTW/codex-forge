@@ -48,7 +48,7 @@ export const oct27bNativeSymbols = {
 // 两个字符的符号（nb/cb）如果按字面量整体替换，会误改 inbound、callback 这类
 // 子串；表达式锚点（E(tb)、Z(cb)）又必须先于标识符替换，否则会被拆开。这里对
 // 标识符使用词边界正则，并对关键符号断言必须命中，避免静默产出坏补丁。
-function rewriteExtension(extension, symbols) {
+export function rewriteExtension(extension, symbols) {
   if (symbols === legacyNativeSymbols) return extension;
   let result = extension;
   for (const [from, to] of [['E(tb)', symbols.routeScope], ['Z(cb)', symbols.fullWidthRead]]) result = result.replaceAll(from, () => to);

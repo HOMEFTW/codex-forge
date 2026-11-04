@@ -7,7 +7,7 @@ Forge API 3 随 Codex Forge 0.4.0 发布，在 API 2 操作基础上增加星枢
 插件目录必须包含 `plugin.json`。`id` 使用 `publisher.name`；`forge.*` 保留给内置插件。`compatibility.codex` 和 `compatibility.forge` 是非空数组，数组项之间是“或”；单项空格分隔的比较条件是“且”。支持精确三/四段数字版本、`>= <= > < = ^ ~` 和 `||`，不接受隐式通配或预发布字符串。
 
 ```json
-{"schemaVersion":1,"apiVersion":3,"id":"example.panel","name":"示例","version":"0.4.0","compatibility":{"codex":["26.1027.6604.0"],"forge":[">=0.4.0 <0.5.0"]},"permissions":["panels"],"contributes":{"panels":[{"id":"main","title":"示例","entry":"panel.html"}]}}
+{"schemaVersion":1,"apiVersion":3,"id":"example.panel","name":"示例","version":"0.4.0","compatibility":{"codex":["26.1029.7803.0"],"forge":[">=0.4.0 <0.5.0"]},"permissions":["panels"],"contributes":{"panels":[{"id":"main","title":"示例","entry":"panel.html"}]}}
 ```
 
 宿主向 iframe 注入 `window.CodexForge`。`entry` 是可选的浏览器 JS 命令入口。面板 HTML 应自包含，使用内联脚本和样式；可在发布前用自己的构建器打包。没有 Node、任意 IPC、文件系统、同源权限或自动消息发送权限。允许的网络源必须通过 `network` 和 `networkOrigins` 声明；面板不能导航宿主。API 仍按来源窗口和插件安装记录校验身份。

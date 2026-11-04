@@ -17,10 +17,11 @@ function allowedURL(value,update) {
   else check(u.origin===new URL(update.manifestUrl).origin,'更新文件必须属于声明服务器');
   return u.href;
 }
-function assess(registry,id,release) {
+function assess(registry,id,release,{allowSameVersion=false}={}) {
   const entry=registry.get(id,false);check(!entry.builtin,'内置插件随 Forge 更新');
   check(release.schemaVersion===1&&release.id===id,'插件更新身份不匹配');
-  check(compare(release.version,entry.manifest.version)>0,'没有更高版本');
+  const difference=compare(release.version,entry.manifest.version);
+  check(allowSameVersion?difference>=0:difference>0,allowSameVersion?'不能覆盖安装更低版本，请勿降级':'没有更高版本');
   const result=compatibility(release,registry.versions),reasons=[...result.reasons];
   for(const [dependency,range] of Object.entries(release.dependencies||{})) {
     const target=registry.entries.get(dependency);
@@ -33,6 +34,35 @@ function assess(registry,id,release) {
   visit(id);
   return {compatible:reasons.length===0,reasons};
 }
+function permissionsChanged(before,after) {
+  return ['permissions','networkOrigins'].some(key=>JSON.stringify([...(before[key]||[])].sort())!==JSON.stringify([...(after[key]||[])].sort()));
+}
+// Both imports and online updates use the same verified, restart-only replacement.
+function stageDirectory(registry,staging,manifest,{local=false}={}) {
+  const id=manifest.id,entry=registry.get(id,false);
+  const match=assess(registry,id,manifest,{allowSameVersion:local});check(match.compatible,match.reasons.join('；'));
+  const {fingerprint}=require('./forge-registry.cjs'),digest=fingerprint(staging),files=[];
+  const walk=directory=>{for(const name of fs.readdirSync(directory)){const file=path.join(directory,name);if(fs.statSync(file).isDirectory())walk(file);else files.push({path:path.relative(staging,file).split(path.sep).join('/'),sha256:hash(fs.readFileSync(file))});}};
+  walk(staging);
+  const changed=permissionsChanged(entry.manifest,manifest);
+  const directory=path.join(registry.root,'pending',id),previous=directory+'.previous-'+crypto.randomUUID();
+  const queueFile=path.join(registry.root,'pending-updates.json'),queue=json(queueFile,{});
+  queue[id]={fingerprint:digest,id,version:manifest.version,files,permissionsChanged:changed,wasEnabled:registry.status(id).enabled,local};
+  fs.mkdirSync(path.dirname(directory),{recursive:true});let saved=false,moved=false;
+  try {
+    if(fs.existsSync(directory)){fs.renameSync(directory,previous);saved=true;}
+    fs.renameSync(staging,directory);moved=true;
+    atomic(queueFile,queue);
+  } catch(error) {
+    if(moved)fs.renameSync(directory,staging);
+    if(saved)fs.renameSync(previous,directory);
+    throw error;
+  }
+  // A leftover backup must not turn an already committed import into a failure.
+  if(saved)try{fs.rmSync(previous,{recursive:true,force:true});}catch{}
+  return {id,version:manifest.version,restartRequired:true,permissionsChanged:changed,message:'插件 '+manifest.name+' '+manifest.version+' 已准备好，请重启客户端完成覆盖升级。设置和数据将保留。'+(changed?'权限或网络访问范围有变化，重启后需审阅并重新启用。':'')};
+}
+function stageLocalPluginUpdate(registry,staging,manifest) {return stageDirectory(registry,staging,manifest,{local:true});}
 async function checkPluginUpdate(registry,id,readJSON=fetchJSON) {
   const entry=registry.get(id,false),update=source(entry.manifest.update);check(!entry.builtin,'内置插件随 Forge 更新');
   let manifestUrl=update.manifestUrl;
@@ -63,32 +93,28 @@ async function stagePluginUpdate(registry,plan,fetcher=fetch) {
     check(manifest.id===plan.id&&manifest.version===plan.release.version&&JSON.stringify(manifest.compatibility)===JSON.stringify(plan.release.compatibility)&&manifest.apiVersion===plan.release.apiVersion&&JSON.stringify(manifest.dependencies||{})===JSON.stringify(plan.release.dependencies||{}),'插件包与更新清单声明不一致');
     check(JSON.stringify(manifest.update)===JSON.stringify(plan.source),'更新不能静默更换来源');
     const verified=assess(registry,plan.id,{...manifest,schemaVersion:1});check(verified.compatible,verified.reasons.join('；'));
-    const permissionsChanged=JSON.stringify([...manifest.permissions].sort())!==JSON.stringify([...entry.manifest.permissions].sort());
-    if(fs.existsSync(directory))fs.rmSync(directory,{recursive:true,force:true});fs.renameSync(staging,directory);
-    const queueFile=path.join(registry.root,'pending-updates.json'),queue=json(queueFile,{});
-    const {fingerprint}=require('./forge-registry.cjs');
-    // Record the exact package contents, then verify them again at startup.
-    queue[plan.id]={fingerprint:fingerprint(directory),id:plan.id,version:manifest.version,files:bundle.files.map(i=>({path:i.path,sha256:hash(fs.readFileSync(path.join(directory,i.path)))})),permissionsChanged,wasEnabled:registry.status(plan.id).enabled};
-    atomic(queueFile,queue);return {id:plan.id,version:manifest.version,restartRequired:true,permissionsChanged,message:'更新已准备好，请重启客户端生效。'+(permissionsChanged?'权限有变化，重启后需重新启用。':'')};
+    return stageDirectory(registry,staging,manifest);
   } finally {if(fs.existsSync(staging))fs.rmSync(staging,{recursive:true,force:true});}
 }
 function pendingUpdates(registry){return json(path.join(registry.root,'pending-updates.json'),{});}
 function applyPending(registry) {
   const queue=pendingUpdates(registry),results=[];
   for(const [id,item] of Object.entries(queue)){
-    let backup,destination,moved=false;
+    let backup,destination,directory,moved=false,replaced=false;
     try{
       const entry=registry.get(id,false);check(!entry.builtin&&item.id===id,'更新目标无效');
       const requestedEnabled=registry.status(id).requestedEnabled;
-      const directory=path.join(registry.root,'pending',id);const manifest=validate(json(path.join(directory,'plugin.json')),directory);check(manifest.id===id&&manifest.version===item.version,'暂存插件身份变化');
+      const reviewed=registry.state().plugins[id]?.fingerprint===entry.fingerprint;
+      directory=path.join(registry.root,'pending',id);const manifest=validate(json(path.join(directory,'plugin.json')),directory);check(manifest.id===id&&manifest.version===item.version,'暂存插件身份变化');
       check(require('./forge-registry.cjs').fingerprint(directory)===item.fingerprint,'暂存插件内容发生变化');
-      const match=assess(registry,id,manifest);check(match.compatible,match.reasons.join('；'));
+      const match=assess(registry,id,manifest,{allowSameVersion:item.local===true});check(match.compatible,match.reasons.join('；'));
+      const changed=permissionsChanged(entry.manifest,manifest);
       for(const file of item.files){const {safeFile}=require('./forge-manifest.cjs');check(hash(fs.readFileSync(safeFile(directory,file.path)))===file.sha256,'暂存插件文件摘要变化');}
-      destination=entry.root;backup=path.join(registry.root,'backups',id+'-'+crypto.randomUUID());fs.mkdirSync(path.dirname(backup),{recursive:true});fs.renameSync(destination,backup);moved=true;fs.renameSync(directory,destination);
-      registry.reload();registry.setEnabled(id,requestedEnabled&&!item.permissionsChanged);moved=false;
-      results.push({id,status:'installed',version:manifest.version,restartRequired:false,permissionsChanged:item.permissionsChanged});delete queue[id];
-    }catch(error){if(moved){if(fs.existsSync(destination))fs.rmSync(destination,{recursive:true,force:true});fs.renameSync(backup,destination);registry.reload();}results.push({id,status:'failed',error:error.message});}
+      destination=entry.root;backup=path.join(registry.root,'backups',id+'-'+crypto.randomUUID());fs.mkdirSync(path.dirname(backup),{recursive:true});fs.renameSync(destination,backup);moved=true;fs.renameSync(directory,destination);replaced=true;
+      registry.reload();registry.setEnabled(id,requestedEnabled&&reviewed&&!changed);moved=false;
+      results.push({id,status:'installed',version:manifest.version,restartRequired:false,permissionsChanged:changed});delete queue[id];
+    }catch(error){if(moved){if(replaced)fs.renameSync(destination,directory);fs.renameSync(backup,destination);registry.reload();}results.push({id,status:'failed',error:error.message});}
   }
   atomic(path.join(registry.root,'pending-updates.json'),queue);atomic(path.join(registry.root,'last-plugin-update.json'),results);return results;
 }
-module.exports={source,allowedURL,assess,checkPluginUpdate,stagePluginUpdate,pendingUpdates,applyPending};
+module.exports={source,allowedURL,assess,checkPluginUpdate,stagePluginUpdate,stageLocalPluginUpdate,pendingUpdates,applyPending};

@@ -90,8 +90,10 @@ class ForgeRegistry {
     }
     const source = fs.realpathSync(directory), manifest = validate(json(safeFile(source, 'plugin.json')), source);
     const match = compatibility(manifest, this.versions); check(match.compatible, match.reasons.join('；'));
-    const destination = path.join(this.root, 'plugins', manifest.id); check(!fs.existsSync(destination), '插件已存在；先卸载再安装');
-    const staging = path.join(this.root, 'plugins', '.install-' + crypto.randomUUID());
+    const destination = path.join(this.root, 'plugins', manifest.id), existing = this.entries.get(manifest.id);
+    if (existing) check(!existing.builtin && path.resolve(existing.root) === path.resolve(destination), '不能覆盖内置插件或非托管目录');
+    else check(!fs.existsSync(destination), '目标目录已存在但不是有效插件，请检查后重试');
+    const staging = path.join(this.root, '.install-' + crypto.randomUUID());
     let bytes = 0, count = 0;
     const copy = (from, to) => {
       fs.mkdirSync(to, { recursive: true });
@@ -101,7 +103,14 @@ class ForgeRegistry {
         else { check(stat.isFile() && ++count <= 1000 && (bytes += stat.size) <= 20*1024*1024, '插件超过1000文件或20MB'); fs.copyFileSync(file, path.join(to, name)); }
       }
     };
-    try { copy(source, staging); fs.renameSync(staging, destination); } finally { if (fs.existsSync(staging)) fs.rmSync(staging, { recursive: true, force: true }); }
+    try {
+      copy(source, staging);
+      const copied = validate(json(safeFile(staging, 'plugin.json')), staging);
+      check(copied.id === manifest.id && copied.version === manifest.version, '复制期间插件身份发生变化，请重新导入');
+      const copiedMatch = compatibility(copied, this.versions); check(copiedMatch.compatible, copiedMatch.reasons.join('；'));
+      if (existing) return require('./forge-plugin-updates.cjs').stageLocalPluginUpdate(this, staging, copied);
+      fs.renameSync(staging, destination);
+    } finally { if (fs.existsSync(staging)) fs.rmSync(staging, { recursive: true, force: true }); }
     this.reload(); return { id: manifest.id, enabled: false, permissions: manifest.permissions };
   }
   uninstall(id) {

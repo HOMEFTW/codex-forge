@@ -54,7 +54,7 @@ function preparePayload() {
   for (const item of [
     'forge.config.json', 'adapters', 'runtime', 'bundles', 'assets/codex-forge.ico', 'dist/fast-extension',
     'dist/CodexForge.exe', 'dist/CodexForge.exe.config', 'scripts/build-client.mjs',
-    'scripts/native-tabs-patch.mjs', 'scripts/native-fast-patch.mjs', 'scripts/native-settings-patch.mjs',
+    'scripts/native-tabs-patch.mjs', 'scripts/native-fast-patch.mjs', 'scripts/native-settings-patch.mjs', 'scripts/native-rspack-patch.mjs',
     'scripts/Launch-Codex-Forge.ps1', 'scripts/verify-official.ps1', 'README.md', 'LICENSE', 'docs',
     'sdk', 'examples', 'CODEG-SKILLS-NOTICES.md'
   ]) copy(item);

@@ -139,6 +139,9 @@
   window.addEventListener('DOMContentLoaded', () => {
     const style = document.createElement('style'); style.id = 'fast-canvas-layout';
     style.textContent = '#fast-canvas-entry:hover{background:rgba(127,127,127,.15)!important}[data-fast-native-page],[data-forge-settings-mount]{width:100%;height:100%;min-height:0;min-width:0;display:flex;overflow:hidden}.fast-workspace-frame{display:block;width:100%;height:100%;min-height:0;min-width:0;flex:1;border:0;color-scheme:normal;-webkit-app-region:no-drag}';
+    // Native full view hides its rail but keeps a floating chat surface. Forge
+    // pages need the complete panel area; inactive/hidden tabs must not affect it.
+    style.textContent += 'body:has([data-fast-native-mode="expanded"][data-fast-native-active="true"][data-fast-native-visible="true"]) :is(#fast-canvas-entry,.fast-workspace-entry,[data-forge-contribution*=":sidebar:"],#fast-information-summary,[data-floating-chat-surface]){display:none!important}';
     document.head.appendChild(style);
     new MutationObserver(refresh).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-fast-native-mode', 'data-fast-native-page','data-forge-settings-plugin'] });
     refresh(); ipcRenderer.invoke('fast-ext:host-ready').then(show).catch(() => {});

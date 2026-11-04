@@ -6,15 +6,12 @@ const path=require('node:path');
 const vm=require('node:vm');
 const read=name=>fs.readFileSync(path.join(__dirname,'fixtures',name),'utf8');
 const adapter=JSON.parse(fs.readFileSync(path.join(__dirname,'../adapters/26.1027.6604.0.json'),'utf8'));
-const config=JSON.parse(fs.readFileSync(path.join(__dirname,'../forge.config.json'),'utf8'));
 const normalize=value=>JSON.parse(JSON.stringify(value));
 
 test('oct27b adapter pins the official MSIX identity, build, digest and private symbol profile',async()=>{
   const {oct27bNativeSymbols}=await import('../scripts/native-tabs-patch.mjs');
   assert.equal(adapter.codexVersion,'26.1027.6604.0');
   assert.equal(adapter.codexBuildVersion,'26.1027.6604.0');
-  assert.equal(config.codexVersion,adapter.codexVersion);
-  assert.equal(config.codexBuildVersion,adapter.codexBuildVersion);
   assert.equal(adapter.patchSet,'oct27b');
   assert.equal(adapter.packageBytes,1003521886);
   assert.equal(adapter.packageSHA256,'9a4f7a1c9b6240968cc9ba40181629f1b3fa30eba5cfa2dd3f4fdd848b25ae5d');

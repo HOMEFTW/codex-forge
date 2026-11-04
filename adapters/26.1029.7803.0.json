@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "forgeVersion": "0.4.3",
+  "apiVersion": 3,
+  "codexVersion": "26.1029.7803.0",
+  "codexBuildVersion": "26.1029.7803.0",
+  "architecture": "x64",
+  "packageIdentity": "OpenAI.Codex",
+  "publisher": "CN=50BDFD77-8903-4850-9FFE-6E8522F64D5B",
+  "downloadUrl": "https://persistent.oaistatic.com/codex-app-prod/releases/26.1029.7803.0/ChatGPT-x64.msix",
+  "packageBytes": 1052222680,
+  "packageSHA256": "19487892b7e27c74e75c6422088e91b35b4291ed485045f82a1984a13b22d128",
+  "baseASARSHA256": "77ed4ddc5b388ac8b29f5035f9c98f982b095df55aad6fa6c27bb80d763b9691",
+  "baseExecutableSHA256": "74dcbc67421c5d5406ea5e4cc80d9c8d8a05d0df62f1d7be5690f090f182e71f",
+  "members": {
+    "network": ".vite/build/early-bootstrap-824-7cc6aeaa77329186.js"
+  },
+  "patchSet": "oct29",
+  "rspackModules": [
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/216127.1eafae6870.js",
+      "start": 109884,
+      "end": 110536,
+      "sha256": "9b67847515abb6c3c5b441825841369df35d731ec18a306652d59efda87ada1e"
+    },
+    {
+      "id": "EpL9",
+      "member": "webview/assets/async/24191.589dcc9878.js",
+      "start": 1837112,
+      "end": 1839148,
+      "sha256": "a63e1bae12f106230575c2e52b67e58c8247bf0c1b6a6d2f162d99c537836d6f"
+    },
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/293748.534685118d.js",
+      "start": 32215,
+      "end": 32867,
+      "sha256": "26c35e775cd4842e769d0e544c8dd42ae18608cd3c9cff77f8808d3ac07c9926"
+    },
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/29761.40c062de31.js",
+      "start": 167483,
+      "end": 168135,
+      "sha256": "a4f2fbeb18c33f8d5975a45fa3d260c59d700f296de7d1804c4eb36b73396f03"
+    },
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/465814.879bc2db3c.js",
+      "start": 24235,
+      "end": 24887,
+      "sha256": "a510f35a934f4735e892cf9b27a50d54d02160597a50474a7dfcde4f5b8fe21d"
+    },
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/552044.50c2869454.js",
+      "start": 36758,
+      "end": 37410,
+      "sha256": "b5cc7a3192365e384741407d0721a5c6d03a051bfd7fdafa58c69e72bad5a213"
+    },
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/572868.36a6c86221.js",
+      "start": 29878,
+      "end": 30530,
+      "sha256": "d70fff3195ee4294957e0cc19a016b170aeda231f038ebc0e246067de2ec46af"
+    },
+    {
+      "id": "yXyz",
+      "member": "webview/assets/async/580165.fdf9562852.js",
+      "start": 40836,
+      "end": 165752,
+      "sha256": "d8603f57d9f78edbbc6d0be7871a482df1b5b7653c1356b2857a5c5a91217ae0"
+    },
+    {
+      "id": "Noba",
+      "member": "webview/assets/async/61039.28e4fa29ed.js",
+      "start": 84538,
+      "end": 98933,
+      "sha256": "41d36df0cea9964e1e2cd8af47c7fcf6d4176951ac5885d938ca688debd280d9"
+    },
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/620883.f45639461f.js",
+      "start": 376533,
+      "end": 377185,
+      "sha256": "e2e90f511cb744e6e73b06c85d0aa015b4fbf60b5ca9e97e5320eeac99f2d80d"
+    },
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/623458.18e4c77b91.js",
+      "start": 91666,
+      "end": 92318,
+      "sha256": "20a08cb0d910b56b21cf95ba389ede1072aad40fcefde50050e52cfbf6eaed74"
+    },
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/714968.8e028d7063.js",
+      "start": 51665,
+      "end": 52317,
+      "sha256": "3a28d05bce8d180a3adb608c546d186d9cf6d6d28412daf6631edc11b282d255"
+    },
+    {
+      "id": "MeKU",
+      "member": "webview/assets/async/855047.832683be0d.js",
+      "start": 11816,
+      "end": 371670,
+      "sha256": "6896ccef9480471075d10da2d40331435f3410bf4e0b9875d1144b49a88cc52d"
+    },
+    {
+      "id": "Nh8F",
+      "member": "webview/assets/async/968499.fa029184f4.js",
+      "start": 29294,
+      "end": 78767,
+      "sha256": "09f31a31beb751393d71aa177743ffccaa36687169ebb18781582aba48f134f6"
+    }
+  ]
+}
