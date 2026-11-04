@@ -62,7 +62,22 @@
       if(!target) continue;
       let button=[...document.querySelectorAll('[data-forge-contribution]')].find(e=>e.dataset.forgeContribution===key);
       if(!button) { button=document.createElement('button');button.type='button';button.dataset.forgeContribution=key;button.style.cssText='color:inherit;background:transparent;border:0;border-radius:6px;padding:6px 10px;cursor:pointer;-webkit-app-region:no-drag';target.append(button); }
-      if(button.textContent!==item.title) button.textContent=item.title;const title=snapshot.plugins.find(p=>p.id===pluginId)?.name;if(button.title!==title)button.title=title;
+      if(button.parentElement!==target)target.append(button);
+      const canvasEntry=document.getElementById('fast-canvas-entry'),compact=surface==='sidebar'&&canvasEntry?.querySelector('span')?.style.display==='none';
+      if(surface==='sidebar'&&canvasEntry){
+        if(button.className!==canvasEntry.className)button.className=canvasEntry.className;
+        if(button.getAttribute('data-sidebar-cycle-item')!=='true')button.setAttribute('data-sidebar-cycle-item','true');
+      }
+      const icon=item.icon||(surface==='sidebar'?{viewBox:'0 0 24 24',paths:['M5 5h14v14H5z','M9 9h6v6H9z']}:null),contentKey=JSON.stringify([item.title,icon,compact,surface]);
+      if(button.dataset.forgeContent!==contentKey){
+        button.textContent='';
+        if(icon){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');for(const [name,value]of Object.entries({viewBox:icon.viewBox,width:'18',height:'18',fill:'none',stroke:'currentColor','stroke-width':'1.6','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true'}))svg.setAttribute(name,value);svg.style.flexShrink='0';for(const d of icon.paths){const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',d);svg.append(p);}button.append(svg);}
+        const label=document.createElement('span');label.textContent=item.title;if(compact)label.style.display='none';button.append(label);
+        button.style.cssText=surface==='sidebar'?'display:flex;align-items:center;gap:8px;color:inherit;background:transparent;border:0;border-radius:6px;padding:6px 10px;cursor:pointer;-webkit-app-region:no-drag':'display:inline-flex;align-items:center;gap:6px;color:inherit;background:transparent;border:0;border-radius:6px;padding:6px 10px;cursor:pointer;-webkit-app-region:no-drag';
+        button.dataset.forgeContent=contentKey;
+      }
+      const title=snapshot.plugins.find(p=>p.id===pluginId)?.name;if(button.title!==title)button.title=title;
+      if(button.getAttribute('aria-label')!==item.title)button.setAttribute('aria-label',item.title);
       button.onclick=()=>run(pluginId,item).catch(error=>{button.title=error.message;console.error('[Forge]',error);});
     }
     const canvas=document.getElementById('fast-canvas-entry');if(canvas){const visibility=active('forge.canvas')?'':'hidden';if(canvas.style.visibility!==visibility)canvas.style.visibility=visibility;}

@@ -12,8 +12,8 @@ const read = relative => JSON.parse(fs.readFileSync(path.join(root, relative), '
 const config = read('forge.config.json');
 const versions = { codex: config.codexVersion, forge: config.version, apiVersion: config.apiVersion };
 
-test('0.4.1 release metadata, API 3 SDK, adapters, bundle and builtins agree', t => {
-  assert.equal(config.version, '0.4.1'); assert.equal(config.apiVersion, 3);
+test('0.4.2 release metadata, API 3 SDK, adapters, bundle and builtins agree', t => {
+  assert.equal(config.version, '0.4.2'); assert.equal(config.apiVersion, 3);
   assert.equal(read('package.json').version, config.version);
   const lock = read('package-lock.json');
   assert.equal(lock.version, config.version); assert.equal(lock.packages[''].version, config.version);
@@ -73,12 +73,12 @@ test('API 3 updater reads mixed API 1/2/3 history and checks target plugin compa
   assert.equal(matchUpdate({ config: oldConfig, plugins: [{ ...external, apiVersion: 3 }], releases: [release] }).plan.forgeVersion, '0.4.0');
 });
 
-test('0.4.0 can update to 0.4.1 with compatible independent API 3 plugins', () => {
+test('0.4.0 can update to current release with compatible independent API 3 plugins', () => {
   const release = { schemaVersion: 3, platform: 'win32-x64', apiVersion: 3, forgeVersion: config.version, codexVersion: config.codexVersion, codexBuildVersion: config.codexBuildVersion, repository: config.githubRepository, distribution: 'msi-portable', containsOfficialClient: false, url: `https://github.com/${config.githubRepository}/releases/download/v${config.version}/Forge.msi`, sha256: 'a'.repeat(64), bytes: 100, portableUrl: `https://github.com/${config.githubRepository}/releases/download/v${config.version}/Forge.zip`, portableSha256: 'b'.repeat(64), portableBytes: 200 };
   validateRelease(release, config.githubRepository);
   const previous = { ...config, version: '0.4.0' };
   const plugin = { id: 'example.notes', name: 'Notes', apiVersion: 3, compatibility: { codex: [config.codexVersion], forge: ['>=0.4.0 <0.5.0'] } };
-  assert.equal(matchUpdate({ config: previous, plugins: [plugin], releases: [release] }).plan.forgeVersion, '0.4.1');
+  assert.equal(matchUpdate({ config: previous, plugins: [plugin], releases: [release] }).plan.forgeVersion, config.version);
   const pinned = { ...plugin, compatibility: { ...plugin.compatibility, forge: ['0.4.0'] } };
   assert.equal(matchUpdate({ config: previous, plugins: [pinned], releases: [release] }).plan, null);
 });

@@ -72,7 +72,8 @@
           "nexus.read",
           "nexus.write",
           "dsh",
-          "dsh.manage"
+          "dsh.manage",
+          "nexus.script"
         ]
       }
     },
@@ -357,6 +358,29 @@
         },
         "command": {
           "type": "string"
+        },
+        "icon": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "viewBox",
+            "paths"
+          ],
+          "properties": {
+            "viewBox": {
+              "const": "0 0 24 24"
+            },
+            "paths": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "items": {
+                "type": "string",
+                "maxLength": 2048,
+                "pattern": "^[Mm][MmZzLlHhVvCcSsQqTtAaEe0-9+.,\\s-]*$"
+              }
+            }
+          }
         }
       },
       "anyOf": [

@@ -17,7 +17,7 @@ try {
   switch(command){
     case 'validate': {const directory=path.resolve(id||'.'),manifest=validate(JSON.parse(fs.readFileSync(path.join(directory,'plugin.json'),'utf8')),directory);result={manifest,...compatibility(manifest,versions)};if(!result.compatible)process.exitCode=1;break;}
     case 'list':result=registry().list();break;
-    case 'install':if(!id)throw Error('需要插件目录');result=registry().install(path.resolve(id));break;
+    case 'install':if(!id)throw Error('需要插件目录或 ZIP/7z/JSON 插件包');result=registry().install(path.resolve(id));break;
     case 'uninstall':result=registry().uninstall(id);break;
     case 'enable':case 'disable':result=registry().setEnabled(id,command==='enable');break;
     case 'settings':result=registry().settings(id,value?JSON.parse(fs.readFileSync(value,'utf8')):undefined);break;
@@ -46,7 +46,7 @@ try {
       if(action==='apply'){result={sources:value.sources.map(item=>item.name),...bundles.apply(registry(),value)};break;}
       throw Error('bundle 支持 list / plan / apply');
     }
-    default:console.log('Codex Forge CLI\n  validate <directory>\n  create <new-directory>\n  pack <directory> <output.forge-plugin.json>\n  list\n  install <directory>\n  uninstall <publisher.name>\n  enable|disable <publisher.name>\n  settings <publisher.name> [values.json]\n  bundle list|plan|apply [--patch <file>]\n  --home <Forge data directory>');process.exit(command?1:0);
+    default:console.log('Codex Forge CLI\n  validate <directory>\n  create <new-directory>\n  pack <directory> <output.forge-plugin.json>\n  list\n  install <directory|package.zip|package.7z|package.forge-plugin.json>\n  uninstall <publisher.name>\n  enable|disable <publisher.name>\n  settings <publisher.name> [values.json]\n  bundle list|plan|apply [--patch <file>]\n  --home <Forge data directory>');process.exit(command?1:0);
   }
   console.log(JSON.stringify(result,null,2));
 }catch(error){console.error(error.message);process.exitCode=1;}

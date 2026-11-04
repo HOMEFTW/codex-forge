@@ -11,11 +11,11 @@ const READ_METHODS = new Set(['vaults', 'snapshot', 'read', 'resolve', 'search',
 function methodKind(method) { if (MUTATIONS.has(method)) return 'write'; if (READ_METHODS.has(method)) return 'read'; throw Object.assign(Error('未知 Nexus 操作：' + method), { code: 'INVALID_ARGUMENT' }); }
 const COMPATIBILITY = [
   { name: 'Advanced Tables', id: 'table-editor-obsidian', supported: 'Markdown 表格渲染、对齐、添加/删除行列', unsupported: '电子表格公式与原插件快捷键' },
-  { name: 'Charts', id: 'obsidian-charts', supported: 'chart YAML：bar/line/pie/doughnut/radar/polarArea/scatter，labels、series', unsupported: '文件引用、DataviewJS 数据源、自定义 JS 回调' },
+  { name: 'Charts', id: 'obsidian-charts', supported: 'chart YAML：bar/line/pie/doughnut/radar/polarArea/scatter；外部插件可支持用户运行的 DataviewJS renderChart 子集', unsupported: '外部文件引用、自定义 JS 回调' },
   { name: 'Homepage', id: 'homepage', supported: '读取主页配置、打开 Markdown/Base 主页、Forge 主页设置', unsupported: 'Obsidian workspace 布局与启动命令' },
   { name: 'Outliner', id: 'obsidian-outliner', supported: '列表分支缩进、反缩进、上下移动', unsupported: '原插件拖动、标题折叠、编辑器快捷键配置' },
   { name: 'Templater', id: 'templater-obsidian', supported: 'tp.file.title/path/folder、tp.date.now、tp.frontmatter 属性；核心模板日期/时间', unsupported: '执行块、用户脚本、系统命令、交互式 suggester/prompt' },
-  { name: 'Dataview', id: 'dataview', supported: 'TABLE/LIST/TASK、FROM/WHERE/SORT/LIMIT、TASK GROUP BY、多行查询、常用安全表达式、行内查询', unsupported: 'DataviewJS、FLATTEN、TABLE/LIST GROUP BY、自定义函数、完整 DQL 语法' },
+  { name: 'Dataview', id: 'dataview', supported: 'TABLE/LIST/TASK、FROM/WHERE/SORT/LIMIT、TASK GROUP BY、多行查询、常用安全表达式、行内查询；外部插件可在用户点击后隔离运行 DataviewJS 常用子集', unsupported: '服务端/MCP 执行 DataviewJS、FLATTEN、TABLE/LIST GROUP BY、自定义 DQL 函数、完整 DQL 语法' },
   { name: 'QuickAdd', id: 'quickadd', supported: '嵌套菜单、Template/Capture、DATE/VALUE/NAME、变量与目标路径', unsupported: 'Macro、脚本、AI、光标定位、复杂插入规则' },
 ];
 function atomic(file, data) {

@@ -6,6 +6,13 @@ Codex Forge 是 Windows Codex 客户端的第三方插件宿主，为插件提�
 
 [DSH 源码对照](docs/DEEPSEEK-HARNESS-MAPPING.md) 记录了 Forge API 对 DeepSeek Harness 的实际借鉴、实现位置和有意保留的边界。
 
+## 0.4.2 更新（2026-11-04，API 3）
+
+- **无需手动解压**：插件管理的“导入插件包…”直接选择 `.zip`、`.7z` 或 `.forge-plugin.json`。自动识别根目录或单个外层目录中的插件，审阅权限后启用；解压器随 Forge 提供。
+- **侧栏图标**：扩展贡献支持受限 SVG 路径图标，跟随左侧栏展开、折叠和重新挂载；位置由插件声明，星枢移除工具栏贡献后仅在左侧显示入口。
+- **DataviewJS 扩展**：可选 `nexus.script` 权限允许独立插件创建隔离 Worker。星枢 0.2.0 在用户点击“运行此查询”后支持常用只读子集；宿主/MCP 不执行 JavaScript，Worker 不获得 Node、SDK、文件写入或网络权限。
+- [下载 0.4.2 安装包与便携版](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.4.2)。独立星枢包需另行安装，不包含在 Forge 安装包内；已有旧星枢可先卸载再导入新版，卸载保留设置。
+
 ## 0.4.1 更新（2026-11-04）
 
 - **Nexus 是独立插件**：Forge 不再包含其界面、固定入口或内置清单。插件 ID 为 `homeftw.nexus`，单独导入、审阅权限、启用和卸载；Forge 只提供 `nexus` 服务和 API 3。

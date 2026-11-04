@@ -119,3 +119,17 @@ CLI 支持 `create / validate / pack / list / install / uninstall / enable / dis
 `forge.nexus.connect()` 使用原生选择器，不能携带参数；成功返回 `{vault}`，取消返回 `null`。`forge.nexus.disconnect(vaultId)` 返回剩余 `Vault[]`。两者需要 `nexus` v1 和读写权限，使用者应声明 Forge `>=0.4.1 <0.5.0`。目录连接不开放给 MCP，选择完成后重新检查插件权限与启用状态。
 
 星枢 `homeftw.nexus` 是独立外部插件，Forge 只提供服务；其 MCP 工具按真实安装、文件指纹、启用和权限状态开放。具有 `nexus.read` 的外部面板允许 `media-src data:`，仍禁止 frame/object；PDF 内嵌不支持。详见 [Nexus 接口](NEXUS-API.md)。
+
+## ZIP/7z、SVG 图标与隔离脚本（0.4.2）
+
+“导入插件包…”和 CLI `install` 支持 `.zip`、`.7z`、`.forge-plugin.json`，无需预解压或额外安装工具。压缩包必须只有一个 `plugin.json`，可以位于根目录或共同的外层目录；不接收插件目录之外的其他文件。最多 30 MiB 压缩数据、20 MiB 展开内容、1000 文件及 2000 目录项。不支持加密、多卷、多个插件、链接、设备路径、路径穿越和重复大小写名称。7-Zip 的解压结果经有界内存流交给宿主，只有校验后的普通文件由宿主创建；失败清理临时目录，安装默认停用。JSON 更新协议保持原样。
+
+静态 `contributes.sidebar/toolbar/composer` 及动态 `Contribution` 可增加：
+
+```json
+"icon": {"viewBox":"0 0 24 24","paths":["M12 2L14 10L22 12L14 14L12 22L10 14L2 12L10 10z"]}
+```
+
+`viewBox` 当前固定为 `0 0 24 24`，路径最多 16 条、每条 2048 字符，仅接受路径命令/数字/逗号/空白。宿主通过 SVG DOM 创建固定 `fill=none`、`stroke=currentColor` 的图标，不接受原始 SVG、HTML、事件或资源 URL。左栏入口跟随原生折叠布局并保留可访问名称。
+
+`nexus.script` 要求同时声明 `nexus.read`，不得与 `network` 权限并用。它仅使插件 CSP 增加 `worker-src blob:`，`connect-src`、frame/object 继续禁止，未开启 `unsafe-eval`。插件应在用户明确点击后运行知识库脚本，传入只读快照、限时终止，并清理声明式渲染输出；不得把宿主 SDK 代理给笔记脚本。该权限本身不赋予文件/Node/SDK/模型执行能力。使用这些新增功能的插件应声明 Forge `>=0.4.2 <0.5.0`，API 保持 3。

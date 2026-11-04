@@ -21,7 +21,7 @@ function pluginBundle(registry,id,{viewId,slotEntry,assetsRoot=path.join(__dirna
     html=inHead(html,'<style>'+css.join('\n').replace(/<\/style/gi,'<\\/style')+'</style>');
     script=[fs.readFileSync(path.join(assetsRoot,'dsh-client.js'),'utf8'),registry.source(id,d.entry),'window.ForgeDshClient.start('+JSON.stringify({packageName:d.packageName,version:m.version})+');'].join('\n;\n');
   }
-  return {html,sdk:fs.readFileSync(path.join(__dirname,'forge-sdk.js'),'utf8'),script,networkOrigins:m.networkOrigins||[],localMedia:m.permissions.includes('nexus.read')};
+  return {html,sdk:fs.readFileSync(path.join(__dirname,'forge-sdk.js'),'utf8'),script,networkOrigins:m.networkOrigins||[],localMedia:m.permissions.includes('nexus.read'),scriptWorker:m.permissions.includes('nexus.script')};
 }
 function pluginResponse(registry,requestURL,options={}) {
   try {
@@ -33,7 +33,7 @@ function pluginResponse(registry,requestURL,options={}) {
     let html=inHead(bundle.html,'<meta charset="utf-8">'+inlineScript(bundle.sdk));
     html+=inlineScript(bundle.script);
     const origins=bundle.networkOrigins.join(' ');
-    const csp="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: "+origins+"; connect-src "+(origins||"'none'")+"; font-src data:; media-src "+(bundle.localMedia?"data:":"'none'")+"; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors app://-";
+    const csp="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: "+origins+"; connect-src "+(origins||"'none'")+"; font-src data:; media-src "+(bundle.localMedia?"data:":"'none'")+"; worker-src "+(bundle.scriptWorker?"blob:":"'none'")+"; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors app://-";
     return new Response(html,{headers:{'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':csp,'X-Content-Type-Options':'nosniff','Cache-Control':'no-store','Permissions-Policy':'camera=(), microphone=(), geolocation=()'}});
   }catch(error){return new Response('Forge plugin unavailable',{status:404,headers:{'Content-Type':'text/plain','Content-Security-Policy':"default-src 'none'"}});}
 }

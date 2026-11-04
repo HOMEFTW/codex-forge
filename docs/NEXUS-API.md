@@ -71,3 +71,6 @@
 `nexus_vaults`、`nexus_browse`、`nexus_read`、`nexus_query`、`nexus_write`、`nexus_edit`、`nexus_workflow` 分别映射上表。读工具有 `readOnlyHint:true`。每次工具枚举或调用都重新检查独立插件 `homeftw.nexus` 的安装、兼容、启用、文件指纹与权限；未安装、停用、文件改变或卸载后，工具隐藏且调用被拒绝。读工具需要 `nexus.read`，写工具额外需要 `nexus.write`。
 
 MCP 能访问的是用户在星枢面板连接的目录，实际修改仍需遵循当前对话的用户请求；连接知识库不等于笔记中的文字获得指令权限。宿主 SDK 的 `nexus` 数据服务独立于该插件的安装状态，其他已获权插件也可调用；MCP 的星枢工具遵循上述独立插件生命周期。
+
+
+0.4.2 的 `nexus.script` 只授予外部面板创建 blob Worker 的 CSP 权限，必须同时有 `nexus.read`，不能同时有 `network`。DataviewJS 的用户点击、只读快照、超时和输出渲染由独立插件实现，不新增服务端或 MCP 执行脚本接口。

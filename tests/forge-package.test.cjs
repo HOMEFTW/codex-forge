@@ -42,6 +42,16 @@ test('ordinary external panels do not gain local media CSP permission', t => {
   assert.match(pluginResponse(f.registry, 'codex-forge://plugin/homeftw.nexus/main').headers.get('Content-Security-Policy'), /media-src 'none'/);
 });
 
+test('isolated script workers require explicit read plus script permission without network', t => {
+  const f=fixture(t);
+  for(const permissions of [['panels','nexus.script'],['panels','nexus.read','nexus.script','network']])assert.throws(()=>f.registry.install(f.pack([], {permissions})),/nexus.script/);
+  f.registry.install(f.pack([], {permissions:['panels','nexus.read','nexus.script']}));f.registry.setEnabled(f.manifest.id,true);
+  const csp=pluginResponse(f.registry,'codex-forge://plugin/homeftw.nexus/main').headers.get('Content-Security-Policy');
+  assert.match(csp,/worker-src blob:/);assert.match(csp,/connect-src 'none'/);assert.match(csp,/frame-src 'none'/);assert(!csp.includes('unsafe-eval'));
+  f.registry.uninstall(f.manifest.id);f.registry.install(f.pack());f.registry.setEnabled(f.manifest.id,true);
+  assert.match(pluginResponse(f.registry,'codex-forge://plugin/homeftw.nexus/main').headers.get('Content-Security-Policy'),/worker-src 'none'/);
+});
+
 test('oversized JSON, decoded content and file counts leave no partial installation', t => {
   const f = fixture(t);
   const oversized = path.join(f.root, 'oversized.forge-plugin.json');

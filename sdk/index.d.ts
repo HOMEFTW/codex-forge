@@ -3,7 +3,8 @@ export * from './nexus.js';
 export interface ForgeError extends Error {code:string}
 export interface CapabilityState {name:string;version:number;optional:boolean;supported:boolean;enabled:boolean;granted:boolean}
 export interface Context {threadId:string|null;codexVersion:string;forgeVersion:string;apiVersion:3}
-export interface Contribution {id:string;title:string;command?:string;panel?:string}
+export interface ContributionIcon {viewBox:'0 0 24 24';paths:string[]}
+export interface Contribution {id:string;title:string;command?:string;panel?:string;icon?:ContributionIcon}
 export interface ForgeEventMetadata {sourcePluginId?:string;threadId?:string|null}
 export interface ForgeCapabilities {apiVersion:3;codexVersion:string;forgeVersion:string;permissions:string[];capabilities:{name:string;version:number;optional:boolean}[];available:Record<string,number>;negotiated:CapabilityState[];denied:Record<string,string>;slots:{id:string;kind:string;scope:string;label:string}[];events:string[];surfaces:string[]}
 export interface ForgeDiagnostics {at:string;href:string;title:string;nodes:number;slots:{id:string;kind:string;label:string;anchor:string|null;verified:boolean;matches:number;samples:unknown[]}[];probes:{name:string;selector:string;matches:number;samples:unknown[]}[]}

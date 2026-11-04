@@ -91,9 +91,9 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
         const result = registry.install(selected.filePaths[0]); broadcast(); return result;
       }
       case 'installPackage': {
-        const selected = await dialog.showOpenDialog(state.win, { title: '导入 Forge 插件包', properties: ['openFile'], filters: [{ name: 'Forge 插件包 (.forge-plugin.json)', extensions: ['json'] }] });
+        const selected = await dialog.showOpenDialog(state.win, { title: '导入 Forge 插件包', properties: ['openFile'], filters: [{ name: 'Forge 插件包（ZIP / 7z / JSON）', extensions: ['zip', '7z', 'json'] }] });
         if (selected.canceled || !selected.filePaths[0]) return null;
-        check(selected.filePaths[0].endsWith('.forge-plugin.json'), '请选择 .forge-plugin.json 插件包');
+        check(/(?:\.forge-plugin\.json|\.zip|\.7z)$/i.test(selected.filePaths[0]), '请选择 ZIP、7z 或 .forge-plugin.json 插件包');
         const result = registry.install(selected.filePaths[0]); broadcast(); return result;
       }
       case 'importDsh': case 'importDshMarket': {
@@ -189,9 +189,10 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
       case 'ui.register': {
         check(['sidebar','toolbar','composer'].includes(args.surface), '未知界面位置'); permission(args.surface);
         const item = args.item; check(item && /^[a-zA-Z][\w-]{0,79}$/.test(item.id), '按钮 ID 无效'); text(item.title,100,'按钮标题');
+        const icon = require('./forge-manifest.cjs').validateIcon(item.icon);
         check(entry.manifest.contributes?.commands?.some(c => c.id === item.command) || entry.manifest.contributes?.panels?.some(p => p.id === item.panel), '按钮操作未声明');
         check(dynamic.size < 200 || dynamic.has(id+':'+args.surface+':'+item.id), '动态按钮数量超限');
-        dynamic.set(id+':'+args.surface+':'+item.id,{pluginId:id,surface:args.surface,item:{id:item.id,title:item.title,command:item.command,panel:item.panel}}); broadcast(); return true;
+        dynamic.set(id+':'+args.surface+':'+item.id,{pluginId:id,surface:args.surface,item:{id:item.id,title:item.title,command:item.command,panel:item.panel,...(icon ? {icon} : {})}}); broadcast(); return true;
       }
       case 'ui.unregister': permission(args.surface); dynamic.delete(id+':'+args.surface+':'+args.id); broadcast(); return true;
       case 'conversation.title': {

@@ -4,11 +4,17 @@ const { parts, ranges, compatibility } = require('./forge-versions.cjs');
 const { CAPABILITIES, normalize: normalizeCapabilities } = require('./forge-capabilities.cjs');
 const { SLOTS } = require('./forge-slots.cjs');
 const { ForgeError } = require('./forge-errors.cjs');
-const permissions = new Set(['panels', 'sidebar', 'toolbar', 'composer', 'ui', 'devtools', 'conversation.read', 'conversation.title', 'output', 'browser', 'storage', 'settings', 'network', 'events', 'dsh', 'dsh.manage', 'nexus.read', 'nexus.write']);
+const permissions = new Set(['panels', 'sidebar', 'toolbar', 'composer', 'ui', 'devtools', 'conversation.read', 'conversation.title', 'output', 'browser', 'storage', 'settings', 'network', 'events', 'dsh', 'dsh.manage', 'nexus.read', 'nexus.write', 'nexus.script']);
 const surfaces = ['sidebar', 'toolbar', 'composer'];
 const idPattern = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/;
 const localId = /^[a-zA-Z][\w-]{0,79}$/;
 function check(value, message, code = 'INVALID_ARGUMENT') { if (!value) throw new ForgeError(code, message); }
+function validateIcon(icon) {
+  if (icon === undefined) return;
+  check(icon && !Array.isArray(icon) && Object.keys(icon).every(key => ['viewBox', 'paths'].includes(key)) && icon.viewBox === '0 0 24 24', '按钮图标必须使用 0 0 24 24 视图与 SVG 路径');
+  check(Array.isArray(icon.paths) && icon.paths.length > 0 && icon.paths.length <= 16 && icon.paths.every(d => typeof d === 'string' && d.length > 0 && d.length <= 2048 && /^[Mm][MmZzLlHhVvCcSsQqTtAaEe0-9+.,\s-]*$/.test(d)), '按钮图标路径无效');
+  return { viewBox: icon.viewBox, paths: [...icon.paths] };
+}
 function safeFile(root, relative) {
   check(typeof relative === 'string' && relative.length < 250 && relative && !/[\x00-\x1f]/.test(relative) && !relative.includes('\\') && !relative.includes(':') && !relative.split('/').some(s => !s || s === '..' || s === '.'), '资源路径必须为包内相对路径');
   const base = fs.realpathSync(root), resolved = fs.realpathSync(path.join(base, relative));
@@ -25,6 +31,7 @@ function validate(input, root, { builtin = false } = {}) {
   parts(m.version); ranges(m.compatibility?.codex); ranges(m.compatibility?.forge);
   check(Array.isArray(m.permissions) && m.permissions.every(p => permissions.has(p)) && new Set(m.permissions).size === m.permissions.length, '插件声明了未知或重复权限');
   check(!m.permissions.includes('nexus.write') || m.permissions.includes('nexus.read'), 'nexus.write 同时需要 nexus.read 权限');
+  check(!m.permissions.includes('nexus.script') || m.permissions.includes('nexus.read') && !m.permissions.includes('network'), 'nexus.script 需要 nexus.read，且不能同时使用 network 权限');
   check(!m.permissions.includes('devtools') || (builtin && m.id === 'forge.devtools'), 'devtools 仅限内置 forge.devtools 插件');
   if (m.capabilities !== undefined) {
     check(Array.isArray(m.capabilities) && m.capabilities.length <= 32, 'capabilities 必须为数组');
@@ -96,6 +103,7 @@ function validate(input, root, { builtin = false } = {}) {
   for (const surface of surfaces) for (const item of c[surface] || []) {
     check(m.permissions.includes(surface), '缺少 '+surface+' 权限');
     check(localId.test(item.id) && typeof item.title === 'string' && item.title.length <= 100, '贡献按钮无效');
+    validateIcon(item.icon);
     check(commands.has(item.command) || views.has(item.panel), '按钮必须引用本插件命令或面板');
   }
   for (const [key, field] of Object.entries(c.settings?.properties || {})) {
@@ -132,4 +140,4 @@ function validateSettings(manifest, value) {
   }
   return result;
 }
-module.exports = { validate, validateSettings, safeFile, compatibility, check, surfaces, idPattern };
+module.exports = { validate, validateSettings, validateIcon, safeFile, compatibility, check, surfaces, idPattern };

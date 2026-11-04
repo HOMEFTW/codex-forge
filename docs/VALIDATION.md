@@ -1,5 +1,16 @@
 # Forge 验证记录
 
+## 0.4.2 / API 3（2026-11-04）
+
+- `node scripts/run-tests.mjs`：**313 项通过、0 失败、0 跳过**；`npm run build`、Windows C# 启动器/准备程序编译、开发教程完整流程通过。受限环境中的 7-Zip 子进程启动/临时目录访问失败，因此实际压缩包回归使用不受限执行与仓库 `output` 下独立样例，未跳过用例。
+- 真实 ZIP、7z 的根目录清单和外层目录包装均可直接安装，中文内容与源文件一致、默认停用。恶意 ZIP 的路径穿越、绝对/设备路径、符号链接、大小写重复、文件/目录冲突和 CRC 损坏均拒绝；多个插件、缺少清单、加密包、展开超过 20 MiB 同样拒绝且临时目录无残留。原 JSON 包导入保持兼容。
+- 7-Zip Extra 26.05 从官方发布下载，对照官方资产 SHA-256 验证；随包提供未修改 x64 解压器、许可证和相同版本源码。程序只把解压结果输出到有大小限制的内存流，不接收落盘目标路径；普通文件由宿主验证后独占创建。
+- SVG 图标验证覆盖受限路径契约、展开/折叠、重新挂载、点击派发和停用移除。使用独立 Nexus 0.2.0 ZIP、真实 ForgePanel/管理 API/preload 的浏览器流程验证导入后左侧三路径图标，菜单栏无星枢按钮；折叠后文字隐藏、18px 图标和 aria-label 保留；停用后入口消失，控制台 0 errors/0 warnings。
+- 浏览器证据：`output/playwright/forge-042-sidebar.png`、`forge-042-sidebar-compact.png` 与 `forge-042-8K2fb7/evidence.json`。父页面使用测试侧栏，文件选择器返回固定样例包；不是当前用户客户端的实际菜单或原生选择器验收。
+- `nexus.script` 必须配合 `nexus.read` 且不可同时声明 `network`；CSP 只增加 blob Worker，仍禁止 eval、连接外网、frame/object。独立插件对话负责 DataviewJS 的用户点击、只读快照、虚拟 DOM/图表、终止与输出限制；服务端/MCP 没有执行 JS 的接口。其生产包在真实宿主 CSP 下的验证由独立插件工程记录。
+- 发布前核对 MSI 的 454 个文件、Portable ZIP 的 455 个文件与 450 个 payload 文件；包内补丁生成的隔离客户端通过 3,983 个文件、22,424 个 ASAR 成员和 22,459 个完整性块校验。独立插件、官方客户端和用户凭据均未混入 Forge 安装包。
+- 本轮发布未安装或重启用户当前客户端，也未修改 GitHub 历史版本。原生桌面点击及 MSI 实际安装/卸载尚未验收。
+
 ## 0.4.1 / API 3 独立插件修订（2026-11-04）
 
 - `node scripts/run-tests.mjs`：**304 项通过、0 失败、0 跳过**，包含 Windows C# 启动器/准备程序与真实 stdio MCP。`npm run build`、Windows 启动器/准备程序编译成功；开发教程 create/validate/install/settings/command/pack/uninstall 全流程通过。

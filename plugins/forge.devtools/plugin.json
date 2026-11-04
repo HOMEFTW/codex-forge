@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "apiVersion": 3,
-  "version": "0.4.1",
+  "version": "0.4.2",
   "compatibility": {
     "codex": [
       "26.1027.6604.0",
@@ -50,6 +50,13 @@
     ]
   },
   "changelog": [
+    {
+      "version": "0.4.2",
+      "date": "2026-11-04",
+      "items": [
+        "随 Forge 0.4.2 更新，支持 ZIP/7z 插件安装、左栏图标及可选隔离脚本权限。"
+      ]
+    },
     {
       "version": "0.4.1",
       "date": "2026-11-04",

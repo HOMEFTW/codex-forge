@@ -23,3 +23,7 @@ forge.nexus.request('write',{vaultId:'v',path:'note.md',content:'new'});
 forge.nexus.request('table',{vaultId:'v',path:'note.md',expectedRevision:'abc',line:0,action:'execute'});
 // @ts-expect-error inline expressions require a source note
 forge.nexus.request('query',{vaultId:'v',language:'expression',query:'file.name'});
+
+forge.sidebar.register({id:'notes',title:'Notes',panel:'main',icon:{viewBox:'0 0 24 24',paths:['M0 0L2 2']}});
+// @ts-expect-error arbitrary viewBox is not part of the icon contract
+forge.sidebar.register({id:'notes',title:'Notes',icon:{viewBox:'0 0 1 1',paths:[]}});

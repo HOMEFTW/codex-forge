@@ -220,3 +220,8 @@ node cli/forge.mjs pack ./my-first-plugin ./first-plugin-0.4.1.forge-plugin.json
 ## 8. 发布前清单
 
 核对清单版本和权限；实际运行原生标签、设置、会话切换、草稿冲突、停用/卸载；从旧版本验证更新和重启。检查打包内容没有密钥、日志、用户历史和构建缓存。用真实已测试的客户端/Forge 版本声明兼容性，保留依赖许可证。扩展插件只依赖 Forge API，客户端混淆符号由 Forge 适配器维护。
+
+
+### 0.4.2 的便捷安装
+
+也可把同一插件目录打包为 ZIP 或 7z，直接在“导入插件包…”选择，无需用户预解压。只允许一个插件和其目录内文件；加密包不支持。CLI 示例：`node cli/forge.mjs install ./my-plugin.zip --home ./test-home`。分发仍应提供完整许可证和兼容范围；JSON 更新包协议不变。侧栏自定义 SVG 路径和 `nexus.script` 需要最低 Forge 0.4.2，见 API 参考。
