@@ -29,7 +29,7 @@ Codex Forge 是面向 Windows Codex 客户端的第三方插件宿主，将模�
 
 插件管理支持启停、卸载以及 GitHub / 私有 HTTPS 服务器更新；安装和更新时检查 Codex、Forge、API 与依赖兼容性。新增权限需要重新启用，内置插件随 Forge 更新。“升级”入口会检查官方客户端与 Forge 的发布，并匹配经过验证的版本组合。
 
-**星枢 Nexus 是独立插件，需另行安装。** 它提供 Obsidian 笔记阅读与编辑、双链、搜索、关系图谱、数据库等知识库功能；支持范围和 DataviewJS 限制见 [Nexus 使用说明](docs/NEXUS.md)。插件开发参考 [开发教程](docs/PLUGIN-DEVELOPMENT-ZERO-TO-ONE.md)、[API 参考](docs/PLUGIN-API.md)、[API 3 迁移](docs/API-3-MIGRATION.md) 与 [更新协议](docs/UPDATES.md)。
+**[星枢 Nexus](https://github.com/HOMEFTW/codex-forge-nexus) 是独立插件，需另行安装。** 从[独立插件发布页](https://github.com/HOMEFTW/codex-forge-nexus/releases/latest)下载 ZIP 后，在 Forge 插件管理中直接导入并启用。它提供 Obsidian 笔记阅读与编辑、双链、搜索、关系图谱、数据库等知识库功能；支持范围和 DataviewJS 限制见 [Nexus 使用说明](docs/NEXUS.md)。插件开发参考 [开发教程](docs/PLUGIN-DEVELOPMENT-ZERO-TO-ONE.md)、[API 参考](docs/PLUGIN-API.md)、[API 3 迁移](docs/API-3-MIGRATION.md) 与 [更新协议](docs/UPDATES.md)。
 
 ## 安装与启动
 
