@@ -4,9 +4,10 @@ const { ForgeRegistry } = require('./forge-registry.cjs');
 const { check } = require('./forge-manifest.cjs');
 const { atomic, json } = require('./collaboration-store.cjs');
 const { DshCompatibilityLayer } = require('./dsh-compat.cjs');
-const { CAPABILITIES, METHOD_CAPABILITY, granted } = require('./forge-capabilities.cjs');
+const { CAPABILITIES, METHOD_CAPABILITY, granted, negotiate } = require('./forge-capabilities.cjs');
+const { ForgeError, reply } = require('./forge-errors.cjs');
 const { SLOTS, slotEntries, slotConfig } = require('./forge-slots.cjs');
-function installForge({ ipcMain, dialog, host, threadContext, nativeCall, nativeMessage, open, notify, states, collaboration }) {
+function installForge({ ipcMain, dialog, host, threadContext, nativeCall, nativeMessage, open, notify, states, collaboration, nexus }) {
   const config = json(fs.existsSync(path.join(__dirname,'forge.config.json'))?path.join(__dirname,'forge.config.json'):path.join(__dirname,'../forge.config.json'));
   const root = process.env.CODEX_FORGE_HOME || path.join(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'forge');
   const registry = new ForgeRegistry({ root, bundledRoot:fs.existsSync(path.join(__dirname,'plugins'))?path.join(__dirname,'plugins'):path.join(__dirname,'../plugins'), versions: { codex: config.codexVersion, forge: config.version, apiVersion: config.apiVersion } });
@@ -21,6 +22,7 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
   const publicContext = (event, state) => ({ threadId: threadContext(event, state).threadId, codexVersion: config.codexVersion, forgeVersion: config.version, apiVersion: config.apiVersion });
   // 提前算好未授予能力的方法，让 SDK 在插件侧就能拿到可读的拒绝原因；
   // 权威校验仍在 forge:api 派发前做，插件绕过 SDK 也拦得住。
+  const enabledCapabilities = () => ({ nexus: !!nexus && registry.status('forge.nexus').enabled });
   const deniedMethods = manifest => Object.fromEntries(Object.keys(METHOD_CAPABILITY).flatMap(method => {
     const reason = granted(manifest, method);
     return reason ? [[method, reason]] : [];
@@ -141,16 +143,21 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
     check(Buffer.byteLength(bundle.html) < 2*1024*1024, '插件页面超过2MB');
     return { ...bundle, context: publicContext(event, state) };
   });
-  ipcMain.handle('forge:api', async (event, request = {}) => {
+  ipcMain.handle('forge:api', (event, request = {}) => reply(async () => {
     const state = host(event), { id, method, args = {} } = request, entry = registry.get(id);
-    const blocked = granted(entry.manifest, method);
-    if (blocked) throw Error(blocked);
+    const blocked = granted(entry.manifest, method, enabledCapabilities());
+    if (blocked) throw new ForgeError('CAPABILITY_UNAVAILABLE', blocked);
     const permission = name => registry.permission(id, name);
     switch (method) {
       case 'context.get': { const value=publicContext(event,state); if(!entry.manifest.permissions.includes('conversation.read')) value.threadId=null; return value; }
       case 'metadata.get': return entry.manifest;
-      case 'capabilities.get': return { apiVersion: config.apiVersion, codexVersion: config.codexVersion, forgeVersion: config.version, permissions: [...entry.manifest.permissions], capabilities: entry.manifest.capabilities.map(item => ({ ...item })), available: Object.fromEntries(Object.entries(CAPABILITIES).map(([name, spec]) => [name, spec.version])), denied: deniedMethods(entry.manifest), slots: Object.entries(SLOTS).map(([id, spec]) => ({ id, kind: spec.kind, scope: spec.scope, label: spec.label })), events: ['ready','context.changed','settings.changed','dispose','output.changed',...(entry.manifest.contributes?.events || []).map(item => item.name)], surfaces: ['panels','sidebar','toolbar','composer'] };
+      case 'capabilities.get': return { apiVersion: config.apiVersion, codexVersion: config.codexVersion, forgeVersion: config.version, permissions: [...entry.manifest.permissions], capabilities: entry.manifest.capabilities.map(item => ({ ...item })), available: Object.fromEntries(Object.entries(CAPABILITIES).map(([name, spec]) => [name, spec.version])), negotiated: negotiate(entry.manifest, enabledCapabilities()), denied: deniedMethods(entry.manifest), slots: Object.entries(SLOTS).map(([id, spec]) => ({ id, kind: spec.kind, scope: spec.scope, label: spec.label })), events: ['ready','context.changed','settings.changed','dispose','output.changed',...(entry.manifest.contributes?.events || []).map(item => item.name)], surfaces: ['panels','sidebar','toolbar','composer'] };
       case 'settings.get': permission('settings'); return registry.settings(id);
+      case 'nexus.request': {
+        permission('nexus.read'); check(registry.status('forge.nexus').enabled && nexus, 'Nexus 插件未启用或宿主不支持', 'CAPABILITY_UNAVAILABLE');
+        if (require('./nexus.cjs').methodKind(args.method) === 'write') permission('nexus.write');
+        return nexus.dispatch(args.method, args.args || {});
+      }
       case 'dsh.request': {
         permission('dsh'); const result = await dsh.request(id, args.endpoint, { method: args.method, body: args.body });
         if (result.body?.openPlugin) { const target = result.body.openPlugin; panel(target.id, target.view); open(state, { page: pageId(target.id, target.view) }); }
@@ -196,9 +203,9 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
         else { items.push({pluginId:id,pluginName:entry.manifest.name,text:text(args.text,200000,'输出'),title:text(args.title||entry.manifest.name,200,'输出标题'),at:new Date().toISOString(),level:['info','warning','error'].includes(args.level)?args.level:'info'}); while (items.length > 100 || Buffer.byteLength(JSON.stringify(items)) > 2*1024*1024) items.shift(); }
         atomic(outputFile,output); broadcastPluginEvent('output.changed', { threadId, pluginId: id }); broadcast(); return true;
       }
-      default: throw Error('Forge API 不支持此操作');
+      default: throw new ForgeError('METHOD_NOT_FOUND', 'Forge API 不支持此操作');
     }
-  });
+  }));
   return { registry, management, snapshot, page: page => ['forge-settings','forge-updates','forge-features','forge-changelog','forge-plugins','forge-extension-info','forge-output'].includes(page) || [...registry.entries.values()].some(e => registry.status(e.manifest.id).enabled && e.manifest.contributes?.panels?.some(v => pageId(e.manifest.id,v.id) === page)), enabled: id => registry.status(id).enabled };
 }
 module.exports = { installForge };

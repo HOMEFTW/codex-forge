@@ -125,7 +125,7 @@ async function runInformationProbe({ executable, timeoutMs=240000, signal, ...co
   const deadline=setTimeout(()=>{fail(Error('检测超时，请稍后重试'));child.kill();},timeoutMs);
   try {
     if(signal?.aborted)throw Error('检测已取消');
-    await call('initialize',{clientInfo:{name:'forge_information_stats',version:'0.3.4'},capabilities:{experimentalApi:true}});
+    await call('initialize',{clientInfo:{name:'forge_information_stats',version:'0.4.0'},capabilities:{experimentalApi:true}});
     child.stdin.write('{"method":"initialized"}\n');
     return await probeWithRpc({...context,call,subscribe:listener=>{listeners.add(listener);return()=>listeners.delete(listener);},signal:controller.signal,probeCwd});
   } finally {

@@ -31,6 +31,7 @@ test('native menu opens package notes and IPC rejects other origins and subframe
  try {
   const services = require('../runtime/main.cjs').install();
   const event = { sender: win.webContents, senderFrame: { processId: 20, routingId: 1 } };
+  const api = async (...args) => { const reply = await handlers.get('forge:api')(...args); if (!reply.ok) throw Object.assign(Error(reply.error.message), { code: reply.error.code }); return reply.result; };
   const manage = (method, args = {}) => handlers.get('forge:manage')(event, { method, args });
   const models = await manage('fastModels', { enableTerra: true });
   assert.deepEqual(models.map(model => model.id), ['gpt-6-sol', 'gpt-6.1-sol', 'gpt-6.1-terra']);
@@ -63,23 +64,45 @@ test('native menu opens package notes and IPC rejects other origins and subframe
   const bootstrap = await handlers.get('fast-ext:canvas')(event, { method: 'bootstrap' }); assert.equal(bootstrap.notes.revision, 'r4');
   const pluginRoot = path.join(root, 'composer-plugin'); fs.mkdirSync(pluginRoot, { recursive: true });
   fs.writeFileSync(path.join(pluginRoot, 'plugin.json'), JSON.stringify({
-    schemaVersion: 1, apiVersion: 2, id: 'test.composer', name: 'Composer fixture', version: '0.1.0',
-    compatibility: { codex: [currentCodexVersion], forge: ['>=0.3.0 <0.4.0'] }, permissions: ['composer'], contributes: {}
+    schemaVersion: 1, apiVersion: 3, id: 'test.composer', name: 'Composer fixture', version: '0.1.0',
+    compatibility: { codex: [currentCodexVersion], forge: ['>=0.4.0 <0.5.0'] }, permissions: ['composer'], contributes: {}
   }));
   services.forge.registry.install(pluginRoot); services.forge.registry.setEnabled('test.composer', true);
-  await assert.rejects(handlers.get('forge:api')(event, { id: 'test.composer', method: 'composer.read', args: {}, threadId: 'thread-visible' }), /conversation\.read/);
+  await assert.rejects(api(event, { id: 'test.composer', method: 'composer.read', args: {}, threadId: 'thread-visible' }), /conversation\.read/);
   const narrowRoot = path.join(root, 'narrow-plugin'); fs.mkdirSync(narrowRoot, { recursive: true });
   fs.writeFileSync(path.join(narrowRoot, 'plugin.json'), JSON.stringify({
-    schemaVersion: 1, apiVersion: 2, id: 'test.narrow', name: 'Narrow fixture', version: '0.1.0',
-    compatibility: { codex: [currentCodexVersion], forge: ['>=0.3.0 <0.4.0'] },
+    schemaVersion: 1, apiVersion: 3, id: 'test.narrow', name: 'Narrow fixture', version: '0.1.0',
+    compatibility: { codex: [currentCodexVersion], forge: ['>=0.4.0 <0.5.0'] },
     permissions: ['panels', 'storage'], capabilities: [{ name: 'panels', version: 1 }], contributes: {}
   }));
   services.forge.registry.install(narrowRoot); services.forge.registry.setEnabled('test.narrow', true);
-  await assert.rejects(handlers.get('forge:api')(event, { id: 'test.narrow', method: 'storage.get', args: { key: 'x' } }), /未声明能力 "storage"/);
-  const narrowCapabilities = await handlers.get('forge:api')(event, { id: 'test.narrow', method: 'capabilities.get', args: {} });
+  await assert.rejects(api(event, { id: 'test.narrow', method: 'storage.get', args: { key: 'x' } }), /未声明能力 "storage"/);
+  const narrowCapabilities = await api(event, { id: 'test.narrow', method: 'capabilities.get', args: {} });
   assert.deepEqual(narrowCapabilities.capabilities.map(item => item.name), ['panels']);
   assert.match(narrowCapabilities.denied['storage.get'], /storage/);
   assert.equal(narrowCapabilities.denied['panels.open'], undefined);
+  const nexusRoot = path.join(root, 'nexus-reader'); fs.mkdirSync(nexusRoot);
+  fs.writeFileSync(path.join(nexusRoot, 'plugin.json'), JSON.stringify({ schemaVersion: 1, apiVersion: 3, id: 'test.nexus', name: 'Reader', version: '1.0.0', compatibility: { codex: [currentCodexVersion], forge: ['>=0.4.0 <0.5.0'] }, permissions: ['nexus.read'], capabilities: [{ name: 'nexus', version: 1, optional: true }] }));
+  services.forge.registry.install(nexusRoot); services.forge.registry.setEnabled('test.nexus', true);
+  const nexusCall = (method, args = {}) => api(event, { id: 'test.nexus', method: 'nexus.request', args: { method, args } });
+  assert(Array.isArray((await nexusCall('vaults')).vaults));
+  await assert.rejects(nexusCall('write', { vaultId: 'missing', path: 'x.md', content: '', expectedRevision: '' }), e => e.code === 'PERMISSION_DENIED');
+  await assert.rejects(nexusCall('read', { vaultId: 'missing', path: 'x.md' }), e => e.code === 'VAULT_NOT_CONNECTED');
+  await assert.rejects(nexusCall('connect', { path: root }), e => e.code === 'INVALID_ARGUMENT');
+  services.forge.registry.setEnabled('forge.nexus', false);
+  const disabledNexus = await api(event, { id: 'test.nexus', method: 'capabilities.get' });
+  assert.deepEqual(disabledNexus.negotiated.map(x => [x.supported, x.enabled, x.granted]), [[true, false, false]]);
+  await assert.rejects(nexusCall('vaults'), e => e.code === 'CAPABILITY_UNAVAILABLE');
+  services.forge.registry.setEnabled('forge.nexus', true);
+  assert(Array.isArray((await nexusCall('vaults')).vaults));
+  const uiNexus = args => handlers.get('fast-ext:nexus')(event, args);
+  await handlers.get('fast-ext:host-open')(event, { page: 'nexus' });
+  const external = []; fake.shell.openExternal = async url => external.push(url);
+  assert.equal((await uiNexus({ method: 'openExternal', args: { url: 'https://example.com/note' } })).ok, true);
+  for (const url of ['file:///C:/secret', 'https://user:password@example.com/']) assert.equal((await uiNexus({ method: 'openExternal', args: { url } })).error.code, 'INVALID_ARGUMENT');
+  assert.deepEqual(external, ['https://example.com/note']);
+  await handlers.get('fast-ext:host-open')(event, { page: 'canvas' });
+  assert.equal((await uiNexus({ method: 'vaults' })).error.code, 'PERMISSION_DENIED');
   fs.writeFileSync(path.join(process.env.CODEX_FORGE_HOME, 'profile.json'), JSON.stringify({ schemaVersion: 1, bundles: ['forge.builtin'], patches: [] }));
   const planned = await handlers.get('forge:manage')(event, { method: 'bundlePlan', args: {} });
   assert.deepEqual(planned.sources.map(item => item.name), ['bundle:forge.builtin']);
@@ -90,14 +113,14 @@ test('native menu opens package notes and IPC rejects other origins and subframe
    const eventPluginRoot = path.join(root, 'event-plugin'); fs.mkdirSync(eventPluginRoot, { recursive: true });
    fs.writeFileSync(path.join(eventPluginRoot, 'main.js'), 'void 0');
    fs.writeFileSync(path.join(eventPluginRoot, 'plugin.json'), JSON.stringify({
-     schemaVersion: 1, apiVersion: 2, id: 'test.events', name: 'Events fixture', version: '0.1.0',
-     compatibility: { codex: [currentCodexVersion], forge: ['>=0.3.0 <0.4.0'] }, permissions: ['events'], entry: 'main.js', contributes: { events: [{ name: 'plugin.test.events.status' }] }
+     schemaVersion: 1, apiVersion: 3, id: 'test.events', name: 'Events fixture', version: '0.1.0',
+     compatibility: { codex: [currentCodexVersion], forge: ['>=0.4.0 <0.5.0'] }, permissions: ['events'], entry: 'main.js', contributes: { events: [{ name: 'plugin.test.events.status' }] }
    }));
    services.forge.registry.install(eventPluginRoot); services.forge.registry.setEnabled('test.events', true);
    const secondEvent = { sender: secondWin.webContents, senderFrame: { processId: 21, routingId: 1 } };
    await handlers.get('fast-ext:overview')(secondEvent);
    const firstBefore = sent.length, secondBefore = sentSecond.length;
-   await handlers.get('forge:api')(event, { id: 'test.events', method: 'events.emit', args: { name: 'plugin.test.events.status', value: { ready: true } }, threadId: null });
+   await api(event, { id: 'test.events', method: 'events.emit', args: { name: 'plugin.test.events.status', value: { ready: true } }, threadId: null });
    assert.ok(sent.slice(firstBefore).some(item => item[1]?.type === 'forge-plugin-event'));
    assert.equal(sentSecond.slice(secondBefore).some(item => item[1]?.type === 'forge-plugin-event'), false);
   await assert.rejects(handlers.get('fast-ext:canvas')({ ...event, senderFrame: { processId: 20, routingId: 2 } }, { method: 'list' }), /Untrusted/);

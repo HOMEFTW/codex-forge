@@ -8,6 +8,7 @@
 //   3. 失败文本必须告诉插件怎么改清单，而不是只报"没有权限"。
 // permission 仍是用户授权面（安装时审阅）；capability 是技术声明，两者都要过。
 const CAPABILITIES = Object.freeze({
+  nexus: { version: 1, permission: 'nexus.read', description: '访问用户连接的星枢 Nexus 知识库；写入另需 nexus.write' },
   conversation: { version: 1, permission: 'conversation.title', description: '修改当前会话标题' },
   composer: { version: 1, permission: 'composer', description: '读写输入框草稿' },
   output: { version: 1, permission: 'output', description: '写当前会话的可折叠输出' },
@@ -24,6 +25,7 @@ const CAPABILITIES = Object.freeze({
 const ALWAYS_ALLOWED = new Set(['context.get', 'metadata.get', 'capabilities.get']);
 
 const METHOD_CAPABILITY = Object.freeze({
+  'nexus.request': 'nexus',
   'conversation.title': 'conversation',
   'composer.read': 'composer', 'composer.insert': 'composer', 'composer.set': 'composer',
   'output.append': 'output', 'output.clear': 'output', 'output.open': 'output',
@@ -40,6 +42,7 @@ const METHOD_CAPABILITY = Object.freeze({
 function inferCapabilities(permissions = []) {
   const set = new Set();
   for (const permission of permissions) {
+    if (permission === 'nexus.read' || permission === 'nexus.write') set.add('nexus');
     if (permission === 'conversation.title') set.add('conversation');
     else if (permission === 'composer') { set.add('composer'); set.add('ui'); }
     else if (['output', 'browser', 'storage', 'settings', 'events', 'panels', 'ui', 'dsh'].includes(permission)) set.add(permission);
@@ -52,7 +55,7 @@ function normalize(manifest) {
   if (Array.isArray(manifest.capabilities)) {
     return manifest.capabilities.map(item => ({
       name: item.name,
-      version: item.version ?? CAPABILITIES[item.name].version,
+      version: item.version ?? CAPABILITIES[item.name]?.version ?? 1,
       optional: item.optional === true,
     }));
   }
@@ -60,7 +63,7 @@ function normalize(manifest) {
 }
 
 function requiredCapability(method) {
-  return ALWAYS_ALLOWED.has(method) ? null : METHOD_CAPABILITY[method] || null;
+  return ALWAYS_ALLOWED.has(method) ? null : (Object.hasOwn(METHOD_CAPABILITY, method) ? METHOD_CAPABILITY[method] : null);
 }
 
 // 缺失能力的拒绝文本要能直接指导修改清单。
@@ -70,7 +73,7 @@ function denial(method, capability) {
   return `插件未声明能力 "${capability}"，无法调用 ${method}。请在 plugin.json 中加入 "capabilities": [{"name":"${capability}","version":${spec?.version || 1}}]${permission}。`;
 }
 
-function granted(manifest, method) {
+function granted(manifest, method, enabled = {}) {
   const capability = requiredCapability(method);
   if (!capability) return null;
   const declared = normalize(manifest).find(item => item.name === capability);
@@ -78,7 +81,17 @@ function granted(manifest, method) {
   if (declared.version !== CAPABILITIES[capability].version) {
     return `能力 "${capability}" 声明版本 ${declared.version}，当前 Forge 提供版本 ${CAPABILITIES[capability].version}；请更新 plugin.json。`;
   }
+  if (enabled[capability] === false) return `能力 "${capability}" 当前未启用，请启用对应内置插件后重试。`;
   return null;
 }
 
-module.exports = { CAPABILITIES, METHOD_CAPABILITY, ALWAYS_ALLOWED, inferCapabilities, normalize, requiredCapability, denial, granted };
+function negotiate(manifest, enabled = {}) {
+  return normalize(manifest).map(item => {
+    const spec = Object.hasOwn(CAPABILITIES, item.name) ? CAPABILITIES[item.name] : null;
+    const supported = !!spec && item.version === spec.version;
+    const active = !!spec && enabled[item.name] !== false;
+    const permission = !spec?.permission || manifest.permissions.includes(spec.permission);
+    return { ...item, supported, enabled: active, granted: supported && active && permission };
+  });
+}
+module.exports = { CAPABILITIES, METHOD_CAPABILITY, ALWAYS_ALLOWED, inferCapabilities, normalize, requiredCapability, denial, granted, negotiate };

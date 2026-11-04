@@ -125,7 +125,7 @@
   function controls() {
     let previous = document.getElementById('fast-canvas-entry'); if (!previous?.parentElement) return;
     const compact = previous.querySelector('span')?.style.display === 'none';
-    for (const [page, label, icon] of [['collaboration', '智能体协作', collabIcon], ['skills', '技能包', skillsIcon], ['todos', '待办清单', todoIcon], ['information-stats', '信息统计', statsIcon], ['codex-memory', '记忆管理', memoryIcon]]) {
+    for (const [page, label, icon] of [['collaboration', '智能体协作', collabIcon], ['skills', '技能包', skillsIcon], ['todos', '待办清单', todoIcon], ['information-stats', '信息统计', statsIcon], ['codex-memory', '记忆管理', memoryIcon], ['nexus', '星枢 Nexus', memoryIcon]]) {
       let button = document.getElementById(`fast-${page}-entry`);
       if(overview.forgePlugins?.some(p=>p.id==='forge.'+page&&!p.enabled)){button?.remove();continue;}
       if (!button) {
@@ -133,7 +133,7 @@
         button.setAttribute('aria-label', label); button.title = label; button.innerHTML = icon + `<span>${label}</span>`; button.addEventListener('click', () => open(page));
       }
       button.className = previous.className + ' fast-workspace-entry'; button.style.cssText = previous.style.cssText;
-      if (button.style.position === 'fixed') button.style.top = `${54 + 43 * (page === 'collaboration' ? 1 : page === 'skills' ? 2 : page === 'todos' ? 3 : page === 'information-stats' ? 4 : 5)}px`;
+      if (button.style.position === 'fixed') button.style.top = `${54 + 43 * (page === 'collaboration' ? 1 : page === 'skills' ? 2 : page === 'todos' ? 3 : page === 'information-stats' ? 4 : page === 'codex-memory' ? 5 : 6)}px`;
       button.querySelector('span').style.display = compact ? 'none' : '';
       if (previous.nextElementSibling !== button) previous.after(button);
       previous = button;

@@ -66,3 +66,13 @@ test('Forge SDK rejects pending requests when the host disposes the plugin', asy
   await assert.rejects(pending, /插件已停止/);
   await assert.rejects(api.capabilities.get(), /插件已停止/);
 });
+
+test('API 3 Nexus SDK preserves typed host errors through the browser reply', async () => {
+  const { api, reply, messages, message } = loadSdk();
+  reply('capabilities.get', { denied: {} }); reply('context.get', { threadId: null, apiVersion: 3 });
+  const pending = api.nexus.request('write', { vaultId: 'vault', path: 'note.md', content: 'new', expectedRevision: 'old' });
+  const request = messages.at(-1).forgePluginRequest;
+  assert.equal(request.method, 'nexus.request'); assert.equal(request.args.method, 'write');
+  message({ forgePluginReply: { id: request.id, error: { code: 'REVISION_CONFLICT', message: '笔记已变化' } } });
+  await assert.rejects(pending, error => error.code === 'REVISION_CONFLICT' && error.message === '笔记已变化');
+});

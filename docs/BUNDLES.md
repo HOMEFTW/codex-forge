@@ -29,7 +29,7 @@
 }
 ```
 
-`patch` 必须是组合包目录内的相对路径。Forge 0.3.0 的 `forge.builtin` 声明九个内置插件，包括信息统计、记忆管理和开发检查器。组合包格式的 `schemaVersion` 仍为 1，与 Forge API 2 分开版本管理。
+`patch` 必须是组合包目录内的相对路径。Forge 0.4.0 的 `forge.builtin` 声明十个内置插件，包括信息统计、记忆管理、开发检查器和星枢 Nexus。组合包格式的 `schemaVersion` 仍为 1，与 Forge API 3 分开版本管理。
 
 ## patch 文件
 

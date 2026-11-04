@@ -180,11 +180,13 @@
       return;
     }
     try {
-      let result=await ipcRenderer.invoke('forge:api',{...request,id:info.id});
+      const response=await ipcRenderer.invoke('forge:api',{...request,id:info.id});
+      if (!response?.ok) throw Object.assign(Error(response?.error?.message || 'Forge 响应无效'), { code: response?.error?.code || 'INTERNAL_ERROR' });
+      let result=response.result;
       if(result?.nativeAction==='close') result=await nativeRequest('close',{page:result.page});
       else if(result?.nativeAction?.startsWith('composer.')) result=composer(result.nativeAction,result.args);
       frame.contentWindow?.postMessage({forgePluginReply:{id:request.id,result}},'*');
-    }catch(error){frame.contentWindow?.postMessage({forgePluginReply:{id:request.id,error:error.message}},'*');}
+    }catch(error){frame.contentWindow?.postMessage({forgePluginReply:{id:request.id,error:{message:error.message,code:error.code||'INTERNAL_ERROR'}}},'*');}
   });
   globalThis.__forgeBridge={configure:fn=>{nativeRequest=fn;},mount:(node,page)=>{const [,id,viewId]=page.split(':');return mount(node,id,viewId);},refresh,layout:()=>{contributions();outputView();},snapshot:()=>snapshot};
   ipcRenderer.on('fast-ext:changed',(_event,payload)=>{

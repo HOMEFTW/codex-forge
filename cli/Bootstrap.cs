@@ -19,7 +19,7 @@ using System.Reflection;
 
 [assembly: AssemblyTitle("Codex Forge Bootstrap")]
 [assembly: AssemblyProduct("Codex Forge")]
-[assembly: AssemblyVersion("0.3.4.0")]
+[assembly: AssemblyVersion("0.4.0.0")]
 
 internal static class BootstrapCore {
     static BootstrapCore() {
@@ -42,7 +42,7 @@ internal static class BootstrapCore {
         Need(resolved.StartsWith(Path.GetFullPath(root).TrimEnd('\\')+"\\",StringComparison.OrdinalIgnoreCase),"安装路径越界");return resolved;
     }
     internal static void ValidateAdapter(Dictionary<string,object> adapter) {
-        Need(Convert.ToInt32(adapter["schemaVersion"])==1&&Convert.ToInt32(adapter["apiVersion"])==2&&Text(adapter,"architecture")=="x64","不支持的 Forge API 或系统架构");
+        Need(Convert.ToInt32(adapter["schemaVersion"])==1&&Convert.ToInt32(adapter["apiVersion"])==3&&Text(adapter,"architecture")=="x64","不支持的 Forge API 或系统架构");
         string version=Text(adapter,"codexVersion");Version parsed;
         Need(Version.TryParse(version,out parsed)&&parsed.Revision>=0&&version!="26.1013.4894.0","不支持的客户端版本");
         Need(Text(adapter,"packageIdentity")=="OpenAI.Codex"&&Text(adapter,"publisher")=="CN=50BDFD77-8903-4850-9FFE-6E8522F64D5B","官方产品身份不匹配");
@@ -94,7 +94,7 @@ internal static class BootstrapCore {
                 if(offset>expected){File.Delete(partial);offset=0;}
                 if(offset==expected)break;
                 using(var request=new HttpRequestMessage(HttpMethod.Get,Text(adapter,"downloadUrl"))) {
-                request.Headers.UserAgent.ParseAdd("Codex-Forge/0.3.4");if(offset>0)request.Headers.Range=new System.Net.Http.Headers.RangeHeaderValue(offset,null);
+                request.Headers.UserAgent.ParseAdd("Codex-Forge/0.4.0");if(offset>0)request.Headers.Range=new System.Net.Http.Headers.RangeHeaderValue(offset,null);
                     using(var response=await http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,token)) {
                         Need(response.StatusCode==HttpStatusCode.OK||response.StatusCode==HttpStatusCode.PartialContent,"官方客户端下载失败：HTTP "+(int)response.StatusCode);
                         if(response.StatusCode==HttpStatusCode.OK)offset=0;

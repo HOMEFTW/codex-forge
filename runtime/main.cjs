@@ -14,6 +14,7 @@ const { NativeApprovals } = require('./native-approvals.cjs');
 const { InformationStats } = require('./information-stats.cjs');
 const { runInformationProbe } = require('./information-probe.cjs');
 const { CodexMemory } = require('./codex-memory.cjs');
+const { NexusService } = require('./nexus.cjs');
 const { applyFastModelSettings } = require('./model-catalog.cjs');
 const defaultTarget = () => ({ agent: 'codex', model: '', reasoningEffort: '' });
 function install() {
@@ -33,8 +34,9 @@ function install() {
   const directHistory = new NativeDirectHistory(collaboration.store), nativeRequests = new Map(), internalRequests = new Map();
   const statistics = new InformationStats({ root:path.join(store.root,'information-stats'), probeRunner:context => runInformationProbe({ executable:path.join(process.resourcesPath,'codex.exe'), ...context }) });
   const codexMemory = new CodexMemory();
+  const nexus = new NexusService({ root: path.join(store.root, 'nexus') });
   const informationContexts = new Map();
-  const pages = new Set(['canvas', 'updates', 'todos', 'collaboration', 'skills', 'information-stats', 'codex-memory']);
+  const pages = new Set(['canvas', 'updates', 'todos', 'collaboration', 'skills', 'information-stats', 'codex-memory', 'nexus']);
   let forge;
   const active = id => !forge || forge.enabled(id);
   let signalNonce = ''; const contextRequests = new Map();
@@ -218,7 +220,7 @@ function install() {
   function open(state, { mode = 'right', page = 'canvas', canvasId, nodeIds = [] } = {}) {
     if (!state) return;
     state.mode = mode === 'expanded' ? 'expanded' : 'right'; state.page = pages.has(page) || forge?.page(page) ? page : 'canvas';
-    const owner={canvas:'forge.canvas',todos:'forge.todos',collaboration:'forge.collaboration',skills:'forge.skills','information-stats':'forge.information-stats','codex-memory':'forge.codex-memory'}[state.page];
+    const owner={canvas:'forge.canvas',todos:'forge.todos',collaboration:'forge.collaboration',skills:'forge.skills','information-stats':'forge.information-stats','codex-memory':'forge.codex-memory',nexus:'forge.nexus'}[state.page];
     if(owner && !active(owner)) throw Error('此插件已停用');
     if (canvasId) state.canvasId = canvasId;
     state.visible = true; state.win.webContents.send('fast-ext:panel', panelState(state));
@@ -255,6 +257,22 @@ function install() {
     if (!active('forge.codex-memory')) throw Error('记忆管理插件已停用');
     return codexMemory.dispatch(method, args);
   });
+  ipcMain.handle('fast-ext:nexus', (event, { method, args = {} } = {}) => require('./forge-errors.cjs').reply(async () => {
+    const state = host(event);
+    if (state.page !== 'nexus' || !active('forge.nexus')) throw new (require('./forge-errors.cjs').ForgeError)('PERMISSION_DENIED', 'Nexus 操作仅在已启用的笔记页面可用');
+    if (method === 'openExternal') {
+      const url = new URL(args.url);
+      if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new (require('./forge-errors.cjs').ForgeError)('INVALID_ARGUMENT', '仅支持无凭据的 HTTP(S) 链接');
+      await shell.openExternal(url.href); return { opened: url.href };
+    }
+    if (method === 'connect') {
+      const result = await dialog.showOpenDialog(state.win, { title: '选择星枢 Nexus 知识库目录', properties: ['openDirectory'] });
+      if (result.canceled || !result.filePaths[0]) return null;
+      return nexus.connect(result.filePaths[0]);
+    }
+    if (method === 'disconnect') return nexus.disconnect(args.vaultId);
+    return nexus.dispatch(method, args);
+  }));
   ipcMain.handle('fast-ext:collaboration-native', async (event, { method, args = {}, threadId } = {}) => {
     const state = host(event), context = threadContext(event, state);
     if (threadId !== undefined && threadId !== context.threadId) throw Error('当前对话已变化，请重新选择智能体');
@@ -344,7 +362,7 @@ function install() {
   if (process.env.CODEX_FAST_EXTENSION_TEST === '1') setTimeout(() => {
     fs.writeFileSync(path.join(store.root, '.diagnostics.json'), JSON.stringify({ menu: Menu.getApplicationMenu()?.items.map(item => ({ label: item.label, id: item.id })) }, null, 2));
   }, 10000);
-  forge = require('./forge-host.cjs').installForge({ipcMain,dialog,host,threadContext,nativeCall,nativeMessage:(state,message)=>{if(!state.bridge) throw Error('原生连接尚未就绪'); return state.bridge.handler(state.bridge.event,message);},open,notify,states,collaboration});
+  forge = require('./forge-host.cjs').installForge({ipcMain,dialog,host,threadContext,nativeCall,nativeMessage:(state,message)=>{if(!state.bridge) throw Error('原生连接尚未就绪'); return state.bridge.handler(state.bridge.event,message);},open,notify,states,collaboration,nexus});
   if (process.versions.electron) {
     try { const result = applyFastModelSettings({ registry: forge.registry }); if (result.visibilityFallback) console.warn('[Forge models] 模型目录已变化，已恢复默认模型显示；请检查 Fast 与模型配置设置。'); }
     catch (error) { console.error('[Forge models]', error.message); }

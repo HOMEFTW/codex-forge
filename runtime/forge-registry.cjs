@@ -41,6 +41,7 @@ class ForgeRegistry {
     const reasons = [...compatibility(m, this.versions).reasons];
     // 能力版本由宿主提供，插件声明不匹配时停用而不是带着错误的假设运行。
     for (const item of m.capabilities || []) {
+      if (m.apiVersion >= 3 && item.optional) continue;
       const spec = CAPABILITIES[item.name];
       if (!spec) { reasons.push('未知能力：' + item.name); continue; }
       if (item.version !== spec.version) reasons.push(`能力 ${item.name} 需要版本 ${item.version}，当前 Forge 提供 ${spec.version}`);
@@ -56,7 +57,7 @@ class ForgeRegistry {
     return { enabled: requestedEnabled && reasons.length === 0, requestedEnabled, reasons };
   }
   list() { return { versions: this.versions, plugins: [...this.entries.values()].map(e => ({ ...e.manifest, builtin: e.builtin, fingerprint: e.fingerprint, ...this.status(e.manifest.id) })), errors: this.errors }; }
-  get(id, active = true) { const e = this.entries.get(id); check(e, '插件不存在'); if (active) check(this.status(id).enabled, '插件未启用或不兼容'); return e; }
+  get(id, active = true) { const e = this.entries.get(id); check(e, '插件不存在', 'PLUGIN_NOT_FOUND'); if (active) check(this.status(id).enabled, '插件未启用或不兼容', 'PLUGIN_DISABLED'); return e; }
   setEnabled(id, enabled) {
     check(typeof enabled === 'boolean', '启用值无效'); const entry = this.get(id, false), state = this.state();
     if (enabled) { const match = compatibility(entry.manifest, this.versions); check(match.compatible, match.reasons.join('；')); }
@@ -72,7 +73,7 @@ class ForgeRegistry {
     }
     return validateSettings(entry.manifest, json(file, {}));
   }
-  permission(id, name) { const e = this.get(id); check(e.manifest.permissions.includes(name), '插件未声明权限：'+name); return e; }
+  permission(id, name) { const e = this.get(id); check(e.manifest.permissions.includes(name), '插件未声明权限：'+name, 'PERMISSION_DENIED'); return e; }
   storage(id, op, key, value) {
     this.permission(id, 'storage'); check(typeof key === 'string' && /^[\w.-]{1,100}$/.test(key) && !['__proto__','constructor','prototype'].includes(key), '存储键无效');
     const file = path.join(this.root, 'storage', id + '.json'), data = json(file, {});

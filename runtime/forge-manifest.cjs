@@ -3,11 +3,12 @@ const fs = require('node:fs'), path = require('node:path');
 const { parts, ranges, compatibility } = require('./forge-versions.cjs');
 const { CAPABILITIES, normalize: normalizeCapabilities } = require('./forge-capabilities.cjs');
 const { SLOTS } = require('./forge-slots.cjs');
-const permissions = new Set(['panels', 'sidebar', 'toolbar', 'composer', 'ui', 'devtools', 'conversation.read', 'conversation.title', 'output', 'browser', 'storage', 'settings', 'network', 'events', 'dsh', 'dsh.manage']);
+const { ForgeError } = require('./forge-errors.cjs');
+const permissions = new Set(['panels', 'sidebar', 'toolbar', 'composer', 'ui', 'devtools', 'conversation.read', 'conversation.title', 'output', 'browser', 'storage', 'settings', 'network', 'events', 'dsh', 'dsh.manage', 'nexus.read', 'nexus.write']);
 const surfaces = ['sidebar', 'toolbar', 'composer'];
 const idPattern = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/;
 const localId = /^[a-zA-Z][\w-]{0,79}$/;
-function check(value, message) { if (!value) throw Error(message); }
+function check(value, message, code = 'INVALID_ARGUMENT') { if (!value) throw new ForgeError(code, message); }
 function safeFile(root, relative) {
   check(typeof relative === 'string' && relative.length < 250 && relative && !/[\x00-\x1f]/.test(relative) && !relative.includes('\\') && !relative.includes(':') && !relative.split('/').some(s => !s || s === '..' || s === '.'), '资源路径必须为包内相对路径');
   const base = fs.realpathSync(root), resolved = fs.realpathSync(path.join(base, relative));
@@ -17,12 +18,13 @@ function safeFile(root, relative) {
 function validate(input, root, { builtin = false } = {}) {
   check(input && typeof input === 'object' && !Array.isArray(input), '插件清单必须为对象');
   const m = JSON.parse(JSON.stringify(input));
-  check(m.schemaVersion === 1 && [1, 2].includes(m.apiVersion), '不支持的清单或 API 版本');
+  check(m.schemaVersion === 1 && [1, 2, 3].includes(m.apiVersion), '不支持的清单或 API 版本');
   check(idPattern.test(m.id) && m.id.length <= 100, '插件 ID 使用 publisher.name 格式');
   check(builtin || !m.id.startsWith('forge.'), 'forge.* 是内置插件保留命名空间');
   check(typeof m.name === 'string' && m.name.trim() && m.name.length <= 100, '插件名称无效');
   parts(m.version); ranges(m.compatibility?.codex); ranges(m.compatibility?.forge);
   check(Array.isArray(m.permissions) && m.permissions.every(p => permissions.has(p)) && new Set(m.permissions).size === m.permissions.length, '插件声明了未知或重复权限');
+  check(!m.permissions.includes('nexus.write') || m.permissions.includes('nexus.read'), 'nexus.write 同时需要 nexus.read 权限');
   check(!m.permissions.includes('devtools') || (builtin && m.id === 'forge.devtools'), 'devtools 仅限内置 forge.devtools 插件');
   if (m.capabilities !== undefined) {
     check(Array.isArray(m.capabilities) && m.capabilities.length <= 32, 'capabilities 必须为数组');
@@ -31,12 +33,17 @@ function validate(input, root, { builtin = false } = {}) {
       check(item && typeof item === 'object' && !Array.isArray(item), '能力声明必须为对象');
       const unknown = Object.keys(item).find(key => !['name', 'version', 'optional'].includes(key));
       check(!unknown, '未知能力字段：' + unknown);
-      check(typeof item.name === 'string' && Object.hasOwn(CAPABILITIES, item.name), '未知能力：' + item.name);
+      check(typeof item.name === 'string' && /^[a-z][a-z0-9.-]{0,79}$/.test(item.name), '能力名称无效');
+      const spec = Object.hasOwn(CAPABILITIES, item.name) ? CAPABILITIES[item.name] : null;
+      const optional = m.apiVersion >= 3 && item.optional === true;
+      check(spec || optional, '未知能力：' + item.name);
       check(!declared.has(item.name), '能力重复：' + item.name);
       declared.add(item.name);
-      if (item.version !== undefined) check(item.version === CAPABILITIES[item.name].version, `能力 ${item.name} 版本无效，当前为 ${CAPABILITIES[item.name].version}`);
+      if (item.version !== undefined) check(Number.isSafeInteger(item.version) && item.version > 0, '能力版本必须为正整数');
+      if (!spec) check(item.version !== undefined, '未知可选能力必须显式声明版本');
+      if (spec && !optional && item.version !== undefined) check(item.version === spec.version, `能力 ${item.name} 版本无效，当前为 ${spec.version}`);
       if (item.optional !== undefined) check(typeof item.optional === 'boolean', '能力 optional 必须为布尔值');
-      const required = CAPABILITIES[item.name].permission;
+      const required = spec?.permission;
       if (required) check(m.permissions.includes(required), `能力 ${item.name} 需要 ${required} 权限`);
     }
   }

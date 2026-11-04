@@ -71,15 +71,15 @@ test('registers once and opens each fixed page as a native tab without replacing
   scope.tabs.set('ordinary', { tabId: 'ordinary', tabType: { kind: 'browser' } });
   f.context.fastWorkspaceRegisterTabs();
   assert.equal(f.sandbox.QL.size, 1);
-  for (const page of ['canvas', 'todos', 'collaboration', 'skills', 'updates', 'information-stats', 'codex-memory']) {
+  for (const page of ['canvas', 'todos', 'collaboration', 'skills', 'updates', 'information-stats', 'codex-memory', 'nexus']) {
     const reply = f.request({ action: 'open', page, mode: 'right', threadId: 'a' });
     assert.equal(reply.error, undefined);
     assert.equal(reply.result.tabId, 'fast-workspace:' + page);
     assert.equal(reply.result.mode, 'right');
   }
-  assert.equal(scope.tabs.size, 8);
+  assert.equal(scope.tabs.size, 9);
   f.request({ action: 'open', page: 'canvas', mode: 'right', threadId: 'a' });
-  assert.equal(scope.tabs.size, 8, 'reopening a page uses its existing stable native tab');
+  assert.equal(scope.tabs.size, 9, 'reopening a page uses its existing stable native tab');
   const opens = f.calls.filter(item => item.method === 'openTab');
   assert(opens.every(item => item.options.replaceTabId === undefined && item.options.isPreview === false));
   assert(opens.every(item => item.options.requiresWorkspaceReady === false && item.options.allowDuringThreadCreation === true));

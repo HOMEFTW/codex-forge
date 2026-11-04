@@ -1,13 +1,13 @@
-# Forge API 2
+# Forge API 3
 
-Forge API 2 随 Codex Forge 0.3.0 引入，当前实现随 0.3.4 发布。插件清单、`forge.apiVersion`、上下文和能力查询的 API 版本均为 `2`；清单与更新协议的 `schemaVersion` 保持各自版本，不随 API 主版本一起递增。
+Forge API 3 随 Codex Forge 0.4.0 发布，在 API 2 操作基础上增加星枢 Nexus、可选能力协商和结构化错误。插件清单、SDK、上下文与能力查询均使用 `apiVersion: 3`；清单和更新协议的 `schemaVersion` 独立管理。
 
-从 API 1 迁移：将 `plugin.json` 的 `apiVersion` 改为 `2`，将 Forge 兼容范围改为经过测试的 `>=0.3.0 <0.4.0`，更新 SDK，并验证能力声明、UI 插槽、权限及已有交互。API 1 清单仍可读取用于诊断，但版本不匹配时不会启用；不会自动修改已安装第三方插件。DSH 导入器按当前宿主 API 生成清单。
+从 API 1/2 迁移：更新 SDK，清单改为 `apiVersion: 3` 与经过测试的 Forge 范围 `>=0.4.0 <0.5.0`，验证权限、能力及原有交互。旧插件仍可读取并显示诊断，数据保留，未经迁移不启用；宿主不改写第三方插件。DSH 导入器按当前宿主生成清单。详见 [迁移说明](API-3-MIGRATION.md)。
 
 插件目录必须包含 `plugin.json`。`id` 使用 `publisher.name`；`forge.*` 保留给内置插件。`compatibility.codex` 和 `compatibility.forge` 是非空数组，数组项之间是“或”；单项空格分隔的比较条件是“且”。支持精确三/四段数字版本、`>= <= > < = ^ ~` 和 `||`，不接受隐式通配或预发布字符串。
 
 ```json
-{"schemaVersion":1,"apiVersion":2,"id":"example.panel","name":"示例","version":"0.3.0","compatibility":{"codex":["26.1023.6123.0","26.1021.2667.0","26.1016.8622.0"],"forge":[">=0.3.0 <0.4.0"]},"permissions":["panels"],"contributes":{"panels":[{"id":"main","title":"示例","entry":"panel.html"}]}}
+{"schemaVersion":1,"apiVersion":3,"id":"example.panel","name":"示例","version":"0.4.0","compatibility":{"codex":["26.1027.6604.0"],"forge":[">=0.4.0 <0.5.0"]},"permissions":["panels"],"contributes":{"panels":[{"id":"main","title":"示例","entry":"panel.html"}]}}
 ```
 
 宿主向 iframe 注入 `window.CodexForge`。`entry` 是可选的浏览器 JS 命令入口。面板 HTML 应自包含，使用内联脚本和样式；可在发布前用自己的构建器打包。没有 Node、任意 IPC、文件系统、同源权限或自动消息发送权限。允许的网络源必须通过 `network` 和 `networkOrigins` 声明；面板不能导航宿主。API 仍按来源窗口和插件安装记录校验身份。
@@ -26,6 +26,7 @@ Forge API 2 随 Codex Forge 0.3.0 引入，当前实现随 0.3.4 发布。插件
 | `browser.open(url)` | `browser`、`conversation.read` | 使用原生内置浏览器打开 HTTP(S) 地址 |
 | `storage.get/set/delete` | `storage` | 独立 JSON 存储，单键64KB、每插件1MB |
 | `settings.get()` | `settings` | 获取经过类型、范围和枚举校验的设置 |
+| `nexus.request(method,args)` | `nexus.read`，写入另需 `nexus.write` | 访问用户在星枢面板连接的知识库；按方法表校验，只读请求不能写文件，创建/更新需 revision，详见 [Nexus API](NEXUS-API.md) |
 | `metadata.get()` | 无 | 获取自己的清单、描述与升级日志 |
 | `events.emit(name,value)` | `events` | 向当前 Forge 窗口中已启用插件广播受限 JSON 事件；事件必须先在 `contributes.events` 中声明并属于自己的插件 ID，单次数据最多 64KB |
 | `commands.register(id, handler)` | 无 | 注册已声明命令的处理器；返回注销函数 |
@@ -33,7 +34,7 @@ Forge API 2 随 Codex Forge 0.3.0 引入，当前实现随 0.3.4 发布。插件
 
 静态按钮在 `contributes.sidebar/toolbar/composer` 中声明；动态注册使用相同 `{id,title,command}` 或 `{id,title,panel}` 结构。安装后默认停用。停用卸载会销毁运行时与贡献点；卸载保留独立设置。代码或清单被手动修改后，重新加载会要求审阅并重新启用。
 
-`contributes.settings.properties` 使用 `{type,title,default,enum,minimum,maximum,maxLength}`，支持字符串、数字、布尔值；0.3.3 起还支持字符串数组（`type: "array", items: {type: "string", maxLength: 200}, maxItems: 200, default: []`）。数组拒绝重复项、空字符串和非字符串，默认最多 200 项，每项默认最长 200 字符；`maxItems` 可设为 1–1000。使用数组的第三方插件应声明 Forge `>=0.3.3 <0.4.0`，API 版本仍为 2。设置界面自动集中到原生“Codex Forge 插件设置”；插件管理的设置按钮携带插件 ID 深链接，用户不必自行查找。
+`contributes.settings.properties` 使用 `{type,title,default,enum,minimum,maximum,maxLength}`，支持字符串、数字、布尔值；0.3.3 起还支持字符串数组（`type: "array", items: {type: "string", maxLength: 200}, maxItems: 200, default: []`）。数组拒绝重复项、空字符串和非字符串，默认最多 200 项，每项默认最长 200 字符；`maxItems` 可设为 1–1000。使用数组的第三方插件应声明 Forge `>=0.4.0 <0.5.0`，API 版本为 3。设置界面自动集中到原生“Codex Forge 插件设置”；插件管理的设置按钮携带插件 ID 深链接，用户不必自行查找。
 
 `capabilities.get()` 对应 DSH 的 capability seam 思路：插件先读取宿主实际提供的能力与自己的 `denied` 列表，再决定是否显示入口。声明与授权仍由宿主逐请求校验，能力查询不会绕过权限。
 
@@ -46,7 +47,13 @@ Forge API 2 随 Codex Forge 0.3.0 引入，当前实现随 0.3.4 发布。插件
 ]
 ```
 
-可用能力：`conversation`（修改标题）、`composer`、`output`、`browser`、`storage`、`settings`、`events`、`panels`、`ui`（注册按钮）、`dsh`（导入的 DSH 浏览器插件兼容请求）。`context.get`、`metadata.get`、`capabilities.get` 不需要声明。`capabilities.get()` 返回 `capabilities`（本插件声明）、`available`（宿主提供的能力版本）、`denied`（未授予的方法与修复提示）；声明了宿主不提供的版本时插件会被停用并说明原因。
+可用能力：`conversation`（修改标题）、`composer`、`output`、`browser`、`storage`、`settings`、`events`、`panels`、`ui`（注册按钮）、`dsh`（导入的 DSH 浏览器插件兼容请求）、`nexus`（星枢知识库）。`context.get`、`metadata.get`、`capabilities.get` 不需要声明。`capabilities.get()` 返回 `capabilities`（本插件声明）、`available`（宿主提供的能力版本）、`denied`（未授予的方法与修复提示）；API 3 增加 `negotiated`（逐项 `supported/enabled/granted`）。`available` 仅表示实现版本，不代表服务启用或插件获权；例如停用 `forge.nexus` 后，Nexus 仍受宿主支持，但 `enabled/granted` 为 false。必需能力必须存在并匹配版本；`optional:true` 的未知能力或版本不匹配不会停用插件，调用仍拒绝。未知可选能力必须明确填写正整数版本；不会推断或授予未知权限。
+
+## 错误处理
+
+异步 SDK 失败返回带 `code` 的 `Error`，可读说明在 `message`。`CAPABILITY_UNAVAILABLE`、`PERMISSION_DENIED`、`PLUGIN_DISABLED`、`METHOD_NOT_FOUND`、`INVALID_ARGUMENT`、`REVISION_CONFLICT`、`VAULT_NOT_CONNECTED`、`UNSUPPORTED_SYNTAX`、`NOT_FOUND` 与 `TIMEOUT` 可用于分支处理；底层文件异常可能返回原生错误码。未知错误使用 `INTERNAL_ERROR`，不要根据中文 message 解析业务状态。
+
+能力查询是当时快照；服务状态可变化，每次实际调用仍由宿主验证。遇到 `REVISION_CONFLICT` 应保留草稿、重新读取并合并，不应自动重复覆盖。SDK 类型见 `sdk/index.d.ts` 和 `sdk/nexus.d.ts`。
 
 ## UI 贡献点（slot）
 

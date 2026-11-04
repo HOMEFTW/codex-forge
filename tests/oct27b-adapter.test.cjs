@@ -150,7 +150,7 @@ test('cold chat layout opens sidebar and toolbar pages before visiting settings 
   for(const id of ['thread_1','thread_2']){
     active={value:{conversationId:id},tabs:new Map(),full:false,get(signal,key){return signal===full?this.full:signal===unavailable?false:signal===tabById?this.tabs.get(key):undefined;}};
     assert.equal(scope.ZLt({workspaceWidth:1200}).value,'native hook value');
-    for(const page of ['canvas','todos','collaboration','skills','information-stats','codex-memory','forge-plugins','forge-updates']){
+    for(const page of ['canvas','todos','collaboration','skills','information-stats','codex-memory','nexus','forge-plugins','forge-updates']){
       listeners.get('message')({source:window,data:{fastWorkspaceNativeRequest:{id:id+page,action:'open',page,threadId:id}}});
       assert.equal(replies.at(-1).fastWorkspaceNativeReply.error,undefined);
       assert(active.tabs.has('fast-workspace:'+page));

@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "apiVersion": 3,
+  "id": "forge.nexus",
+  "name": "星枢 Nexus",
+  "version": "0.4.0",
+  "description": "独立浏览和编辑 Obsidian 知识库：Markdown、图谱、数据库、模板、日记和模型工具；兼容常用社区插件语法。",
+  "compatibility": {
+    "codex": [
+      "26.1027.6604.0"
+    ],
+    "forge": [
+      ">=0.4.0 <0.5.0"
+    ]
+  },
+  "permissions": [
+    "panels",
+    "sidebar",
+    "toolbar",
+    "nexus.read",
+    "nexus.write"
+  ],
+  "capabilities": [
+    {
+      "name": "panels",
+      "version": 1
+    },
+    {
+      "name": "ui",
+      "version": 1
+    },
+    {
+      "name": "nexus",
+      "version": 1
+    }
+  ],
+  "contributes": {
+    "panels": [
+      {
+        "id": "main",
+        "title": "星枢 Nexus",
+        "builtinPage": "nexus",
+        "placement": "right"
+      }
+    ],
+    "sidebar": [
+      {
+        "id": "open",
+        "title": "星枢 Nexus",
+        "panel": "main"
+      }
+    ],
+    "toolbar": [
+      {
+        "id": "open",
+        "title": "星枢",
+        "panel": "main"
+      }
+    ]
+  },
+  "changelog": [
+    {
+      "version": "0.4.0",
+      "date": "2026-11-04",
+      "items": [
+        "新增星枢知识库，独立兼容 Obsidian 笔记、核心功能和常用社区插件语法。"
+      ]
+    }
+  ]
+}

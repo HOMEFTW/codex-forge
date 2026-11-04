@@ -6,7 +6,7 @@ window.addEventListener('message', event => {
   if (data?.fastCanvasReply) {
     const pending = waiting.get(data.fastCanvasReply); if (!pending) return;
     waiting.delete(data.fastCanvasReply); clearTimeout(pending.timer);
-    if (data.error) pending.reject(new Error(data.error)); else pending.resolve(data.result);
+    if (data.error) pending.reject(Object.assign(new Error(data.error), { code: data.code || 'INTERNAL_ERROR' })); else pending.resolve(data.result);
   }
   if (data?.fastCanvasEvent) for (const listener of listeners) listener(data.fastCanvasEvent);
 });

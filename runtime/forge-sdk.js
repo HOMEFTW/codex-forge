@@ -1,13 +1,14 @@
 // Browser SDK: works only inside a Forge-owned sandbox. No Node or arbitrary IPC.
 (() => {
   const waiting = new Map(), handlers = new Map(), listeners = new Map(); let sequence = 0, context = { threadId: null }, disposed = false, denied = {};
+  const apiError = (value, code = 'INTERNAL_ERROR') => Object.assign(new Error(typeof value === 'string' ? value : value?.message || 'Forge 请求失败'), { name: 'ForgeError', code: value?.code || code });
   function request(method, args = {}) {
-    if (disposed) return Promise.reject(Error('插件已停止'));
+    if (disposed) return Promise.reject(apiError('插件已停止', 'PLUGIN_DISABLED'));
     // 宿主会按清单 capabilities 授权；这里提前拒绝并给出同样的修复指引，
     // 让开发者在插件侧就能看到原因，而不是等宿主报错。
-    if (denied[method]) return Promise.reject(Error(denied[method]));
+    if (denied[method]) return Promise.reject(apiError(denied[method], 'CAPABILITY_UNAVAILABLE'));
     return new Promise((resolve, reject) => {
-      const id = ++sequence, timer = setTimeout(() => { waiting.delete(id); reject(Error('Forge 请求超时')); }, method === 'dsh.request' ? 90000 : 20000);
+      const id = ++sequence, timer = setTimeout(() => { waiting.delete(id); reject(apiError('Forge 请求超时', 'TIMEOUT')); }, method === 'dsh.request' ? 90000 : 20000);
       waiting.set(id, { resolve, reject, timer });
       parent.postMessage({ forgePluginRequest: { id, method, args, threadId: context.threadId } }, '*');
     });
@@ -19,12 +20,12 @@
     const data = event.data;
     if (data?.forgePluginReply) {
       const { id, result, error } = data.forgePluginReply, pending = waiting.get(id); if (!pending) return;
-      waiting.delete(id); clearTimeout(pending.timer); error ? pending.reject(Error(error)) : pending.resolve(result);
+      waiting.delete(id); clearTimeout(pending.timer); error ? pending.reject(apiError(error)) : pending.resolve(result);
     }
     if (data?.forgePluginEvent) {
       const { name, value, metadata } = data.forgePluginEvent;
       if (name === 'context.changed') context = value;
-      if (name === 'dispose') { disposed = true; for (const pending of waiting.values()) { clearTimeout(pending.timer); pending.reject(Error('插件已停止')); } waiting.clear(); }
+      if (name === 'dispose') { disposed = true; for (const pending of waiting.values()) { clearTimeout(pending.timer); pending.reject(apiError('插件已停止', 'PLUGIN_DISABLED')); } waiting.clear(); }
       emit(name, value, metadata);
     }
     if (data?.forgePluginCommand) {
@@ -35,7 +36,7 @@
     }
   });
   const api = {
-    apiVersion: 2,
+    apiVersion: 3,
     context: { async get() { return context = await request('context.get'); } },
     events: { on, emit: (name, value) => request('events.emit', { name, value }) },
     commands: { register(id, handler) { if (handlers.has(id)) throw Error('重复命令'); handlers.set(id, handler); return () => handlers.delete(id); } },
@@ -49,6 +50,7 @@
     storage: { get: key => request('storage.get', { key }), set: (key, value) => request('storage.set', { key, value }), delete: key => request('storage.delete', { key }) },
     dsh: { request: (endpoint, options = {}) => request('dsh.request', { endpoint, ...options }) },
     settings: { get: () => request('settings.get') },
+    nexus: { request: (method, args = {}) => request('nexus.request', { method, args }) },
     metadata: { get: () => request('metadata.get') },
     capabilities: { get: () => request('capabilities.get') },
     diagnostics: { get: () => request('diagnostics.collect') },
