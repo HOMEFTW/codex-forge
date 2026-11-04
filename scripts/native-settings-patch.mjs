@@ -6,7 +6,7 @@ function replace(source, from, to, label = from) {
 }
 
 export function patchSettingsVisibility(source, { version = 'legacy' } = {}) {
-  if (version === 'oct27') {
+  if (version === 'oct27' || version === 'oct27b') {
     source = replace(source, 'case`plugins-settings`:return{visible:p,pending:!1};',
       'case`plugins-settings`:return{visible:p,pending:!1};case`codex-forge`:return{visible:!0,pending:!1};');
     source = replace(source, 'co=[`profile`,`agent`,`personalization`,`mcp-settings`,`plugins-settings`,`file-type-handlers`',
@@ -65,6 +65,20 @@ export function patchSettingsVisibility(source, { version = 'legacy' } = {}) {
 }
 
 export function patchSettingsPage(source, { version = 'legacy' } = {}) {
+  if (version === 'oct27b') {
+    source = replace(source, 'l=vn(e.slug,E,t),',
+      'l=e.slug===`codex-forge`?{id:`codexForge.settings`,defaultMessage:`Codex Forge 插件设置`}:vn(e.slug,E,t),');
+    source = replace(source, 'f=()=>{r||e.appRoute!=null||Qt(e.slug).catch(ti)}',
+      'f=()=>{r||e.slug===`codex-forge`||e.appRoute!=null||Qt(e.slug).catch(ti)}');
+    source = replace(source, 'p=F?(0,Q.jsx)(mn,{',
+      'p=F?e.slug===`codex-forge`?`Codex Forge 插件设置`:(0,Q.jsx)(mn,{');
+    source = replace(source, 'slugs:[`plugins-settings`,`file-type-handlers`',
+      'slugs:[`plugins-settings`,`codex-forge`,`file-type-handlers`');
+    source = replace(source, 'label:(0,Q.jsx)(mn,{codexMicroDeviceModel:T,showChatGptDataControlsLabel:t,showEnterpriseUsageLabel:E,slug:e.slug})',
+      'label:e.slug===`codex-forge`?`Codex Forge 插件设置`:(0,Q.jsx)(mn,{codexMicroDeviceModel:T,showChatGptDataControlsLabel:t,showEnterpriseUsageLabel:E,slug:e.slug})');
+    return replace(source, 'Me=o}let Ne;',
+      'Me=o}if(C===`codex-forge`)Me=(0,$.jsx)(`div`,{\x22data-forge-settings-mount\x22:`true`,\x22data-forge-settings-plugin\x22:new URLSearchParams(f.search).get(`plugin`)||``,style:{width:`100%`,height:`100%`,minHeight:500,display:`flex`}});let Ne;');
+  }
   if (version === 'oct27') {
     source = replace(source, 'l=vn(e.slug,D,t),',
       'l=e.slug===`codex-forge`?{id:`codexForge.settings`,defaultMessage:`Codex Forge 插件设置`}:vn(e.slug,D,t),');

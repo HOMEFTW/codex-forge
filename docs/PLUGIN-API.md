@@ -1,6 +1,6 @@
 # Forge API 2
 
-Forge API 2 随 Codex Forge 0.3.0 引入，当前实现随 0.3.3 发布。插件清单、`forge.apiVersion`、上下文和能力查询的 API 版本均为 `2`；清单与更新协议的 `schemaVersion` 保持各自版本，不随 API 主版本一起递增。
+Forge API 2 随 Codex Forge 0.3.0 引入，当前实现随 0.3.4 发布。插件清单、`forge.apiVersion`、上下文和能力查询的 API 版本均为 `2`；清单与更新协议的 `schemaVersion` 保持各自版本，不随 API 主版本一起递增。
 
 从 API 1 迁移：将 `plugin.json` 的 `apiVersion` 改为 `2`，将 Forge 兼容范围改为经过测试的 `>=0.3.0 <0.4.0`，更新 SDK，并验证能力声明、UI 插槽、权限及已有交互。API 1 清单仍可读取用于诊断，但版本不匹配时不会启用；不会自动修改已安装第三方插件。DSH 导入器按当前宿主 API 生成清单。
 

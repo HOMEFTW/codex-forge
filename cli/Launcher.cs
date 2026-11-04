@@ -8,12 +8,10 @@ using System.Reflection;
 [assembly: AssemblyTitle("Codex Forge")]
 [assembly: AssemblyProduct("Codex Forge")]
 [assembly: AssemblyDescription("Codex Forge plugin host launcher")]
-[assembly: AssemblyVersion("0.3.3.0")]
+[assembly: AssemblyVersion("0.3.4.0")]
 internal static class Launcher {
     static string Quote(string value) { return "\""+value.Replace("\"", "\\\"")+"\""; }
-    // MSI 的 MajorUpgrade 会先卸载旧版本，旧的 current.json 可能仍指向已被替换的
-    // 客户端目录。启动前比较该目录 forge-install.json 的 forgeVersion 与本次安装的
-    // bootstrap.json 版本；不一致就交给准备程序重建，而不是静默启动旧版 Forge。
+    // 同版本修订也可能更新客户端或插件内容；不能只比较 Forge 版本号。
     static bool CurrentPointerStale(string root,string pointer,string setupFile) {
         if(!File.Exists(pointer)) return true;
         try {
@@ -30,7 +28,14 @@ internal static class Launcher {
             string expected=Path.GetFileName(directory.Replace('/',Path.DirectorySeparatorChar).TrimEnd(Path.DirectorySeparatorChar));
             var manifest=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(receipt));
             string actual=manifest["forgeVersion"] as string;
-            return !String.Equals(actual,expected,StringComparison.OrdinalIgnoreCase);
+            if(!String.Equals(actual,expected,StringComparison.OrdinalIgnoreCase)) return true;
+            string payloadRoot=Path.GetFullPath(Path.Combine(root,directory));
+            if(Path.IsPathRooted(directory)||!payloadRoot.StartsWith(root,StringComparison.OrdinalIgnoreCase)) return true;
+            var serializer=new JavaScriptSerializer { MaxJsonLength=32*1024*1024 };
+            var target=serializer.Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(payloadRoot,"forge.config.json")));
+            var payload=serializer.Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(payloadRoot,"forge-payload.json")));
+            return !String.Equals(manifest["sourceMSIXVersion"] as string,target["codexVersion"] as string,StringComparison.Ordinal)
+                || !String.Equals(manifest["forgePayloadSHA256"] as string,payload["payloadDigest"] as string,StringComparison.Ordinal);
         } catch { return true; }
     }
     [STAThread] static int Main(string[] args) {

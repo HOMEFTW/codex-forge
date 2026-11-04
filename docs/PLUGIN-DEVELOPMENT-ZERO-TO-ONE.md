@@ -1,6 +1,6 @@
 # 从零开发一个 Codex Forge 插件
 
-本教程用 JavaScript 和 HTML 创建一个能在原生右侧标签中显示、读取统一设置、向当前会话输出、编辑输入草稿及打开内置浏览器的插件。目标环境：Windows x64，Codex Forge 0.3.3 / API 2，目标客户端 26.1027.3384.0（同时保留三个旧版兼容声明）。
+本教程用 JavaScript 和 HTML 创建一个能在原生右侧标签中显示、读取统一设置、向当前会话输出、编辑输入草稿及打开内置浏览器的插件。目标环境：Windows x64，Codex Forge 0.3.4 / API 2，目标客户端 26.1027.6604.0（同时保留四个旧版兼容声明）。
 
 ## 1. 获取源码与创建项目
 
@@ -31,10 +31,10 @@ node cli/forge.mjs create ./my-first-plugin
   "apiVersion": 2,
   "id": "yourname.first-plugin",
   "name": "我的第一个插件",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "在当前会话插入问候，显示可折叠输出，并打开内置浏览器。",
   "compatibility": {
-    "codex": ["26.1027.3384.0", "26.1023.6123.0", "26.1021.2667.0", "26.1016.8622.0"],
+    "codex": ["26.1027.6604.0", "26.1027.3384.0", "26.1023.6123.0", "26.1021.2667.0", "26.1016.8622.0"],
     "forge": [">=0.3.0 <0.4.0"]
   },
   "permissions": ["panels", "sidebar", "toolbar", "composer", "conversation.read", "output", "browser", "storage", "settings", "events"],
@@ -62,11 +62,11 @@ node cli/forge.mjs create ./my-first-plugin
       }
     }
   },
-  "changelog": [{"version": "0.3.3", "date": "2026-11-03", "items": ["适配 Codex Forge 0.3.3 / API 2。"]}]
+  "changelog": [{"version": "0.3.4", "date": "2026-11-04", "items": ["适配 Codex Forge 0.3.4 / API 2。"]}]
 }
 ```
 
-每个插件必须同时声明客户端和 Forge 兼容范围。数组里的多个版本是“或”，单个字符串中的条件是“且”，例如 `codex: ["26.1027.3384.0", "26.1023.6123.0", "26.1021.2667.0", "26.1016.8622.0"]` 表示开发者验证过四个版本；当前 Forge 为这四个版本分别维护固定适配器。后续客户端版本仍必须先完成适配和验证，再加入兼容数组。当前宿主 API 版本为整数 `2`。
+每个插件必须同时声明客户端和 Forge 兼容范围。数组里的多个版本是“或”，单个字符串中的条件是“且”，例如 `codex: ["26.1027.6604.0", "26.1027.3384.0", "26.1023.6123.0", "26.1021.2667.0", "26.1016.8622.0"]` 表示开发者验证过五个版本；当前 Forge 为这五个版本分别维护固定适配器。后续客户端版本仍必须先完成适配和验证，再加入兼容数组。当前宿主 API 版本为整数 `2`。
 
 `panels` 没有指定 `placement` 时就是原生右侧标签页。只有功能确需全宽时才声明 `placement: "expanded"` 和至少 6 个字符的 `placementReason`，不要自己叠加侧栏。`description` 和 `changelog` 会自动显示在“扩展插件功能与升级日志”中。
 
@@ -206,7 +206,7 @@ if (capabilities.permissions.includes('events')) {
 
 ```powershell
 node cli/forge.mjs validate ./my-first-plugin
-node cli/forge.mjs pack ./my-first-plugin ./first-plugin-0.3.3.forge-plugin.json
+node cli/forge.mjs pack ./my-first-plugin ./first-plugin-0.3.4.forge-plugin.json
 ```
 
 输出包必须在源目录之外，目标文件不能已存在。打包器拒绝链接、`.git`、`node_modules`；插件最多 1,000 文件、20 MiB 解包内容。打包产生两个文件：包本身及其 `.release.json` 清单。

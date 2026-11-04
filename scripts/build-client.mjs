@@ -16,11 +16,11 @@ const target = path.resolve(process.argv[3] || path.join(root, 'release', 'packa
 // 该字段时才回退到符号判断。members 必须由适配器提供：静默回退到 legacy 文件名
 // 会把旧补丁套到新客户端上。
 const nativeVersion = adapter.patchSet || (adapter.nativeSymbols?.registryMap === 'QL' ? 'legacy' : 'current');
-assert(['legacy', 'current', 'oct23', 'oct27'].includes(nativeVersion), `适配器 patchSet 无效：${nativeVersion}`);
+assert(['legacy', 'current', 'oct23', 'oct27', 'oct27b'].includes(nativeVersion), `适配器 patchSet 无效：${nativeVersion}`);
 const currentAdapter = nativeVersion !== 'legacy';
 const members = adapter.members;
 assert(members && ['renderer', 'settingsPage', 'visibleSettings', 'network'].every(key => typeof members[key] === 'string' && members[key]), '适配器必须声明 members.renderer/settingsPage/visibleSettings/network');
-if (['oct23', 'oct27'].includes(nativeVersion)) assert(members.workspaceRenderer, '适配器必须声明主页面工作区模块');
+if (['oct23', 'oct27', 'oct27b'].includes(nativeVersion)) assert(members.workspaceRenderer, '适配器必须声明主页面工作区模块');
 const hash = data => crypto.createHash('sha256').update(data).digest('hex');
 const payloadManifest = JSON.parse(fs.readFileSync(path.join(root, 'forge-payload.json'), 'utf8'));
 const payloadFiles = payloadManifest.files || [];
@@ -69,7 +69,7 @@ for (const { member, entry, offset } of all) {
     changed=Buffer.from(patchSettingsPage(original.toString(),{version:nativeVersion}));
   } else if(!process.env.FAST_NO_PATCH && member===members.visibleSettings) {
     changed=Buffer.from(patchSettingsVisibility(original.toString(),{version:nativeVersion}));
-  } else if (!process.env.FAST_NO_PATCH && member === members.network && nativeVersion === 'oct27') {
+  } else if (!process.env.FAST_NO_PATCH && member === members.network && ['oct27', 'oct27b'].includes(nativeVersion)) {
     changed = Buffer.from(patchOct27Network(original.toString()));
   } else if (!process.env.FAST_NO_PATCH && member === members.network) {
     const sourceText = original.toString(), start = sourceText.indexOf(`function ${currentAdapter ? 'Oc' : 'rc'}(`), end = sourceText.indexOf(`function ${currentAdapter ? 'kc' : 'ic'}(`, start);

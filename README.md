@@ -1,10 +1,16 @@
 # Codex Forge
 
-Codex Forge 是 Windows Codex 客户端的第三方插件宿主，为插件提供原生界面入口、统一设置、会话输出和版本兼容检查。**0.3.3** 适配官方客户端 **26.1027.3384.0（Windows x64，更新源构建 26.1027.6604.0）**，保持 **Forge API 2**；同时保留三个旧版适配器用于回归。
+Codex Forge 是 Windows Codex 客户端的第三方插件宿主，为插件提供原生界面入口、统一设置、会话输出和版本兼容检查。**0.3.4** 适配官方客户端 **26.1027.6604.0（Windows x64，MSIX 身份版本）**，保持 **Forge API 2**；同时保留四个旧版适配器用于回归。
 
-[下载安装包](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.3.3) · [从零开发插件](docs/PLUGIN-DEVELOPMENT-ZERO-TO-ONE.md) · [API 参考](docs/PLUGIN-API.md) · [更新协议](docs/UPDATES.md)
+[下载安装包](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.3.4) · [从零开发插件](docs/PLUGIN-DEVELOPMENT-ZERO-TO-ONE.md) · [API 参考](docs/PLUGIN-API.md) · [更新协议](docs/UPDATES.md)
 
 [DSH 源码对照](docs/DEEPSEEK-HARNESS-MAPPING.md) 记录了 Forge API 对 DeepSeek Harness 的实际借鉴、实现位置和有意保留的边界。
+
+## 0.3.4 更新（2026-11-04）
+
+- 新增 `26.1027.6604.0` 固定适配器，更新主页面工作区、原生侧栏、设置导航与 Fast 控件的模块和符号；保留首次进入主页面即可打开 Forge 按钮的挂钩。
+- 启动器同时比较 Forge 版本、官方客户端版本和 payload 摘要，修复同版本修订仍启动旧客户端的问题；MSI 支持同版本修订升级。
+- OpenAI 固定下载地址与 Microsoft Store 当前公开的 x64 包均为上述版本，已核对签名与 SHA-256。官方更新 Feed 另报 `26.1029.7803.0`，截至本次核验其固定包尚不可下载，因此未声明支持该版本，也不会将旧补丁套到未知构建。
 
 ## 0.3.3 更新
 
@@ -38,16 +44,16 @@ Codex Forge 是 Windows Codex 客户端的第三方插件宿主，为插件提�
 
 ## 安装与启动
 
-1. 从 Release 下载 `Codex-Forge-0.3.3-Windows.msi`，可对照 `SHA256SUMS.txt` 校验；也可以下载 `Codex-Forge-0.3.3-Windows-Portable.zip` 直接解压运行。
+1. 从 Release 下载 `Codex-Forge-0.3.4-Windows.msi`，可对照 `SHA256SUMS.txt` 校验；也可以下载 `Codex-Forge-0.3.4-Windows-Portable.zip` 直接解压运行。
 2. 双击 MSI 或使用 `msiexec /i` 安装。默认安装在 `%LOCALAPPDATA%\Programs\Codex Forge`，Windows Installer 负责升级和卸载；桌面快捷方式可通过 `CREATEDESKTOPSHORTCUT=0` 关闭。
 3. 安装完成后，准备程序从 OpenAI 官方 HTTPS 地址下载适配的 Codex MSIX（约 958 MiB），检查大小、SHA-256、签名、产品身份、版本及架构，再在本地应用 Forge 适配器。
 4. 准备成功后运行 **CodexForge.exe**。请先退出其他使用相同配置的 Codex 客户端。
 
 **MSI 和便携 ZIP 只包含 Forge，不包含官方客户端、Node、MSIX 或用户凭据。** 首次准备需要网络和约 7 GB 临时可用空间。下载支持续传；准备失败后再次启动 Forge 可重试，日志位于安装目录的 `forge-prepare.log`。安装阶段不下载官方客户端，启动 `CodexForge.exe` 后才开始准备。
 
-0.3.0 / 0.3.1 / 0.3.2 用户可运行新版 MSI 升级；从 0.2.x 升级请手动下载 0.3.3 MSI 并运行；旧客户端的 API 1 更新器不能直接接受 API 2 发布清单。已有 API 1 第三方插件会显示版本不兼容，须由作者迁移；用户数据继续保留。
+0.3.0 / 0.3.1 / 0.3.2 / 0.3.3 用户可运行新版 MSI 升级；从 0.2.x 升级请手动下载 0.3.4 MSI 并运行；旧客户端的 API 1 更新器不能直接接受 API 2 发布清单。已有 API 1 第三方插件会显示版本不兼容，须由作者迁移；用户数据继续保留。
 
-发行包使用 MSI 和便携 ZIP。**0.3.3 的 Forge EXE 与 MSI 未进行 Authenticode 签名**，Windows 可能显示未知发布者。`SHA256SUMS.txt` 用于核对下载文件完整性，不替代发布者签名；签名和 Defender 声誉验证尚未完成。
+发行包使用 MSI 和便携 ZIP。**0.3.4 的 Forge EXE 与 MSI 未进行 Authenticode 签名**，Windows 可能显示未知发布者。`SHA256SUMS.txt` 用于核对下载文件完整性，不替代发布者签名；签名和 Defender 声誉验证尚未完成。
 
 如需移除当前运行的 Forge，可在项目目录执行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/uninstall-current-forge.ps1 -WhatIf` 先预览，再去掉 `-WhatIf` 执行。脚本只清理 Forge 安装目录、快捷方式和启动项，保留 `%CODEX_HOME%` 用户数据。
 

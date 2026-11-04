@@ -1,4 +1,9 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),path=require('node:path'),{spawnSync}=require('node:child_process');
+test('launcher rebuilds for same-version native client and payload updates',{skip:process.platform!=='win32'},()=>{
+ const powershell=path.join(process.env.WINDIR,'System32/WindowsPowerShell/v1.0/powershell.exe');
+ const result=spawnSync(powershell,['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.resolve(__dirname,'fixtures/launcher-runner.ps1')],{encoding:'utf8',windowsHide:true,timeout:60000});
+ assert.equal(result.status,0,result.stdout+result.stderr);assert.match(result.stdout,/LAUNCHER_CORE_PASS/);
+});
 test('bootstrap rejects unsafe paths, mismatched identities and corrupted files; decodes official archive paths once',{skip:process.platform!=='win32'},t=>{
  const powershell=path.join(process.env.WINDIR,'System32/WindowsPowerShell/v1.0/powershell.exe');
  const environment={...process.env};for(const key of Object.keys(environment))if(key.startsWith('NODE_'))delete environment[key];

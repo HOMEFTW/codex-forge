@@ -188,7 +188,7 @@ function createWixSource(files, sourceRoot) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="Codex Forge" Manufacturer="HOMEFTW" Version="${xml(version)}" UpgradeCode="CC655CB5-B493-4544-8EBE-FD396307DF74" Scope="perUser" Compressed="yes">
-    <MajorUpgrade DowngradeErrorMessage="A newer version of Codex Forge is already installed." />
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer version of Codex Forge is already installed." />
     <MediaTemplate EmbedCab="yes" />
     <Property Id="CREATEDESKTOPSHORTCUT" Value="1" Secure="yes" />
     <Feature Id="MainFeature" Title="Codex Forge" Level="1">${refs}<ComponentGroupRef Id="CG_Shortcuts" /></Feature>

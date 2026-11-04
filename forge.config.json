@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "version": "0.3.3",
+  "version": "0.3.4",
   "apiVersion": 2,
-  "codexVersion": "26.1027.3384.0",
+  "codexVersion": "26.1027.6604.0",
   "codexBuildVersion": "26.1027.6604.0",
   "githubRepository": "HOMEFTW/codex-forge",
   "channel": "stable",

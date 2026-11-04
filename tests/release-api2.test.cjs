@@ -12,8 +12,8 @@ const read = relative => JSON.parse(fs.readFileSync(path.join(root, relative), '
 const config = read('forge.config.json');
 const versions = { codex: config.codexVersion, forge: config.version, apiVersion: config.apiVersion };
 
-test('0.3.3 release metadata, API 2 SDK, adapters, bundle and builtins agree', t => {
-  assert.equal(config.version, '0.3.3'); assert.equal(config.apiVersion, 2);
+test('0.3.4 release metadata, API 2 SDK, adapters, bundle and builtins agree', t => {
+  assert.equal(config.version, '0.3.4'); assert.equal(config.apiVersion, 2);
   assert.equal(read('package.json').version, config.version);
   const lock = read('package-lock.json');
   assert.equal(lock.version, config.version); assert.equal(lock.packages[''].version, config.version);
@@ -74,19 +74,21 @@ test('mixed API 1/API 2 release history does not block API 2 update discovery', 
 for (const previous of [
   { version: '0.3.0', codexVersion: '26.1021.2667.0', codexBuildVersion: '26.1021.3705.0' },
   { version: '0.3.1', codexVersion: '26.1023.6123.0', codexBuildVersion: '26.1023.6621.0' },
-  { version: '0.3.2', codexVersion: config.codexVersion, codexBuildVersion: config.codexBuildVersion },
-]) test(`${previous.version} API 2 discovers 0.3.3 and checks external plugin compatibility`, () => {
+  { version: '0.3.2', codexVersion: '26.1027.3384.0', codexBuildVersion: '26.1027.6604.0' },
+  { version: '0.3.3', codexVersion: '26.1027.3384.0', codexBuildVersion: '26.1027.6604.0' },
+  { version: '0.3.3', codexVersion: '26.1027.6604.0', codexBuildVersion: '26.1027.6604.0' },
+]) test(`${previous.version}/${previous.codexVersion} API 2 discovers 0.3.4 and checks external plugin compatibility`, () => {
   const oldConfig = { ...config, ...previous };
   const release = { forgeVersion: config.version, codexVersion: config.codexVersion, codexBuildVersion: config.codexBuildVersion, apiVersion: 2 };
   const native = { buildVersion: config.codexBuildVersion };
   const builtin = { builtin: true, apiVersion: 2, compatibility: { codex: [oldConfig.codexVersion], forge: ['>=0.3.0 <0.4.0'] } };
   const external = { ...builtin, builtin: false, id: 'test.external', name: 'External' };
-  assert.equal(matchUpdate({ config: oldConfig, plugins: [builtin], releases: [release], native }).plan.forgeVersion, '0.3.3');
+  assert.equal(matchUpdate({ config: oldConfig, plugins: [builtin], releases: [release], native }).plan.forgeVersion, '0.3.4');
   const blocked = matchUpdate({ config: oldConfig, plugins: [external], releases: [release], native });
   if (previous.codexVersion !== config.codexVersion) {
     assert.equal(blocked.plan, null);
     assert(blocked.candidates[0].reasons.join(';').includes('codex '+config.codexVersion));
-  } else assert.equal(blocked.plan.forgeVersion, '0.3.3');
+  } else assert.equal(blocked.plan.forgeVersion, '0.3.4');
   external.compatibility = { ...external.compatibility, codex: [config.codexVersion] };
-  assert.equal(matchUpdate({ config: oldConfig, plugins: [external], releases: [release], native }).plan.forgeVersion, '0.3.3');
+  assert.equal(matchUpdate({ config: oldConfig, plugins: [external], releases: [release], native }).plan.forgeVersion, '0.3.4');
 });

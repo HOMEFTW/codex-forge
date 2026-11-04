@@ -10,8 +10,6 @@ const normalize=value=>JSON.parse(JSON.stringify(value));
 
 test('oct27 adapter pins the official MSIX identity, build, digest and private symbol profile',async()=>{
   const {oct27NativeSymbols}=await import('../scripts/native-tabs-patch.mjs');
-  const config=JSON.parse(fs.readFileSync(path.join(__dirname,'../forge.config.json'),'utf8'));
-  assert.equal(config.codexVersion,adapter.codexVersion);
   assert.equal(adapter.codexVersion,'26.1027.3384.0');
   assert.equal(adapter.codexBuildVersion,'26.1027.6604.0');
   assert.equal(adapter.patchSet,'oct27');

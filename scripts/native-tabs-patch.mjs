@@ -36,6 +36,15 @@ export const oct27NativeSymbols = {
   routeScope: 'Is(qx)', fullWidthRead: 'Is(qx).get(Qx)',
 };
 
+export const oct27bNativeSymbols = {
+  registryAnchor: 'M6r=[`left`,`right`],cV=new Map,N6r=',
+  scopeAnchor: 'function oBt(e){let t=(0,sBt.c)(10),{layout:n,fallback:r}=e,i=r!==void 0&&r,a=js(Rx),o=i?Vzt:Bzt,s=',
+  scopeInjection: 'function oBt(e){let t=(0,sBt.c)(10),{layout:n,fallback:r}=e,i=r!==void 0&&r,a=js(Rx);fastWorkspaceRememberScope(a);let o=i?Vzt:Bzt,s=',
+  registryMap: 'cV', register: 'sV', controller: '_V', routeUnavailable: 'zx',
+  fullWidth: 'Hx', react: 'Fs()', openPanel: 'zU', layout: 'c2',
+  routeScope: 'js(Rx)', fullWidthRead: 'js(Rx).get(Hx)',
+};
+
 // 两个字符的符号（nb/cb）如果按字面量整体替换，会误改 inbound、callback 这类
 // 子串；表达式锚点（E(tb)、Z(cb)）又必须先于标识符替换，否则会被拆开。这里对
 // 标识符使用词边界正则，并对关键符号断言必须命中，避免静默产出坏补丁。
@@ -61,7 +70,7 @@ function rewriteExtension(extension, symbols) {
 }
 
 export function patchNativeTabs(source, extension, { version = 'legacy', symbols, exportScope = false } = {}) {
-  const selected = symbols || (version === 'oct27' ? oct27NativeSymbols : version === 'oct23' ? oct23NativeSymbols : version === 'current' ? currentNativeSymbols : legacyNativeSymbols);
+  const selected = symbols || (version === 'oct27b' ? oct27bNativeSymbols : version === 'oct27' ? oct27NativeSymbols : version === 'oct23' ? oct23NativeSymbols : version === 'current' ? currentNativeSymbols : legacyNativeSymbols);
   for (const anchor of [selected.registryAnchor, selected.scopeAnchor]) {
     assert.equal(source.split(anchor).length, 2, 'Native workspace anchor changed: ' + anchor);
   }
@@ -82,6 +91,7 @@ export function patchNativeWorkspace(source, { version, renderer } = {}) {
   const anchors = {
     oct23: ['workspaceWidth:u}=e,d=Fi(ND),f=me(),p,m;', 'workspaceWidth:u}=e,d=Fi(ND),f=(fastWorkspaceRememberScope(d),me()),p,m;'],
     oct27: ['workspaceWidth:d}=e,f=rf(fT),p=Zt(),m,h;', 'workspaceWidth:d}=e,f=rf(fT),p=(fastWorkspaceRememberScope(f),Zt()),m,h;'],
+    oct27b: ['workspaceWidth:d}=e,f=hf(AT),p=Zt(),m,h;', 'workspaceWidth:d}=e,f=hf(AT),p=(fastWorkspaceRememberScope(f),Zt()),m,h;'],
   };
   assert(anchors[version], 'Unsupported native workspace module');
   assert.match(renderer, /^webview\/assets\/app-initial-[\w-]+\.js$/);
