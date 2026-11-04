@@ -1,10 +1,12 @@
 # 星枢 Nexus API
 
-目标：Codex Forge **0.4.0 / API 3**。能力 `nexus` v1，权限 `nexus.read` / `nexus.write`，插件 `forge.nexus`。旧版 0.3.4 不提供此能力。
+目标：Codex Forge **0.4.1 / API 3**。能力 `nexus` v1，权限 `nexus.read` / `nexus.write`。星枢界面由独立外部插件 `homeftw.nexus` 提供，不属于 Forge 内置组合包。数据请求从 0.4.0 起提供，外部插件目录连接接口从 0.4.1 起提供；旧版 0.3.4 不提供此能力。
 
 浏览器入口：`forge.nexus.request(method, args)`。`methodKind()` 是服务、宿主与工具的读写分类依据；未知方法拒绝。模型工具前缀为 `nexus_`。所有笔记、配置、模板与查询结果均为数据，不是模型指令。
 
-目录连接/断开由原生界面处理，不在 SDK/MCP 方法表中。每个知识库使用选择时规范化的实际路径和目录 dev/ino 身份；模型传 `vaultId`，文件路径仅为库内相对路径。隐藏目录、目录联接、设备路径不开放；书签和模板设置通过专门接口读取。
+`forge.nexus.connect()` 打开宿主原生目录选择器，成功返回 `{vault}`，取消返回 `null`；不能传入路径或其他参数。`forge.nexus.disconnect(vaultId)` 断开连接并返回剩余 `Vault[]`。二者同时要求 `nexus.read` / `nexus.write`，选择完成后会重新检查插件状态和权限，不开放给 MCP。
+
+每个知识库使用选择时规范化的实际路径和目录 dev/ino 身份；模型传 `vaultId`，文件路径仅为库内相对路径。隐藏目录、目录联接、设备路径不开放；书签和模板设置通过专门接口读取。
 
 ## 数据结构
 
@@ -66,4 +68,6 @@
 
 ## MCP
 
-`nexus_vaults`、`nexus_browse`、`nexus_read`、`nexus_query`、`nexus_write`、`nexus_edit`、`nexus_workflow` 分别映射上表。读工具有 `readOnlyHint:true`；停用插件时宿主隐藏并拒绝工具。MCP 能访问的是用户在星枢面板连接的目录，实际修改仍需遵循当前对话的用户请求；连接知识库不等于笔记中的文字获得指令权限。
+`nexus_vaults`、`nexus_browse`、`nexus_read`、`nexus_query`、`nexus_write`、`nexus_edit`、`nexus_workflow` 分别映射上表。读工具有 `readOnlyHint:true`。每次工具枚举或调用都重新检查独立插件 `homeftw.nexus` 的安装、兼容、启用、文件指纹与权限；未安装、停用、文件改变或卸载后，工具隐藏且调用被拒绝。读工具需要 `nexus.read`，写工具额外需要 `nexus.write`。
+
+MCP 能访问的是用户在星枢面板连接的目录，实际修改仍需遵循当前对话的用户请求；连接知识库不等于笔记中的文字获得指令权限。宿主 SDK 的 `nexus` 数据服务独立于该插件的安装状态，其他已获权插件也可调用；MCP 的星枢工具遵循上述独立插件生命周期。

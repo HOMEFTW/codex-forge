@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "apiVersion": 3,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "compatibility": {
     "codex": [
       "26.1027.6604.0",
@@ -30,6 +30,13 @@
     }
   ],
   "changelog": [
+    {
+      "version": "0.4.1",
+      "date": "2026-11-04",
+      "items": [
+        "随 Forge 0.4.1 发布，保持 API 3；Nexus 改为独立导入的外部插件。"
+      ]
+    },
     {
       "version": "0.4.0",
       "date": "2026-11-04",

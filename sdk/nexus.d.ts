@@ -1,4 +1,4 @@
-/** Nexus v1, available in Forge 0.4.0 / API 3. Paths are relative to connected vaults. */
+/** Nexus v1: request since Forge 0.4.0; connect/disconnect since 0.4.1. API 3. Paths are relative to connected vaults. */
 export interface NexusVault { id:string; name:string; root:string; available:boolean }
 export interface NexusFile { path:string; ext:string; size:number; mtime:number; ctime:number }
 export interface NexusCompatibility { name:string; id:string; supported:string; unsupported:string; installed?:boolean }
@@ -62,5 +62,8 @@ export interface NexusMethods {
   quickadd:NexusCall<NexusVaultArgs & {choiceId:string;expectedRevision:string;path?:string;variables?:Record<string,unknown>},NexusWriteResult>;
 }
 export interface NexusAPI {
+  /** Native directory picker only; requires nexus.read and nexus.write. Not available to MCP. */
+  connect():Promise<{vault:NexusVault}|null>;
+  disconnect(vaultId:string):Promise<NexusVault[]>;
   request<M extends keyof NexusMethods>(method:M,...args: {} extends NexusMethods[M]['args'] ? [args?:NexusMethods[M]['args']] : [args:NexusMethods[M]['args']]):Promise<NexusMethods[M]['result']>;
 }

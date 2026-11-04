@@ -22,7 +22,7 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
   const publicContext = (event, state) => ({ threadId: threadContext(event, state).threadId, codexVersion: config.codexVersion, forgeVersion: config.version, apiVersion: config.apiVersion });
   // 提前算好未授予能力的方法，让 SDK 在插件侧就能拿到可读的拒绝原因；
   // 权威校验仍在 forge:api 派发前做，插件绕过 SDK 也拦得住。
-  const enabledCapabilities = () => ({ nexus: !!nexus && registry.status('forge.nexus').enabled });
+  const enabledCapabilities = () => ({ nexus: !!nexus });
   const deniedMethods = manifest => Object.fromEntries(Object.keys(METHOD_CAPABILITY).flatMap(method => {
     const reason = granted(manifest, method);
     return reason ? [[method, reason]] : [];
@@ -90,6 +90,12 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
         if (selected.canceled || !selected.filePaths[0]) return null;
         const result = registry.install(selected.filePaths[0]); broadcast(); return result;
       }
+      case 'installPackage': {
+        const selected = await dialog.showOpenDialog(state.win, { title: '导入 Forge 插件包', properties: ['openFile'], filters: [{ name: 'Forge 插件包 (.forge-plugin.json)', extensions: ['json'] }] });
+        if (selected.canceled || !selected.filePaths[0]) return null;
+        check(selected.filePaths[0].endsWith('.forge-plugin.json'), '请选择 .forge-plugin.json 插件包');
+        const result = registry.install(selected.filePaths[0]); broadcast(); return result;
+      }
       case 'importDsh': case 'importDshMarket': {
         const market = method === 'importDshMarket';
         const selected = await dialog.showOpenDialog(state.win, { title: market ? '导入 DSH 市场（允许管理 Forge 中的 DSH 插件）' : '导入 DSH 浏览器插件', properties: ['openDirectory'] });
@@ -140,7 +146,7 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
   ipcMain.handle('forge:manage', (event, { method, args } = {}) => management(event, method, args));
   ipcMain.handle('forge:bundle', (event, { id, viewId } = {}) => {
     const state = host(event), bundle = require('./forge-content.cjs').pluginBundle(registry, id, { viewId });
-    check(Buffer.byteLength(bundle.html) < 2*1024*1024, '插件页面超过2MB');
+    check(Buffer.byteLength(bundle.html) <= 20*1024*1024, '插件页面超过20MB');
     return { ...bundle, context: publicContext(event, state) };
   });
   ipcMain.handle('forge:api', (event, request = {}) => reply(async () => {
@@ -154,9 +160,23 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
       case 'capabilities.get': return { apiVersion: config.apiVersion, codexVersion: config.codexVersion, forgeVersion: config.version, permissions: [...entry.manifest.permissions], capabilities: entry.manifest.capabilities.map(item => ({ ...item })), available: Object.fromEntries(Object.entries(CAPABILITIES).map(([name, spec]) => [name, spec.version])), negotiated: negotiate(entry.manifest, enabledCapabilities()), denied: deniedMethods(entry.manifest), slots: Object.entries(SLOTS).map(([id, spec]) => ({ id, kind: spec.kind, scope: spec.scope, label: spec.label })), events: ['ready','context.changed','settings.changed','dispose','output.changed',...(entry.manifest.contributes?.events || []).map(item => item.name)], surfaces: ['panels','sidebar','toolbar','composer'] };
       case 'settings.get': permission('settings'); return registry.settings(id);
       case 'nexus.request': {
-        permission('nexus.read'); check(registry.status('forge.nexus').enabled && nexus, 'Nexus 插件未启用或宿主不支持', 'CAPABILITY_UNAVAILABLE');
+        permission('nexus.read'); check(nexus, '宿主不支持 Nexus', 'CAPABILITY_UNAVAILABLE');
         if (require('./nexus.cjs').methodKind(args.method) === 'write') permission('nexus.write');
         return nexus.dispatch(args.method, args.args || {});
+      }
+      case 'nexus.connect': {
+        permission('nexus.read'); permission('nexus.write');
+        check(Object.keys(args).length === 0, '连接目录不接受路径或其他参数');
+        const selected = await dialog.showOpenDialog(state.win, { title: '选择星枢 Nexus 知识库目录', properties: ['openDirectory'] });
+        if (selected.canceled || !selected.filePaths[0]) return null;
+        // Dialogs can outlive the caller's enablement/permissions.
+        permission('nexus.read'); permission('nexus.write');
+        return nexus.connect(selected.filePaths[0]);
+      }
+      case 'nexus.disconnect': {
+        permission('nexus.read'); permission('nexus.write');
+        check(typeof args.vaultId === 'string', '知识库 ID 无效');
+        return nexus.disconnect(args.vaultId);
       }
       case 'dsh.request': {
         permission('dsh'); const result = await dsh.request(id, args.endpoint, { method: args.method, body: args.body });

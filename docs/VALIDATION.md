@@ -1,4 +1,17 @@
-# 0.4.0 / API 3 验证记录（2026-11-04）
+# Forge 验证记录
+
+## 0.4.1 / API 3 独立插件修订（2026-11-04）
+
+- `node scripts/run-tests.mjs`：**304 项通过、0 失败、0 跳过**，包含 Windows C# 启动器/准备程序与真实 stdio MCP。`npm run build`、Windows 启动器/准备程序编译成功；开发教程 create/validate/install/settings/command/pack/uninstall 全流程通过。
+- Nexus 界面、固定入口、内置清单和渲染依赖已移出宿主，内置插件恢复为九个；保留后端服务与 API 3。回归覆盖原生选择器取消、禁止插件提交根路径、只读权限拒绝、选择期间停用后拒绝、SDK connect/disconnect 参数与 TypeScript 正反例。
+- 新增通用 JSON 插件包导入：默认停用、审阅启用、卸载保留设置；覆盖路径穿越、Windows 设备名、重复大小写路径、非法 base64、30 MiB JSON/20 MiB 解码/1000 文件上限和失败无残留。普通面板不能加载本地音视频；声明 `nexus.read` 时仅增加 `media-src data:`，仍禁止 frame/object。
+- MCP 对真实外部 `homeftw.nexus` 的安装、启用、指纹与读写权限逐次验证，未安装、停用、文件篡改或卸载后隐藏并拒绝。更新匹配新增 0.4.0 → 0.4.1，兼容的 API 3 插件允许升级，固定旧版本的插件阻止不兼容更新。
+- Playwright 使用真实 `ForgePanel`、管理 API 与最终独立 JSON 包，在隔离目录完成导入、默认停用、审阅权限、启用、打开面板派发、停用及卸载；最后只剩九个内置插件，控制台 0 errors/0 warnings。文件选择器用固定测试返回值，未操作用户插件目录。证据：`output/playwright/forge-041-YKLaKp/evidence.json`、`output/playwright/forge-041-plugins.png`。
+- 独立插件工程交付的 `Nexus-0.1.0.forge-plugin.json` SHA-256 为 `48a1f4bf684c49da6f2eb441b376499da7c1de859034129558b36067a5c453a3`。对方工程记录 3/3 集成测试与真实 SDK/CSP/服务浏览器验收，详见该工程 `docs/EXTERNAL-VALIDATION.md`；没有把独立插件包纳入宿主发行内容。
+- MSI 解包逐字节核对 448 个文件，便携 ZIP 核对 449 个文件，444 个 payload 文件逐项摘要一致；只有九个内置插件，没有独立 Nexus 包、Nexus 渲染依赖、官方客户端或凭据。包内补丁生成的隔离客户端通过 3,978 个文件、22,424 个 ASAR 成员和 22,459 个完整性块校验。详细摘要保存在本地产物 `output/release-041-package-audit.json` 与 `output/release-041-client-integrity.json`。
+- 目标官方客户端仍为已验证的 `26.1027.6604.0`。本轮未安装或重启用户客户端；原生选择器实际窗口、当前会话桌面点击、MSI 真实安装/卸载和音视频设备播放未验收。下方 `0x80000003` 是此前隔离桌面启动的限制，不表示本次重新启动验证过。
+
+## 0.4.0 / API 3 历史验证记录（2026-11-04）
 
 - `node scripts/run-tests.mjs` 最终完整回归：**298 项通过、0 失败、0 跳过**，包含实际 Windows C# 启动器/准备程序测试和真实 stdio MCP 流程。首次完整运行发现准备程序仍限定 API 2，已修复为 API 3，并覆盖拒绝 API 1/2/4 的回归。
 - `npm run build`、Windows 启动器/准备程序编译成功；TypeScript 正反例验证 Nexus 请求参数、必需修订、禁止目录连接和返回类型。开发教程 create/validate/install/settings/command/pack/uninstall 全流程通过。

@@ -26,6 +26,7 @@ const ALWAYS_ALLOWED = new Set(['context.get', 'metadata.get', 'capabilities.get
 
 const METHOD_CAPABILITY = Object.freeze({
   'nexus.request': 'nexus',
+  'nexus.connect': 'nexus', 'nexus.disconnect': 'nexus',
   'conversation.title': 'conversation',
   'composer.read': 'composer', 'composer.insert': 'composer', 'composer.set': 'composer',
   'output.append': 'output', 'output.clear': 'output', 'output.open': 'output',

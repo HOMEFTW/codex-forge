@@ -47,7 +47,7 @@ Forge API 3 随 Codex Forge 0.4.0 发布，在 API 2 操作基础上增加星枢
 ]
 ```
 
-可用能力：`conversation`（修改标题）、`composer`、`output`、`browser`、`storage`、`settings`、`events`、`panels`、`ui`（注册按钮）、`dsh`（导入的 DSH 浏览器插件兼容请求）、`nexus`（星枢知识库）。`context.get`、`metadata.get`、`capabilities.get` 不需要声明。`capabilities.get()` 返回 `capabilities`（本插件声明）、`available`（宿主提供的能力版本）、`denied`（未授予的方法与修复提示）；API 3 增加 `negotiated`（逐项 `supported/enabled/granted`）。`available` 仅表示实现版本，不代表服务启用或插件获权；例如停用 `forge.nexus` 后，Nexus 仍受宿主支持，但 `enabled/granted` 为 false。必需能力必须存在并匹配版本；`optional:true` 的未知能力或版本不匹配不会停用插件，调用仍拒绝。未知可选能力必须明确填写正整数版本；不会推断或授予未知权限。
+可用能力：`conversation`（修改标题）、`composer`、`output`、`browser`、`storage`、`settings`、`events`、`panels`、`ui`（注册按钮）、`dsh`（导入的 DSH 浏览器插件兼容请求）、`nexus`（星枢知识库）。`context.get`、`metadata.get`、`capabilities.get` 不需要声明。`capabilities.get()` 返回 `capabilities`（本插件声明）、`available`（宿主提供的能力版本）、`denied`（未授予的方法与修复提示）；API 3 增加 `negotiated`（逐项 `supported/enabled/granted`）。`available` 仅表示实现版本，不代表服务启用或插件获权；`enabled` 表示对应宿主服务存在，`granted` 还要求本插件获权。Nexus 服务与独立插件安装状态分开；停用独立插件会拒绝该插件调用，并关闭其 MCP 工具，但不影响其他获权插件的数据接口。必需能力必须存在并匹配版本；`optional:true` 的未知能力或版本不匹配不会停用插件，调用仍拒绝。未知可选能力必须明确填写正整数版本；不会推断或授予未知权限。
 
 ## 错误处理
 
@@ -111,3 +111,11 @@ slot 条目需要 `ui` 权限，`view` 必须是包内 HTML。list 允许多个�
 CLI 支持 `create / validate / pack / list / install / uninstall / enable / disable / settings`，`--home` 可选独立测试数据目录。详见 `node cli/forge.mjs`。示例代码见 `examples/hello-forge`。
 
 固定版本适配器在 `scripts/native-*-patch.mjs`。遇到未知客户端版本或锚点变化必须增加经过验证的适配器，不能放宽版本号并直接套用。Forge API 与原生混淆符号之间仅由宿主适配层连接。
+
+## 独立插件包与 Nexus 连接（0.4.1）
+
+插件管理的「导入插件包…」接收 CLI `pack` 生成的 `.forge-plugin.json`，也支持原有目录安装。包为 `schemaVersion:1`，`files` 中每项含 `path`、`encoding:"base64"` 和 `content`。JSON 最大 30 MiB，解码后合计最大 20 MiB、最多 1000 文件，必须含 `plugin.json`；不允许路径穿越、Windows 设备名、大小写重复文件及 `.git/node_modules`。导入复用清单、权限、兼容和指纹检查，默认停用；卸载保留用户设置。HTML 面板最大 20 MiB。
+
+`forge.nexus.connect()` 使用原生选择器，不能携带参数；成功返回 `{vault}`，取消返回 `null`。`forge.nexus.disconnect(vaultId)` 返回剩余 `Vault[]`。两者需要 `nexus` v1 和读写权限，使用者应声明 Forge `>=0.4.1 <0.5.0`。目录连接不开放给 MCP，选择完成后重新检查插件权限与启用状态。
+
+星枢 `homeftw.nexus` 是独立外部插件，Forge 只提供服务；其 MCP 工具按真实安装、文件指纹、启用和权限状态开放。具有 `nexus.read` 的外部面板允许 `media-src data:`，仍禁止 frame/object；PDF 内嵌不支持。详见 [Nexus 接口](NEXUS-API.md)。

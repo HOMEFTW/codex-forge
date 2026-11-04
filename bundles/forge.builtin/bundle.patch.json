@@ -36,10 +36,6 @@
     {
       "id": "forge.devtools",
       "enabled": true
-    },
-    {
-      "id": "forge.nexus",
-      "enabled": true
     }
   ]
 }

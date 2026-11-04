@@ -83,6 +83,11 @@ class ForgeRegistry {
   }
   source(id, relative) { return fs.readFileSync(safeFile(this.get(id).root, relative), 'utf8'); }
   install(directory) {
+    if (fs.statSync(directory).isFile()) {
+      const staging = fs.mkdtempSync(path.join(this.root, '.import-'));
+      try { require('./forge-package.cjs').unpack(directory, staging); return this.install(staging); }
+      finally { fs.rmSync(staging, { recursive: true, force: true }); }
+    }
     const source = fs.realpathSync(directory), manifest = validate(json(safeFile(source, 'plugin.json')), source);
     const match = compatibility(manifest, this.versions); check(match.compatible, match.reasons.join('；'));
     const destination = path.join(this.root, 'plugins', manifest.id); check(!fs.existsSync(destination), '插件已存在；先卸载再安装');

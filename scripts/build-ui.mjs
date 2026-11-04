@@ -12,7 +12,7 @@ fs.copyFileSync(path.join(root,'assets','codex-forge.ico'),path.join(destination
 fs.copyFileSync(path.join(root,'forge.config.json'),path.join(destination,'forge.config.json'));
 fs.cpSync(path.join(root, 'bundled-skills'), path.join(destination, 'bundled-skills'), { recursive: true });
 const nexusResult = await build({ entryPoints: [path.join(root, 'runtime', 'nexus.cjs')], bundle: true, metafile: true, outfile: path.join(destination, 'nexus.cjs'), platform: 'node', format: 'cjs', target: ['node22'], legalComments: 'linked' });
-const result = await build({ entryPoints: [path.join(root, 'ui', 'app.jsx')], bundle: true, minify: true, metafile: true, outfile: path.join(destination, 'ui', 'app.js'), format: 'iife', target: ['chrome140'], loader: { '.woff': 'dataurl', '.woff2': 'dataurl', '.ttf': 'dataurl' }, define: { 'process.env.NODE_ENV': '"production"' }, legalComments: 'linked' });
+const result = await build({ entryPoints: [path.join(root, 'ui', 'app.jsx')], bundle: true, minify: true, metafile: true, outfile: path.join(destination, 'ui', 'app.js'), format: 'iife', target: ['chrome140'], define: { 'process.env.NODE_ENV': '"production"' }, legalComments: 'linked' });
 const dshResult = await build({ entryPoints: [path.join(root, 'ui', 'dsh-client.jsx')], bundle: true, minify: true, metafile: true, outfile: path.join(destination, 'ui', 'dsh-client.js'), format: 'iife', target: ['chrome140'], jsx: 'automatic', alias: { clsx: path.join(root, 'ui', 'dsh-classnames.js') }, define: { 'process.env.NODE_ENV': '"production"' }, legalComments: 'linked' });
 fs.copyFileSync(path.join(root, 'ui', 'index.html'), path.join(destination, 'ui', 'index.html'));
 const dependencies = new Set();

@@ -44,10 +44,25 @@ function workspace(store) {
   return services.get(store);
 }
 function forgeEnabled(name) {
-  if (name.startsWith('nexus_') && process.env.CODEX_FORGE_HOME) { const { json } = require('./collaboration-store.cjs'); return json(path.join(process.env.CODEX_FORGE_HOME, 'plugins.json'), { plugins: {} }).plugins['forge.nexus']?.enabled !== false; }
+  if (name.startsWith('nexus_')) return nexusToolEnabled(name);
   if(!process.env.CODEX_FORGE_HOME) return true;
   const id=name.startsWith('canvas_')?'forge.canvas':name.startsWith('todo_')?'forge.todos':(name.startsWith('collaboration_') || ['delegate_to_agent','get_delegation_status','cancel_delegation','resume_delegation'].includes(name))?'forge.collaboration':SKILL_MCP_TOOLS.some(t=>t.name===name)?'forge.skills':null;
   if(!id)return true;const {json}=require('./collaboration-store.cjs');return json(path.join(process.env.CODEX_FORGE_HOME,'plugins.json'),{plugins:{}}).plugins[id]?.enabled!==false;
+}
+function nexusToolEnabled(name) {
+  const tool = NEXUS_TOOLS.find(item => item.name === name);
+  if (!tool) return false;
+  try {
+    const config = require(fs.existsSync(path.join(__dirname, 'forge.config.json')) ? './forge.config.json' : '../forge.config.json');
+    const root = process.env.CODEX_FORGE_HOME || path.join(process.env.CODEX_HOME || path.join(require('node:os').homedir(), '.codex'), 'forge');
+    // Re-read and fingerprint the installed plugin for every tool dispatch; saved
+    // enablement alone cannot authorize a missing, modified or incompatible plugin.
+    const registry = new (require('./forge-registry.cjs').ForgeRegistry)({ root, bundledRoot: fs.existsSync(path.join(__dirname, 'plugins')) ? path.join(__dirname, 'plugins') : path.join(__dirname, '../plugins'), versions: { codex: config.codexVersion, forge: config.version, apiVersion: config.apiVersion } });
+    const entry = registry.permission('homeftw.nexus', 'nexus.read');
+    if (require('./forge-capabilities.cjs').granted(entry.manifest, 'nexus.request')) return false;
+    if (!tool.annotations?.readOnlyHint) registry.permission('homeftw.nexus', 'nexus.write');
+    return !entry.builtin;
+  } catch { return false; }
 }
 async function callTool(store, name, args) {
   if(!forgeEnabled(name)) throw new (require('./forge-errors.cjs').ForgeError)('PLUGIN_DISABLED', '此 Forge 插件已停用');

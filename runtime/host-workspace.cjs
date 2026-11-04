@@ -125,7 +125,7 @@
   function controls() {
     let previous = document.getElementById('fast-canvas-entry'); if (!previous?.parentElement) return;
     const compact = previous.querySelector('span')?.style.display === 'none';
-    for (const [page, label, icon] of [['collaboration', '智能体协作', collabIcon], ['skills', '技能包', skillsIcon], ['todos', '待办清单', todoIcon], ['information-stats', '信息统计', statsIcon], ['codex-memory', '记忆管理', memoryIcon], ['nexus', '星枢 Nexus', memoryIcon]]) {
+    for (const [page, label, icon] of [['collaboration', '智能体协作', collabIcon], ['skills', '技能包', skillsIcon], ['todos', '待办清单', todoIcon], ['information-stats', '信息统计', statsIcon], ['codex-memory', '记忆管理', memoryIcon]]) {
       let button = document.getElementById(`fast-${page}-entry`);
       if(overview.forgePlugins?.some(p=>p.id==='forge.'+page&&!p.enabled)){button?.remove();continue;}
       if (!button) {

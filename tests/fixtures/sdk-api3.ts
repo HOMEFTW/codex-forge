@@ -2,6 +2,10 @@ import type {ForgeAPI, NexusWriteResult, NexusDocument} from '../../sdk/index.js
 declare const forge:ForgeAPI;
 const api:3 = forge.apiVersion;
 forge.nexus.request('vaults').then(value => value.vaults[0]?.id);
+forge.nexus.connect().then(value => value?.vault.id);
+forge.nexus.disconnect('v');
+// @ts-expect-error directories are chosen by the native dialog, never by plugin input
+forge.nexus.connect({root:'D:/private'});
 const read:Promise<NexusDocument> = forge.nexus.request('read',{vaultId:'v',path:'note.md'});
 const write:Promise<NexusWriteResult> = forge.nexus.request('write',{vaultId:'v',path:'note.md',expectedRevision:'',content:'new'});
 forge.nexus.request('snapshot',{vaultId:'v',offset:500,limit:500}).then(page=>page.nextOffset);

@@ -50,7 +50,7 @@
     storage: { get: key => request('storage.get', { key }), set: (key, value) => request('storage.set', { key, value }), delete: key => request('storage.delete', { key }) },
     dsh: { request: (endpoint, options = {}) => request('dsh.request', { endpoint, ...options }) },
     settings: { get: () => request('settings.get') },
-    nexus: { request: (method, args = {}) => request('nexus.request', { method, args }) },
+    nexus: { request: (method, args = {}) => request('nexus.request', { method, args }), connect: () => request('nexus.connect'), disconnect: vaultId => request('nexus.disconnect', { vaultId }) },
     metadata: { get: () => request('metadata.get') },
     capabilities: { get: () => request('capabilities.get') },
     diagnostics: { get: () => request('diagnostics.collect') },

@@ -76,3 +76,9 @@ test('API 3 Nexus SDK preserves typed host errors through the browser reply', as
   message({ forgePluginReply: { id: request.id, error: { code: 'REVISION_CONFLICT', message: '笔记已变化' } } });
   await assert.rejects(pending, error => error.code === 'REVISION_CONFLICT' && error.message === '笔记已变化');
 });
+
+test('Nexus connection SDK uses only the native picker and sends the vault identity on disconnect', async () => {
+  const {api, reply, replyLast, messages}=loadSdk();reply('capabilities.get',{denied:{}});reply('context.get',{threadId:null,apiVersion:3});
+  const pending=api.nexus.connect({root:'ignored'});assert.equal(messages.at(-1).forgePluginRequest.method,'nexus.connect');assert.deepEqual(Object.keys(messages.at(-1).forgePluginRequest.args),[]);replyLast(null);assert.equal(await pending,null);
+  const removed=api.nexus.disconnect('v');assert.equal(messages.at(-1).forgePluginRequest.args.vaultId,'v');replyLast([]);await removed;
+});
