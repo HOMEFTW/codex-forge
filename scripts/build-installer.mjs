@@ -54,7 +54,7 @@ function preparePayload() {
   for (const item of [
     'forge.config.json', 'adapters', 'runtime', 'bundles', 'assets/codex-forge.ico', 'dist/fast-extension',
     'dist/CodexForge.exe', 'dist/CodexForge.exe.config', 'scripts/build-client.mjs',
-    'scripts/native-tabs-patch.mjs', 'scripts/native-fast-patch.mjs', 'scripts/native-settings-patch.mjs', 'scripts/native-rspack-patch.mjs',
+    'scripts/native-tabs-patch.mjs', 'scripts/native-fast-patch.mjs', 'scripts/native-settings-patch.mjs', 'scripts/native-rspack-patch.mjs', 'scripts/native-nov09-patch.mjs', 'scripts/native-nov09-main.mjs', 'scripts/native-windows-cua.mjs',
     'scripts/Launch-Codex-Forge.ps1', 'scripts/verify-official.ps1', 'README.md', 'LICENSE', 'docs',
     'sdk', 'examples', 'CODEG-SKILLS-NOTICES.md'
   ]) copy(item);
@@ -91,6 +91,8 @@ function stageInstallRoots() {
   for (const destination of [msiSource, portableSource]) {
     fs.copyFileSync(path.join(root, 'dist', 'CodexForge.exe'), path.join(destination, 'CodexForge.exe'));
     fs.copyFileSync(path.join(root, 'dist', 'CodexForge.exe.config'), path.join(destination, 'CodexForge.exe.config'));
+    fs.copyFileSync(path.join(root, 'dist', 'CodexForgeUpdater.exe'), path.join(destination, 'CodexForgeUpdater.exe'));
+    fs.copyFileSync(path.join(root, 'dist', 'CodexForgeUpdater.exe.config'), path.join(destination, 'CodexForgeUpdater.exe.config'));
     fs.copyFileSync(path.join(forgeOnly, 'bootstrap.json'), path.join(destination, 'bootstrap.json'));
     fs.cpSync(payload, path.join(destination, forgeDirectory), { recursive: true });
   }
@@ -175,6 +177,7 @@ function createWixSource(files, sourceRoot) {
     <ComponentGroup Id="CG_Shortcuts">
       <Component Id="CMP_StartMenuShortcuts" Directory="ApplicationProgramsFolder" Guid="${sha1Guid('shortcut:start-menu')}">
         <Shortcut Id="StartMenuLaunch" Name="Codex Forge" Target="[PRODUCTFOLDER]CodexForge.exe" WorkingDirectory="PRODUCTFOLDER" />
+        <Shortcut Id="StartMenuUpdate" Name="Codex Forge Updater" Target="[PRODUCTFOLDER]CodexForgeUpdater.exe" WorkingDirectory="PRODUCTFOLDER" />
         <Shortcut Id="StartMenuPrepare" Name="Prepare Codex Client" Target="${bootstrapTarget}" Arguments="--root &quot;[PRODUCTFOLDER]&quot;" WorkingDirectory="PRODUCTFOLDER" />
         <RemoveFolder Id="RemoveStartMenuFolder" On="uninstall" />
         <RegistryValue Root="HKCU" Key="Software\\HOMEFTW\\Codex Forge" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
@@ -256,6 +259,8 @@ const msiBytes = fs.statSync(msi).size;
 const portableBytes = fs.statSync(portable).size;
 const msiSHA256 = fileHash(msi);
 const portableSHA256 = fileHash(portable);
+const updaterName = `Codex-Forge-${version}-Updater.exe`;
+fs.copyFileSync(path.join(root, 'dist/CodexForgeUpdater.exe'), path.join(output, updaterName));
 const manifest = {
   schemaVersion: 3,
   platform: 'win32-x64',
@@ -271,10 +276,12 @@ const manifest = {
   bytes: msiBytes,
   portableUrl: `https://github.com/${config.githubRepository}/releases/download/v${version}/${portableName}`,
   portableSha256: portableSHA256,
-  portableBytes
+  portableBytes,
+  updater: { url: `https://github.com/${config.githubRepository}/releases/download/v${version}/${updaterName}`, bytes: fs.statSync(path.join(output,updaterName)).size, sha256: fileHash(path.join(output,updaterName)) },
+  deltas: []
 };
 fs.writeFileSync(path.join(output, 'codex-forge-release.json'), JSON.stringify(manifest, null, 2) + '\n');
-fs.writeFileSync(path.join(output, 'SHA256SUMS.txt'), `${msiSHA256}  ${msiName}\n${portableSHA256}  ${portableName}\n`);
+fs.writeFileSync(path.join(output, 'SHA256SUMS.txt'), `${msiSHA256}  ${msiName}\n${portableSHA256}  ${portableName}\n${fileHash(path.join(output,updaterName))}  ${updaterName}\n`);
 fs.writeFileSync(path.join(root, 'output', 'installer-audit.json'), JSON.stringify({
   installer: msiName,
   portable: portableName,

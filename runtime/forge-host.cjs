@@ -122,6 +122,7 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
         const { checkUpdates } = require('./forge-updates.cjs');
         currentUpdate = await checkUpdates({ config: updateConfig(), plugins: registry.list().plugins.filter(p => p.enabled) }); broadcast(); return currentUpdate;
       }
+      case 'openUpdater': return require('./forge-updates.cjs').launchIndependentUpdater(process.env.CODEX_FORGE_INSTALL_ROOT, config.githubRepository);
       case 'stageUpdate': {
         check(currentUpdate?.plan?.compatible, '请先检测到匹配版本');
         const { stageUpdate, recheckPlan } = require('./forge-updates.cjs');
@@ -131,9 +132,14 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
       }
       case 'applyUpdate': {
         check(currentUpdate?.staged, '请先下载并校验匹配更新');
-        const { launchUpdate, recheckPlan } = require('./forge-updates.cjs');
+        const { launchUpdate, recheckPlan, recoverUpdate, launchIndependentUpdater } = require('./forge-updates.cjs');
         recheckPlan(currentUpdate.staged,{config:updateConfig(),plugins:registry.list().plugins.filter(p=>p.enabled),native:currentUpdate.native});
-        return launchUpdate(currentUpdate.staged, process.env.CODEX_FORGE_INSTALL_ROOT, process.execPath);
+        const installing=currentUpdate;
+        return launchUpdate(currentUpdate.staged, process.env.CODEX_FORGE_INSTALL_ROOT, process.execPath, undefined, async error=>{
+          try { installing.installFailure=await recoverUpdate(error,()=>launchIndependentUpdater(process.env.CODEX_FORGE_INSTALL_ROOT,config.githubRepository)); }
+          catch(failure) { installing.installFailure={error:failure.message}; }
+          broadcast();
+        });
       }
       default: throw Error('未知 Forge 管理操作');
     }
@@ -143,7 +149,12 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
     check(entry.builtin && id==='forge.devtools' && fingerprint===entry.fingerprint,'宿主调试仅限当前已启用的内置 forge.devtools 插件');
     return true;
   });
-  ipcMain.handle('forge:manage', (event, { method, args } = {}) => management(event, method, args));
+  function manageWithFallback(event,method,args) {
+    host(event);
+    const {runUpdateAction,launchIndependentUpdater}=require('./forge-updates.cjs');
+    return runUpdateAction(method,()=>management(event,method,args),()=>launchIndependentUpdater(process.env.CODEX_FORGE_INSTALL_ROOT,config.githubRepository));
+  }
+  ipcMain.handle('forge:manage', (event, { method, args } = {}) => manageWithFallback(event,method,args));
   ipcMain.handle('forge:bundle', (event, { id, viewId } = {}) => {
     const state = host(event), bundle = require('./forge-content.cjs').pluginBundle(registry, id, { viewId });
     check(Buffer.byteLength(bundle.html) <= 20*1024*1024, '插件页面超过20MB');
@@ -227,6 +238,6 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
       default: throw new ForgeError('METHOD_NOT_FOUND', 'Forge API 不支持此操作');
     }
   }));
-  return { registry, management, snapshot, page: page => ['forge-settings','forge-updates','forge-features','forge-changelog','forge-plugins','forge-extension-info','forge-output'].includes(page) || [...registry.entries.values()].some(e => registry.status(e.manifest.id).enabled && e.manifest.contributes?.panels?.some(v => pageId(e.manifest.id,v.id) === page)), enabled: id => registry.status(id).enabled };
+  return { registry, management: manageWithFallback, snapshot, page: page => ['forge-settings','forge-updates','forge-features','forge-changelog','forge-plugins','forge-extension-info','forge-output'].includes(page) || [...registry.entries.values()].some(e => registry.status(e.manifest.id).enabled && e.manifest.contributes?.panels?.some(v => pageId(e.manifest.id,v.id) === page)), enabled: id => registry.status(id).enabled };
 }
 module.exports = { installForge };

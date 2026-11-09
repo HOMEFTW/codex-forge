@@ -1,9 +1,10 @@
 {
   "schemaVersion": 1,
   "apiVersion": 3,
-  "version": "0.4.4",
+  "version": "0.5.0",
   "compatibility": {
     "codex": [
+      "26.1103.4239.0",
       "26.1029.7803.0",
       "26.1027.6604.0",
       "26.1027.3384.0",
@@ -12,7 +13,7 @@
       "26.1021.2667.0"
     ],
     "forge": [
-      ">=0.4.0 <0.5.0"
+      ">=0.4.0 <0.6.0"
     ]
   },
   "permissions": [
@@ -31,6 +32,13 @@
     }
   ],
   "changelog": [
+    {
+      "version": "0.5.0",
+      "date": "2026-11-09",
+      "items": [
+        "新增 Ultrafast 默认速度和模型档位；适配新版选择器与请求层，保持受管策略。"
+      ]
+    },
     {
       "version": "0.4.4",
       "date": "2026-11-04",
@@ -112,7 +120,7 @@
   ],
   "id": "forge.fast",
   "name": "Fast 与模型配置",
-  "description": "原生模型显示控制、GPT-6.1-Terra 与 Fast 支持；设置统一保存，重启后生效。",
+  "description": "模型显示控制、GPT-6.1-Terra、Fast 与 Ultrafast；保存后重启生效。",
   "contributes": {
     "settings": {
       "properties": {
@@ -121,7 +129,8 @@
           "title": "默认速度（仅 Forge 启动参数）",
           "enum": [
             "native",
-            "fast"
+            "fast",
+            "ultrafast"
           ],
           "default": "fast"
         },
@@ -133,6 +142,16 @@
         "hiddenModels": {
           "type": "array",
           "title": "隐藏的模型",
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "maxItems": 200,
+          "default": []
+        },
+        "ultrafastModels": {
+          "type": "array",
+          "title": "额外支持 Ultrafast 的模型 ID",
           "items": {
             "type": "string",
             "maxLength": 200

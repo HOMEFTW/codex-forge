@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "0.4.4",
+  "version": "0.5.0",
   "apiVersion": 3,
-  "codexVersion": "26.1029.7803.0",
-  "codexBuildVersion": "26.1029.7803.0",
+  "codexVersion": "26.1103.4239.0",
+  "codexBuildVersion": "26.1103.4239.0",
   "githubRepository": "HOMEFTW/codex-forge",
   "channel": "stable",
   "nativeUpdateProductId": "9PLM9XGG6VKS"

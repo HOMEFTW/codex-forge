@@ -30,7 +30,7 @@ try {
         if ($state.plugins.'forge.fast'.enabled -eq $false) { $env:CODEX_FORGE_FAST = '0' }
     }
     $fastSettings = Join-Path $env:CODEX_FORGE_HOME 'storage\forge.fast.settings.json'
-    if (Test-Path -LiteralPath $fastSettings) { $options = Get-Content -LiteralPath $fastSettings -Raw -Encoding UTF8 | ConvertFrom-Json; if ($options.defaultSpeed -eq 'native') { $env:CODEX_FORGE_SPEED = 'native' } }
+    if (Test-Path -LiteralPath $fastSettings) { $options = Get-Content -LiteralPath $fastSettings -Raw -Encoding UTF8 | ConvertFrom-Json; if ($options.defaultSpeed -in @('native','fast','ultrafast')) { $env:CODEX_FORGE_SPEED = $options.defaultSpeed } }
     $browserSettings = Join-Path $env:CODEX_FORGE_HOME 'storage\forge.browser.settings.json'
     if (Test-Path -LiteralPath $browserSettings) { $options = Get-Content -LiteralPath $browserSettings -Raw -Encoding UTF8 | ConvertFrom-Json; if ($options.nativeBrowserMode -ne $true -or $state.plugins.'forge.browser'.enabled -eq $false) { $env:CODEX_FAST_IAB = '0' } }
     $arguments = @(('--user-data-dir="' + (Join-Path $env:CODEX_ELECTRON_USER_DATA_PATH 'web\Codex') + '"'), ('--codex-forge-fast=' + $env:CODEX_FORGE_FAST))

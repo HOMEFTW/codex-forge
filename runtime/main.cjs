@@ -22,7 +22,7 @@ function install() {
   ipcMain.on('forge:startup-flags', event => {
     const frame = event.senderFrame, main = event.sender.mainFrame;
     const trusted = frame && main && frame.routingId === main.routingId && frame.processId === main.processId && event.sender.getURL().startsWith('app://-/');
-    event.returnValue = { fastEnabled: !!trusted && process.env.CODEX_FORGE_FAST === '1' };
+    event.returnValue = { fastEnabled: !!trusted && process.env.CODEX_FORGE_FAST === '1', browserEnabled: !!trusted && process.env.CODEX_FAST_IAB === '1', externalBrowserEnabled: !!trusted && process.env.CODEX_FORGE_EXTERNAL_BROWSER === '1', computerUseEnabled: !!trusted && process.env.CODEX_FORGE_COMPUTER_USE === '1' };
   });
   app.setName?.('Codex Forge');
   app.setAppUserModelId?.('HOMEFTW.CodexForge');
@@ -348,6 +348,8 @@ function install() {
   }, 10000);
   forge = require('./forge-host.cjs').installForge({ipcMain,dialog,host,threadContext,nativeCall,nativeMessage:(state,message)=>{if(!state.bridge) throw Error('原生连接尚未就绪'); return state.bridge.handler(state.bridge.event,message);},open,notify,states,collaboration,nexus});
   if (process.versions.electron) {
+    try { require('./native-features.cjs').applyNativeFeatures(forge.registry); }
+    catch (error) { console.error('[Forge native features]', error.message); }
     try { const result = applyFastModelSettings({ registry: forge.registry }); if (result.visibilityFallback) console.warn('[Forge models] 模型目录已变化，已恢复默认模型显示；请检查 Fast 与模型配置设置。'); }
     catch (error) { console.error('[Forge models]', error.message); }
   }

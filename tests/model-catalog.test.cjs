@@ -142,7 +142,7 @@ test('the Fast plugin owns Terra, visibility and speed settings across disable a
   const config = require('../forge.config.json');
   const options = { root: path.join(home, 'forge'), codexHome: home, bundledRoot: path.join(__dirname, '../plugins'), versions: { codex: config.codexVersion, forge: config.version, apiVersion: config.apiVersion } };
   const registry = new ForgeRegistry(options), env = {};
-  assert.deepEqual(registry.settings('forge.fast'), { defaultSpeed: 'fast', enableTerra: true, hiddenModels: [] });
+  assert.deepEqual(registry.settings('forge.fast'), { defaultSpeed: 'fast', enableTerra: true, hiddenModels: [], ultrafastModels: [] });
   registry.settings('forge.fast', { defaultSpeed: 'native', enableTerra: true, hiddenModels: ['gpt-6-sol'] });
   let result = applyFastModelSettings({ registry, codexHome: home, env });
   let models = JSON.parse(fs.readFileSync(result.path)).models;

@@ -1,3 +1,4 @@
+import { installCua } from './native-windows-cua.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -5,6 +6,7 @@ import assert from 'node:assert/strict';
 import { patchSettingsPage, patchSettingsVisibility } from './native-settings-patch.mjs';
 import { patchNativeTabs, patchNativeWorkspace } from './native-tabs-patch.mjs';
 import { patchFastAccess, patchModelCatalogArgs, patchOct27Network } from './native-fast-patch.mjs';
+import { patchNov09Main } from './native-nov09-main.mjs';
 import { patchRspackMember, patchRspackIndex } from './native-rspack-patch.mjs';
 const root = path.resolve(import.meta.dirname, '..');
 const config=JSON.parse(fs.readFileSync(path.join(root,'forge.config.json'),'utf8'));
@@ -17,11 +19,12 @@ const target = path.resolve(process.argv[3] || path.join(root, 'release', 'packa
 // 该字段时才回退到符号判断。members 必须由适配器提供：静默回退到 legacy 文件名
 // 会把旧补丁套到新客户端上。
 const nativeVersion = adapter.patchSet || (adapter.nativeSymbols?.registryMap === 'QL' ? 'legacy' : 'current');
-assert(['legacy', 'current', 'oct23', 'oct27', 'oct27b', 'oct29'].includes(nativeVersion), `适配器 patchSet 无效：${nativeVersion}`);
+assert(['legacy', 'current', 'oct23', 'oct27', 'oct27b', 'oct29', 'nov09'].includes(nativeVersion), `适配器 patchSet 无效：${nativeVersion}`);
+const rspackAdapter = ['oct29', 'nov09'].includes(nativeVersion);
 const currentAdapter = nativeVersion !== 'legacy';
 const members = adapter.members;
-assert(members && (nativeVersion === 'oct29' ? ['network'] : ['renderer', 'settingsPage', 'visibleSettings', 'network']).every(key => typeof members[key] === 'string' && members[key]), '适配器必须声明原生模块');
-const rspackMembers = nativeVersion === 'oct29' ? [...new Set(adapter.rspackModules.map(item => item.member))] : [];
+assert(members && (rspackAdapter ? ['network'] : ['renderer', 'settingsPage', 'visibleSettings', 'network']).every(key => typeof members[key] === 'string' && members[key]), '适配器必须声明原生模块');
+const rspackMembers = rspackAdapter ? [...new Set(adapter.rspackModules.map(item => item.member))] : [];
 if (['oct23', 'oct27', 'oct27b'].includes(nativeVersion)) assert(members.workspaceRenderer, '适配器必须声明主页面工作区模块');
 const hash = data => crypto.createHash('sha256').update(data).digest('hex');
 const payloadManifest = JSON.parse(fs.readFileSync(path.join(root, 'forge-payload.json'), 'utf8'));
@@ -49,17 +52,17 @@ for (const { member, entry, offset } of all) {
   const original = base.subarray(8 + oldHeaderSize + offset, 8 + oldHeaderSize + offset + entry.size);
   let changed = original;
   if(!process.env.FAST_NO_PATCH && member === 'webview/index.html'){
-    if(nativeVersion==='oct29') changed=Buffer.from(patchRspackIndex(original.toString()));
+    if(rspackAdapter) changed=Buffer.from(patchRspackIndex(original.toString()));
     else { const anchor='frame-src &#39;self&#39;';assert.equal(original.toString().split(anchor).length,2);changed=Buffer.from(original.toString().replace(anchor,anchor+' codex-forge:')); }
   } else if (!process.env.FAST_NO_PATCH && member === '.vite/build/early-bootstrap.js') {
     const guard = (process.env.FAST_EXTENSION_DEBUG ? 'require("node:fs").writeFileSync(require("node:path").join(process.env.CODEX_HOME,"early-reached.txt"),"reached");try{' : '') + 'require(require("node:path").join(process.resourcesPath,"fast-extension/main.cjs")).install();' + (process.env.FAST_EXTENSION_DEBUG ? '}catch(error){require("node:fs").writeFileSync(require("node:path").join(process.env.CODEX_HOME,"extension-error.txt"),error.stack);throw error}' : '') + '\n';
-    changed = Buffer.from(guard + original.toString());
+    changed = Buffer.from(guard + (nativeVersion === 'nov09' ? patchNov09Main(original.toString(), member) : original.toString()));
   } else if (!process.env.FAST_NO_PATCH && member === '.vite/build/preload.js') {
     const version = hash(fs.readFileSync(path.join(root, 'dist/fast-extension/ui/app.js'))).slice(0, 16);
     const preload = fs.readFileSync(path.join(root,'runtime','forge-preload.cjs'),'utf8')+'\n'+fs.readFileSync(path.join(root, 'runtime', 'host-preload.cjs'), 'utf8').replaceAll('__FAST_UI_VERSION__', version) + '\n' + fs.readFileSync(path.join(root, 'runtime', 'host-workspace.cjs'), 'utf8');
     changed = Buffer.concat([original, Buffer.from('\n' + preload)]);
   } else if (!process.env.FAST_NO_PATCH && rspackMembers.includes(member)) {
-    changed = Buffer.from(patchRspackMember(original.toString(), member, adapter.rspackModules, fs.readFileSync(path.join(root, 'runtime/native-tabs-renderer.js'), 'utf8')));
+    changed = Buffer.from(patchRspackMember(original.toString(), member, adapter.rspackModules, fs.readFileSync(path.join(root, 'runtime/native-tabs-renderer.js'), 'utf8'), nativeVersion));
   } else if (!process.env.FAST_NO_PATCH && member === members.renderer) {
     let renderer=original.toString();
     if (!currentAdapter) {
@@ -74,8 +77,13 @@ for (const { member, entry, offset } of all) {
     changed=Buffer.from(patchSettingsPage(original.toString(),{version:nativeVersion}));
   } else if(!process.env.FAST_NO_PATCH && member===members.visibleSettings) {
     changed=Buffer.from(patchSettingsVisibility(original.toString(),{version:nativeVersion}));
-  } else if (!process.env.FAST_NO_PATCH && member === members.network && ['oct27', 'oct27b', 'oct29'].includes(nativeVersion)) {
-    changed = Buffer.from(patchOct27Network(original.toString()));
+  } else if (!process.env.FAST_NO_PATCH && member === members.network && ['oct27', 'oct27b', 'oct29', 'nov09'].includes(nativeVersion)) {
+    changed = Buffer.from(patchOct27Network(original.toString(), { version: nativeVersion }));
+  } else if (!process.env.FAST_NO_PATCH && nativeVersion === 'nov09' && member === 'package.json') {
+    const metadata = JSON.parse(original);
+    assert.equal(metadata.codexWindowsAppContainedCore, '1');
+    metadata.codexWindowsAppContainedCore = '0';
+    changed = Buffer.from(JSON.stringify(metadata, null, 2));
   } else if (!process.env.FAST_NO_PATCH && member === members.network) {
     const sourceText = original.toString(), start = sourceText.indexOf(`function ${currentAdapter ? 'Oc' : 'rc'}(`), end = sourceText.indexOf(`function ${currentAdapter ? 'kc' : 'ic'}(`, start);
     assert(start >= 0 && end > start);
@@ -85,6 +93,7 @@ for (const { member, entry, offset } of all) {
     const withCatalog = patchModelCatalogArgs(replacement);
     changed = Buffer.from(sourceText.slice(0, start) + withCatalog + sourceText.slice(end));
   }
+  if (!process.env.FAST_NO_PATCH && member === adapter.members.desktopFeatures) changed = Buffer.from(patchNov09Main(original.toString(), member));
   if (!changed.equals(original)) {
     assert(entry.integrity?.algorithm === 'SHA256');
     const blockSize = entry.integrity.blockSize;
@@ -96,7 +105,8 @@ for (const { member, entry, offset } of all) {
 }
 const expectedMembers = process.env.FAST_NO_PATCH ? [] : [
   'webview/index.html', '.vite/build/early-bootstrap.js', '.vite/build/preload.js',
-  ...(nativeVersion === 'oct29' ? rspackMembers : [members.renderer, members.settingsPage, members.visibleSettings]), members.network,
+  ...(rspackAdapter ? rspackMembers : [members.renderer, members.settingsPage, members.visibleSettings]), members.network,
+  ...(nativeVersion === 'nov09' ? ['package.json', members.desktopFeatures] : []),
   ...(members.workspaceRenderer ? [members.workspaceRenderer] : []),
 ];
 assert.deepEqual(modifications.map(item => item.member).sort(), expectedMembers.sort(), 'Native patch member set changed');
@@ -134,6 +144,7 @@ fs.copyFileSync(path.join(root,'dist','CodexForge.exe'),path.join(target,'CodexF
 fs.copyFileSync(path.join(root,'dist','CodexForge.exe.config'),path.join(target,'CodexForge.exe.config'));
 fs.copyFileSync(path.join(root,'assets','codex-forge.ico'),path.join(target,'codex-forge.ico'));
 const oldCmd=path.join(target,'Start-Codex-Forge.cmd');if(fs.existsSync(oldCmd))fs.unlinkSync(oldCmd);
+if (!process.env.FAST_NO_PATCH && nativeVersion === 'nov09') installCua(source, path.join(target,'app'), path.join(root,'runtime'), adapter.cuaGlobalsSHA256);
 const manifest = { product: 'Codex Forge', forgeVersion: config.version, apiVersion:config.apiVersion, fullInstallation:true, forgePayloadSHA256, sourceMSIXVersion: config.codexVersion, sourceBuildVersion: config.codexBuildVersion || adapter.codexBuildVersion || config.codexVersion, baseASARSHA256: hash(base), asarSHA256: digest.digest('hex'), headerSHA256: newHash, executableSHA256: hash(exe), executableIntegrityOffset: at, integrityChecksEnabled: true, fusesChanged: false, modifications };
 const files=[];function inventory(dir){for(const name of fs.readdirSync(dir)){const file=path.join(dir,name);if(fs.statSync(file).isDirectory())inventory(file);else if(file!==path.join(target,'forge-install.json'))files.push({path:path.relative(target,file).replaceAll('\\','/'),bytes:fs.statSync(file).size,sha256:hash(fs.readFileSync(file))});}}inventory(target);manifest.files=files;
 fs.writeFileSync(path.join(target,'forge-install.json'),JSON.stringify(manifest,null,2));

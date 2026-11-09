@@ -133,12 +133,12 @@ test('Forge updater stages a verified MSI and records its receipt',async t=>{
  assert.match(receipt.file,/\.msi$/);assert.equal(fs.statSync(receipt.file).size,body.length);assert.equal(JSON.parse(fs.readFileSync(receipt.file+'.json','utf8')).sha256,plan.sha256);
  await assert.rejects(stageUpdate({...plan,sha256:'0'.repeat(64)},path.join(root,'bad'),async()=>new Response(body)),/摘要/);
 });
-test('Forge updater launches from the versioned payload root',t=>{
+test('Forge updater launches from the versioned payload root',async t=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'forge-launch-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const installer=path.join(root,'update.msi'),sha256=crypto.createHash('sha256').update('fixture').digest('hex');
  fs.writeFileSync(installer,'fixture');fs.writeFileSync(path.join(root,'forge-payload.json'),'{}');fs.writeFileSync(installer+'.json',JSON.stringify({file:installer,sha256}));
  let invocation;
- const result=launchUpdate({file:installer,sha256},root,undefined,(file,args,options)=>{invocation={file,args,options};return {unref(){}}});
+ const result=await launchUpdate({file:installer,sha256},root,undefined,(file,args,options)=>{invocation={file,args,options};const child=new (require('node:events').EventEmitter)();child.unref=()=>{};process.nextTick(()=>child.emit('spawn'));return child;});
  assert.equal(result.scheduled,true);assert.deepEqual(invocation.args,['/i',installer,'/passive','/norestart']);assert.equal(invocation.file,'msiexec.exe');
  assert.throws(()=>launchUpdate({file:installer,sha256},path.join(root,'missing'),undefined,()=>({unref(){}})),/已安装/);
 });

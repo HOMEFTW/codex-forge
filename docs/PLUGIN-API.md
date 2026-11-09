@@ -2,12 +2,12 @@
 
 Forge API 3 随 Codex Forge 0.4.0 发布，在 API 2 操作基础上增加星枢 Nexus、可选能力协商和结构化错误。插件清单、SDK、上下文与能力查询均使用 `apiVersion: 3`；清单和更新协议的 `schemaVersion` 独立管理。
 
-从 API 1/2 迁移：更新 SDK，清单改为 `apiVersion: 3` 与经过测试的 Forge 范围 `>=0.4.0 <0.5.0`，验证权限、能力及原有交互。旧插件仍可读取并显示诊断，数据保留，未经迁移不启用；宿主不改写第三方插件。DSH 导入器按当前宿主生成清单。详见 [迁移说明](API-3-MIGRATION.md)。
+从 API 1/2 迁移：更新 SDK，清单改为 `apiVersion: 3` 与经过测试的 Forge 范围 `>=0.4.0 <0.6.0`，验证权限、能力及原有交互。旧插件仍可读取并显示诊断，数据保留，未经迁移不启用；宿主不改写第三方插件。DSH 导入器按当前宿主生成清单。详见 [迁移说明](API-3-MIGRATION.md)。
 
 插件目录必须包含 `plugin.json`。`id` 使用 `publisher.name`；`forge.*` 保留给内置插件。`compatibility.codex` 和 `compatibility.forge` 是非空数组，数组项之间是“或”；单项空格分隔的比较条件是“且”。支持精确三/四段数字版本、`>= <= > < = ^ ~` 和 `||`，不接受隐式通配或预发布字符串。
 
 ```json
-{"schemaVersion":1,"apiVersion":3,"id":"example.panel","name":"示例","version":"0.4.0","compatibility":{"codex":["26.1029.7803.0"],"forge":[">=0.4.0 <0.5.0"]},"permissions":["panels"],"contributes":{"panels":[{"id":"main","title":"示例","entry":"panel.html"}]}}
+{"schemaVersion":1,"apiVersion":3,"id":"example.panel","name":"示例","version":"0.5.0","compatibility":{"codex":["26.1103.4239.0"],"forge":[">=0.4.0 <0.6.0"]},"permissions":["panels"],"contributes":{"panels":[{"id":"main","title":"示例","entry":"panel.html"}]}}
 ```
 
 宿主向 iframe 注入 `window.CodexForge`。`entry` 是可选的浏览器 JS 命令入口。面板 HTML 应自包含，使用内联脚本和样式；可在发布前用自己的构建器打包。没有 Node、任意 IPC、文件系统、同源权限或自动消息发送权限。允许的网络源必须通过 `network` 和 `networkOrigins` 声明；面板不能导航宿主。API 仍按来源窗口和插件安装记录校验身份。
@@ -34,7 +34,7 @@ Forge API 3 随 Codex Forge 0.4.0 发布，在 API 2 操作基础上增加星枢
 
 静态按钮在 `contributes.sidebar/toolbar/composer` 中声明；动态注册使用相同 `{id,title,command}` 或 `{id,title,panel}` 结构。安装后默认停用。停用卸载会销毁运行时与贡献点；卸载保留独立设置。代码或清单被手动修改后，重新加载会要求审阅并重新启用。
 
-`contributes.settings.properties` 使用 `{type,title,default,enum,minimum,maximum,maxLength}`，支持字符串、数字、布尔值；0.3.3 起还支持字符串数组（`type: "array", items: {type: "string", maxLength: 200}, maxItems: 200, default: []`）。数组拒绝重复项、空字符串和非字符串，默认最多 200 项，每项默认最长 200 字符；`maxItems` 可设为 1–1000。使用数组的第三方插件应声明 Forge `>=0.4.0 <0.5.0`，API 版本为 3。设置界面自动集中到原生“Codex Forge 插件设置”；插件管理的设置按钮携带插件 ID 深链接，用户不必自行查找。
+`contributes.settings.properties` 使用 `{type,title,default,enum,minimum,maximum,maxLength}`，支持字符串、数字、布尔值；0.3.3 起还支持字符串数组（`type: "array", items: {type: "string", maxLength: 200}, maxItems: 200, default: []`）。数组拒绝重复项、空字符串和非字符串，默认最多 200 项，每项默认最长 200 字符；`maxItems` 可设为 1–1000。使用数组的第三方插件应声明 Forge `>=0.4.0 <0.6.0`，API 版本为 3。设置界面自动集中到原生“Codex Forge 插件设置”；插件管理的设置按钮携带插件 ID 深链接，用户不必自行查找。
 
 `capabilities.get()` 对应 DSH 的 capability seam 思路：插件先读取宿主实际提供的能力与自己的 `denied` 列表，再决定是否显示入口。声明与授权仍由宿主逐请求校验，能力查询不会绕过权限。
 
@@ -116,7 +116,7 @@ CLI 支持 `create / validate / pack / list / install / uninstall / enable / dis
 
 插件管理的「导入插件包…」接收 CLI `pack` 生成的 `.forge-plugin.json`，也支持原有目录安装。包为 `schemaVersion:1`，`files` 中每项含 `path`、`encoding:"base64"` 和 `content`。JSON 最大 30 MiB，解码后合计最大 20 MiB、最多 1000 文件，必须含 `plugin.json`；不允许路径穿越、Windows 设备名、大小写重复文件及 `.git/node_modules`。导入复用清单、权限、兼容和指纹检查，默认停用；卸载保留用户设置。HTML 面板最大 20 MiB。
 
-`forge.nexus.connect()` 使用原生选择器，不能携带参数；成功返回 `{vault}`，取消返回 `null`。`forge.nexus.disconnect(vaultId)` 返回剩余 `Vault[]`。两者需要 `nexus` v1 和读写权限，使用者应声明 Forge `>=0.4.1 <0.5.0`。目录连接不开放给 MCP，选择完成后重新检查插件权限与启用状态。
+`forge.nexus.connect()` 使用原生选择器，不能携带参数；成功返回 `{vault}`，取消返回 `null`。`forge.nexus.disconnect(vaultId)` 返回剩余 `Vault[]`。两者需要 `nexus` v1 和读写权限，使用者应声明 Forge `>=0.4.1 <0.6.0`。目录连接不开放给 MCP，选择完成后重新检查插件权限与启用状态。
 
 星枢 `homeftw.nexus` 是独立外部插件，Forge 只提供服务；其 MCP 工具按真实安装、文件指纹、启用和权限状态开放。具有 `nexus.read` 的外部面板允许 `media-src data:`，仍禁止 frame/object；PDF 内嵌不支持。详见 [Nexus 接口](NEXUS-API.md)。
 
@@ -132,4 +132,4 @@ CLI 支持 `create / validate / pack / list / install / uninstall / enable / dis
 
 `viewBox` 当前固定为 `0 0 24 24`，路径最多 16 条、每条 2048 字符，仅接受路径命令/数字/逗号/空白。宿主通过 SVG DOM 创建固定 `fill=none`、`stroke=currentColor` 的图标，不接受原始 SVG、HTML、事件或资源 URL。左栏入口跟随原生折叠布局并保留可访问名称。
 
-`nexus.script` 要求同时声明 `nexus.read`，不得与 `network` 权限并用。它仅使插件 CSP 增加 `worker-src blob:`，`connect-src`、frame/object 继续禁止，未开启 `unsafe-eval`。插件应在用户明确点击后运行知识库脚本，传入只读快照、限时终止，并清理声明式渲染输出；不得把宿主 SDK 代理给笔记脚本。该权限本身不赋予文件/Node/SDK/模型执行能力。使用这些新增功能的插件应声明 Forge `>=0.4.2 <0.5.0`，API 保持 3。
+`nexus.script` 要求同时声明 `nexus.read`，不得与 `network` 权限并用。它仅使插件 CSP 增加 `worker-src blob:`，`connect-src`、frame/object 继续禁止，未开启 `unsafe-eval`。插件应在用户明确点击后运行知识库脚本，传入只读快照、限时终止，并清理声明式渲染输出；不得把宿主 SDK 代理给笔记脚本。该权限本身不赋予文件/Node/SDK/模型执行能力。使用这些新增功能的插件应声明 Forge `>=0.4.2 <0.6.0`，API 保持 3。

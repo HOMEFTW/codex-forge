@@ -2,19 +2,29 @@
 
 Codex Forge 是面向 Windows Codex 客户端的第三方插件宿主，将模型配置、信息统计、记忆管理、画布、待办和智能体协作集中到原生界面中。它为内置及独立插件提供统一的安装管理、设置入口、会话输出和版本兼容检查。
 
-当前版本 **0.4.4 / Forge API 3**，适配官方客户端 **26.1029.7803.0（Windows x64，MSIX 身份版本）**。本项目不是 OpenAI 官方插件 API。
+当前版本 **0.5.0 / Forge API 3**，适配官方客户端 **26.1103.4239.0（Windows x64，MSIX 身份版本）**。本项目不是 OpenAI 官方插件 API。
 
 [下载安装包](https://github.com/HOMEFTW/codex-forge/releases/latest) · [更新日志与版本索引](docs/CHANGELOG.md) · [从零开发插件](docs/PLUGIN-DEVELOPMENT-ZERO-TO-ONE.md) · [API 参考](docs/PLUGIN-API.md)
+
+| 下载 0.5.0 | 用途 |
+| --- | --- |
+| [Windows MSI](https://github.com/HOMEFTW/codex-forge/releases/download/v0.5.0/Codex-Forge-0.5.0-Windows.msi) | 推荐用于首次安装及已有安装版升级。 |
+| [便携 ZIP](https://github.com/HOMEFTW/codex-forge/releases/download/v0.5.0/Codex-Forge-0.5.0-Windows-Portable.zip) | 解压后运行，无需 MSI 安装。 |
+| [独立更新器](https://github.com/HOMEFTW/codex-forge/releases/download/v0.5.0/Codex-Forge-0.5.0-Updater.exe) | 可选备用工具，选择已有 Forge 安装目录后检查、下载或修复。 |
+
+[SHA-256 校验文件](https://github.com/HOMEFTW/codex-forge/releases/download/v0.5.0/SHA256SUMS.txt) · [完整发布说明](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.5.0)
 
 ## 主要功能
 
 | 功能 | 说明 |
 | --- | --- |
-| Fast 与模型配置 | 控制对话中可选的模型和默认速度，支持 GPT-6.1-Terra 模型切换与 Fast 档位。保存配置并完整重启后生效，实际加速能力取决于服务商。 |
+| Fast 与模型配置 | 控制对话中可选的模型和默认速度，支持 GPT-6.1-Terra、Fast 和独立 Ultrafast 档位。保存配置并完整重启后生效，实际加速能力取决于服务商。 |
 | GPT-6.1-Sol 独立 500K | 为 `gpt-6.1-sol` 提供独立上下文配置，不覆盖其他模型；本地协议报告可用窗口为 475,000，远端接受能力取决于服务商。 |
 | 信息统计 | 左栏显示当前 Agent 速度与模型指纹，确认不符时红字提示；右侧提供 Token、速度、上下文占用和历史记录。主动指纹检测需手动启动，属于概率诊断。 |
 | 记忆管理 | 搜索双记忆目录，按来源、分类和时间筛选；支持自定义备注编辑、重命名、删除、草稿保留与冲突保护。 |
-| 内置浏览器 | 在客户端中打开网页，可在插件设置中控制浏览器配置。 |
+| 中文界面 | 启用原生语言设置，沿用官方中文资源并补充新版桌面文本；可切换其他语言。 |
+| 插件、浏览器与电脑操作 | 原生插件、内置/外部浏览器和 Windows 电脑操作分别配置，保留账号策略和操作授权；Windows 电脑操作使用官方运行时。 |
+| 独立更新器 | 作为可选备用入口，常规升级失败时切换；支持 HTTP 代理、续传、SHA-256 校验、增量回退以及 MSI / 便携升级。 |
 | 无限画布 | 管理节点、连线、图片和分组，支持缩放、撤销、重做与恢复；模型可读取和编辑画布。 |
 | 待办清单 | 管理个人及会话待办，支持状态、排序、计划、延后、重试和删除恢复。 |
 | 智能体协作 | 对接 Claude Code、Grok Build 和 DSH，管理模型、思考档位、消息与结果回读；协作默认关闭，按对话授权启用。 |
@@ -33,20 +43,26 @@ Codex Forge 是面向 Windows Codex 客户端的第三方插件宿主，将模�
 
 ## 安装与启动
 
-1. 从 [最新 Release](https://github.com/HOMEFTW/codex-forge/releases/latest) 下载 `Codex-Forge-0.4.4-Windows.msi`，可对照 `SHA256SUMS.txt` 校验；也可以下载 `Codex-Forge-0.4.4-Windows-Portable.zip` 直接解压运行。
+1. 从上方下载 MSI 或便携 ZIP，可对照 `SHA256SUMS.txt` 校验。
 2. 双击 MSI 或使用 `msiexec /i` 安装。默认安装在 `%LOCALAPPDATA%\Programs\Codex Forge`，Windows Installer 负责升级和卸载；桌面快捷方式可通过 `CREATEDESKTOPSHORTCUT=0` 关闭。
 3. 安装完成后，准备程序从 OpenAI 官方 HTTPS 地址下载该 Forge 版本适配的 Codex MSIX（约 1 GiB），检查大小、SHA-256、签名、产品身份、版本及架构，再在本地应用 Forge 适配器。
 4. 准备成功后运行 **CodexForge.exe**。请先退出其他使用相同配置的 Codex 客户端。
 
 **MSI 和便携 ZIP 只包含 Forge，不包含官方客户端、Node、MSIX 或用户凭据。** 首次准备需要网络和约 7 GB 临时可用空间。下载支持续传；准备失败后再次启动 Forge 可重试，日志位于安装目录的 `forge-prepare.log`。安装阶段不下载官方客户端，启动 `CodexForge.exe` 后才开始准备。
 
-0.4.x 用户可运行新版 MSI；0.3.x / 0.2.x 用户请手动下载并运行新版 MSI；已发布旧更新器不接受 API 3 清单。已有 API 1/2 第三方插件会显示不兼容，须由作者迁移；用户数据继续保留。本版本不会自动安装或重启正在使用的客户端。
+0.4.x 用户可运行新版 MSI，或退出便携版后将新版 ZIP 解压到原便携目录。0.3.x / 0.2.x 用户请手动下载并运行新版 MSI；已发布旧更新器不接受 API 3 清单。
+
+**默认升级流程保持不变：检查 Codex 与 Forge 更新 → 下载并校验 → 安装已验证版本。** 检查、下载或安装失败时，显示原因并切换独立更新器；也可从“升级 → 备用方式”手动打开。没有匹配版本、安装成功或用户取消安装时不会自动切换。独立更新器安装前需要完整退出客户端。
+
+独立插件须声明兼容 Forge 0.5.0 和目标 Codex 版本，API 3 相同不代表版本范围自动兼容；API 1/2 插件还须由作者迁移。升级保留用户数据，不改写第三方插件兼容声明。
+
+独立更新器为安装目录内的 `CodexForgeUpdater.exe`，开始菜单也有入口；单独下载的更新器可选择现有 Forge 安装目录。[使用与恢复说明](docs/UPDATER.md)。Ultrafast 在模型目录已支持时自动显示；自定义服务可在 Fast 插件中填写支持该档位的模型 ID。
 
 发行包使用 MSI 和便携 ZIP。**发行包的 Forge EXE 与 MSI 未进行 Authenticode 签名**，Windows 可能显示未知发布者。`SHA256SUMS.txt` 用于核对下载文件完整性，不替代发布者签名；签名和 Defender 声誉验证尚未完成。
 
 如需移除当前运行的 Forge，可在项目目录执行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/uninstall-current-forge.ps1 -WhatIf` 先预览，再去掉 `-WhatIf` 执行。脚本只清理 Forge 安装目录、快捷方式和启动项，保留 `%CODEX_HOME%` 用户数据。
 
-升级成功切换 `current.json` 后，准备程序会自动删除旧的 Forge 管理客户端目录和旧版 MSIX 缓存，以释放官方客户端占用的空间。当前正在运行的旧客户端会跳过本次删除，退出后再次启动 Forge 会继续清理；不带 Forge 安装清单的目录不会触碰。
+升级成功切换 `current.json` 后，准备程序保留前一客户端供恢复，并清理更早的 Forge 管理客户端目录和旧版 MSIX 缓存，以释放官方客户端占用的空间。当前正在运行的旧客户端会跳过本次删除，退出后再次启动 Forge 会继续清理；不带 Forge 安装清单的目录不会触碰。
 
 GitHub 仓库与 Release 已公开，无需登录即可查看源码、下载安装包。客户端通过匿名 HTTPS 读取 GitHub 更新清单；网络或服务访问失败时会显示更新不可用，不会显示成“已是最新版”。
 
@@ -64,12 +80,12 @@ node scripts/run-tests.mjs
 node scripts/build-installer.mjs
 ```
 
-安装器输出到 `release/dist/`，包含 per-user MSI、Portable ZIP、`SHA256SUMS.txt` 和 `codex-forge-release.json`。更新下载 MSI 并交给 Windows Installer；便携版本需要手动下载。`release/forge-only/payload/forge-payload.json` 记录 Forge 文件摘要；构建器拒绝官方 EXE、ASAR、Node 和 MSIX 混入安装包。
+安装器输出到 `release/dist/`，包含 per-user MSI、Portable ZIP、独立更新器 EXE、`SHA256SUMS.txt` 和 `codex-forge-release.json`。常规流程下载 MSI 并交给 Windows Installer；备用独立更新器还支持直接校验安装便携 ZIP。`release/forge-only/payload/forge-payload.json` 记录 Forge 文件摘要；构建器拒绝官方 EXE、ASAR、Node 和 MSIX 混入安装包。
 
 需要本地开发客户端时，先自行下载并核验适配清单指定的官方 MSIX，将 `app/` 安全解包（路径 URI 解码一次），再执行：
 
 ```powershell
-npm run build:client -- D:/path/to/verified-official/app
+node release/forge-only/payload/scripts/build-client.mjs D:/path/to/verified-official/app D:/Code/codex-forge/release/package-full
 node scripts/verify-install.mjs release/package-full
 ```
 
@@ -80,6 +96,8 @@ node scripts/verify-install.mjs release/package-full
 ## 数据与来源
 
 Forge 数据默认在 `%CODEX_HOME%/forge`（缺省 `%USERPROFILE%/.codex/forge`）；画布、待办、协作与技能数据在 `%CODEX_HOME%/fast-canvas`。Forge 不复制账号、密钥、历史或第三方 CLI 配置到安装包，卸载不会删除 `.codex` 数据。
+
+客户端本地化、速度档位、电脑操作及独立更新器的设计参考 [CodexDesktop-Rebuild](https://github.com/AnLifeX/CodexDesktop-Rebuild)（调研提交 `46b7c54`），按 Forge 的轻量分发结构独立实现。
 
 本项目参考 [DSH](https://github.com/deepseek-ai/deepseek-harness) 的宿主/客户端边界及 UI 贡献点，以及 [Codeg](https://github.com/spacering-net/codeg) 的配置、ACP 能力探测和技能组织。技能来源、固定提交与许可证见 [CODEG-SKILLS-NOTICES.md](CODEG-SKILLS-NOTICES.md)。Forge 原创代码使用 MIT；第三方资源遵循各自许可证。Codex 是 OpenAI 的产品，本项目不是官方插件 API，也不重新分发官方客户端。
 

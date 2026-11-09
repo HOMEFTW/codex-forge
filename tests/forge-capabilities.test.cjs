@@ -24,7 +24,7 @@ test('API 3 optional capabilities negotiate unknown names and versions without e
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'forge-optional-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const source = path.join(root, 'source'); fs.mkdirSync(source);
-  const manifest = { schemaVersion: 1, apiVersion: 3, id: 'test.optional', name: 'Optional', version: '1.0.0', compatibility: { codex: ['26.1027.6604.0'], forge: ['>=0.4.0 <0.5.0'] }, permissions: ['storage', 'nexus.read'], capabilities: [{ name: 'future.service', version: 1, optional: true }, { name: 'storage', version: 2, optional: true }, { name: 'nexus', version: 1, optional: true }] };
+  const manifest = { schemaVersion: 1, apiVersion: 3, id: 'test.optional', name: 'Optional', version: '1.0.0', compatibility: { codex: ['26.1027.6604.0'], forge: ['>=0.4.0 <0.6.0'] }, permissions: ['storage', 'nexus.read'], capabilities: [{ name: 'future.service', version: 1, optional: true }, { name: 'storage', version: 2, optional: true }, { name: 'nexus', version: 1, optional: true }] };
   fs.writeFileSync(path.join(source, 'plugin.json'), JSON.stringify(manifest));
   const registry = new ForgeRegistry({ root: path.join(root, 'home'), bundledRoot: path.join(root, 'empty'), versions: { codex: '26.1027.6604.0', forge: '0.4.0', apiVersion: 3 } });
   registry.install(source); registry.setEnabled(manifest.id, true);

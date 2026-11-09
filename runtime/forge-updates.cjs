@@ -7,7 +7,7 @@ const { atomic, json } = require('./collaboration-store.cjs');
 const nativeFeed = 'https://persistent.oaistatic.com/codex-app-prod/windows-store-update.json';
 const blockedVersions = new Set(['26.1013.4894.0']);
 async function fetchJSON(url, { limit = 2*1024*1024 } = {}) {
-  const response = await fetch(url, { headers: { Accept:'application/json','User-Agent':'Codex-Forge/0.4.4' }, signal:AbortSignal.timeout(20000) });
+  const response = await fetch(url, { headers: { Accept:'application/json','User-Agent':'Codex-Forge/0.5.0' }, signal:AbortSignal.timeout(20000) });
   if (!response.ok) {
     const retry = response.headers.get('retry-after');
     throw Error(`更新源 HTTP ${response.status}${response.status === 403 ? '（GitHub API 限流或拒绝匿名请求）' : response.status === 404 ? '（私有仓库或尚未发布版本）' : ''}${retry ? `；Retry-After ${retry}` : ''}`);
@@ -95,8 +95,17 @@ function recheckPlan(plan,{config,plugins,native}) {
   const result=matchUpdate({config,plugins,releases:[plan],native:{buildVersion:native?.version}});
   check(result.plan,result.candidates[0]?.reasons.join('；')||'更新计划已过期，请重新检查');return result.plan;
 }
-function launchUpdate(staged, installRoot, executable, spawnProcess=spawn) {
-  check(installRoot&&fs.existsSync(path.join(installRoot,'forge-payload.json')),'请从已安装的 Codex Forge 启动');
+function launchDetached(file, args, spawnProcess, onFailure) {
+  return new Promise((resolve, reject) => {
+    const child=spawnProcess(file,args,{windowsHide:true,detached:true,stdio:'ignore',shell:false});
+    let started=false;
+    child.once('error',error=>{if(started)onFailure?.(error);else reject(error);});
+    child.once('spawn',()=>{started=true;child.unref();resolve();});
+    child.once('exit',(code,signal)=>{if(started&&![0,1641,3010,1602].includes(code))onFailure?.(Error(`Windows Installer 安装失败（${signal||code}）`));});
+  });
+}
+function launchUpdate(staged, installRoot, executable, spawnProcess=spawn, onFailure) {
+  check(installRoot&&(fs.existsSync(path.join(installRoot,'forge-payload.json'))||fs.existsSync(path.join(installRoot,'forge-install.json'))),'请从已安装的 Codex Forge 启动');
   const receipt=json(staged.file+'.json');check(receipt.sha256===staged.sha256&&receipt.file===staged.file,'下载记录不匹配');
   // Windows Installer is handed the file directly, so re-hash the staged bytes
   // immediately before launching. The download receipt alone cannot prove the
@@ -105,7 +114,35 @@ function launchUpdate(staged, installRoot, executable, spawnProcess=spawn) {
   try { verified=crypto.createHash('sha256').update(fs.readFileSync(staged.file)).digest('hex'); }
   catch(error) { throw Error('升级包不可读：'+error.message); }
   check(verified===staged.sha256,'升级包 SHA-256 已变化，请重新下载');
-  const child=spawnProcess('msiexec.exe',['/i',staged.file,'/passive','/norestart'],{windowsHide:true,detached:true,stdio:'ignore',shell:false});child.unref();
-  return {scheduled:true,restartRequired:true,message:'正在打开 Windows Installer 更新；完成后请退出当前客户端并重新启动。'};
+  return launchDetached('msiexec.exe',['/i',staged.file,'/passive','/norestart'],spawnProcess,onFailure).then(()=>({scheduled:true,restartRequired:true,message:'正在打开 Windows Installer 更新；完成后请退出当前客户端并重新启动。'}));
 }
-module.exports={nativeFeed,fetchJSON,validateRelease,matchUpdate,checkUpdates,stageUpdate,recheckPlan,launchUpdate,githubReleaseManifests,rateLimited,releaseBuildVersion};
+function launchIndependentUpdater(installRoot, repository, spawnProcess=spawn) {
+  check(installRoot, '请从已安装的 Codex Forge 启动');
+  check(/^[\w.-]+\/[\w.-]+$/.test(repository), '更新仓库无效');
+  let root=path.resolve(installRoot);
+  for(let depth=0;depth<4;depth++) {
+    const updater=path.join(root,'CodexForgeUpdater.exe');
+    if(fs.existsSync(path.join(root,'bootstrap.json'))&&fs.existsSync(updater)) {
+      return launchDetached(updater,['--root',root,'--repository',repository],spawnProcess).then(()=>({opened:true,message:'已打开独立更新器，可设置代理、续传下载或修复安装。'}));
+    }
+    const parent=path.dirname(root);if(parent===root)break;root=parent;
+  }
+  throw Error('安装目录中没有独立更新器，请先安装 Forge 0.5.0 或更新版本。');
+}
+async function recoverUpdate(error, openUpdater) {
+  const reason='常规升级失败：'+error.message;
+  try { const result=await openUpdater();return {fallback:true,message:reason+'。'+result.message}; }
+  catch(fallbackError) { throw Error(reason+'；独立更新器也未能打开：'+fallbackError.message); }
+}
+async function runUpdateAction(method, run, openUpdater) {
+  if(!['checkUpdates','stageUpdate','applyUpdate'].includes(method))return run();
+  try {
+    const result=await run();
+    if(method==='checkUpdates'&&!result.plan) {
+      const unavailable=[result.native,result.forge].filter(source=>source?.status==='unavailable');
+      if(unavailable.length)throw Error(unavailable.map(source=>source.error).join('；'));
+    }
+    return result;
+  } catch(error) { if(error.name==='AbortError')throw error;return recoverUpdate(error,openUpdater); }
+}
+module.exports={nativeFeed,fetchJSON,validateRelease,matchUpdate,checkUpdates,stageUpdate,recheckPlan,launchUpdate,launchIndependentUpdater,githubReleaseManifests,rateLimited,releaseBuildVersion,runUpdateAction,recoverUpdate};

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { rewriteExtension } from './native-tabs-patch.mjs';
+import { patchNov09Factory } from './native-nov09-patch.mjs';
 
 // These module IDs and source ranges belong to the pinned Oct 29 MSIX only.
 // Resolve native dependencies on use: the registry and controller import each
@@ -79,7 +80,7 @@ export function patchRspackFactory(source, id, extension) {
   }
 }
 
-export function patchRspackMember(source, member, modules, extension) {
+export function patchRspackMember(source, member, modules, extension, version = 'oct29') {
   const entries = modules.filter(item => item.member === member).sort((a, b) => b.start - a.start);
   assert(entries.length, 'No Rspack patches for ' + member);
   let limit = source.length, result = source;
@@ -89,7 +90,7 @@ export function patchRspackMember(source, member, modules, extension) {
     const original = source.slice(start, end);
     assert.equal(crypto.createHash('sha256').update(original).digest('hex'), sha256, 'Rspack module digest changed: ' + member + ':' + id);
     assert(original.startsWith(id + '('), 'Rspack module ID changed');
-    result = result.slice(0, start) + patchRspackFactory(original, id, extension) + result.slice(end);
+    result = result.slice(0, start) + (version === 'nov09' ? patchNov09Factory(original, id, extension) : patchRspackFactory(original, id, extension)) + result.slice(end);
     limit = start;
   }
   return result;

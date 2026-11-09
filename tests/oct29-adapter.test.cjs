@@ -19,7 +19,7 @@ function requireModules(modules){
 }
 
 test('oct29 adapter pins official identity and every Rspack Fast copy',()=>{
-  assert.equal(config.codexVersion,adapter.codexVersion);assert.equal(config.codexBuildVersion,adapter.codexBuildVersion);
+  assert.equal(adapter.codexBuildVersion,adapter.codexVersion);
   assert.equal(adapter.codexVersion,'26.1029.7803.0');assert.equal(adapter.patchSet,'oct29');
   assert.equal(adapter.packageIdentity,'OpenAI.Codex');assert.equal(adapter.packageBytes,1052222680);
   assert.equal(adapter.packageSHA256,'19487892b7e27c74e75c6422088e91b35b4291ed485045f82a1984a13b22d128');

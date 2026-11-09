@@ -7,7 +7,7 @@ function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'forge-package-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const registry = new ForgeRegistry({ root: path.join(root, 'data'), bundledRoot: path.join(root, 'empty'), versions: { forge: config.version, codex: config.codexVersion, apiVersion: config.apiVersion } });
-  const manifest = { schemaVersion: 1, apiVersion: 3, id: 'homeftw.nexus', name: 'Nexus fixture', version: '0.1.0', compatibility: { forge: ['>=0.4.0 <0.5.0'], codex: [config.codexVersion] }, permissions: ['panels', 'nexus.read', 'nexus.write'], contributes: { panels: [{ id: 'main', title: 'Notes', entry: 'panel.html' }] } };
+  const manifest = { schemaVersion: 1, apiVersion: 3, id: 'homeftw.nexus', name: 'Nexus fixture', version: '0.1.0', compatibility: { forge: ['>=0.4.0 <0.6.0'], codex: [config.codexVersion] }, permissions: ['panels', 'nexus.read', 'nexus.write'], contributes: { panels: [{ id: 'main', title: 'Notes', entry: 'panel.html' }] } };
   const file = (name, data) => ({ path: name, encoding: 'base64', content: Buffer.from(data).toString('base64') });
   let count = 0;
   const pack = (extras = [], override = {}) => { const target = path.join(root, 'plugin-' + (++count) + '.forge-plugin.json'); fs.writeFileSync(target, JSON.stringify({ schemaVersion: 1, files: [file('plugin.json', JSON.stringify({ ...manifest, ...override })), file('panel.html', '<html><head></head><body>Standalone</body></html>'), ...extras] })); return target; };

@@ -1,14 +1,14 @@
 # API 3 迁移与验收
 
-当前目标版本为 **Codex Forge 0.4.1 / Forge API 3**。API 3 自 0.4.0 引入，这是在 API 2 操作基础上的扩展，沿用主版本隔离：API 1/2 第三方插件继续显示清单和不兼容原因，存储与设置保留，不会自动改写或启用。
+当前目标版本为 **Codex Forge 0.5.0 / Forge API 3**。API 3 自 0.4.0 引入，这是在 API 2 操作基础上的扩展，沿用主版本隔离：API 1/2 第三方插件继续显示清单和不兼容原因，存储与设置保留，不会自动改写或启用。
 
 ## 插件作者
 
-1. 更新 SDK 类型与清单 schema；将 `apiVersion` 改为 `3`，Forge 范围改为经过验证的 `>=0.4.0 <0.5.0`，保留真实测试过的 Codex 版本。
+1. 更新 SDK 类型与清单 schema；将 `apiVersion` 改为 `3`，Forge 范围改为经过验证的 `>=0.4.0 <0.6.0`，保留真实测试过的 Codex 版本。
 2. 复验已有命令、面板、存储、草稿和事件。原有浏览器方法签名保持；使用 SDK 获取结果，不依赖宿主内部 IPC 包装。
 3. 依赖可选功能时声明 `{name,version,optional:true}`。未知能力必须明确填写版本；读取 `capabilities.get().negotiated` 后检查 `granted`。`available` 表示实现，`enabled` 表示服务状态，二者不能互相替代。每次实际请求仍会校验。
 4. 用 `error.code` 处理冲突或权限失败，`message` 只用于显示。修订冲突时保留草稿、重新读取并合并；不要自动覆盖重试。
-5. 需要知识库时声明 `nexus` v1 与 `nexus.read`；写操作再声明 `nexus.write`。调用 `forge.nexus.request`，方法、参数和结果由 `sdk/nexus.d.ts` 约束。新文件使用 `expectedRevision: ""`，现有文件使用读取到的 SHA-256。0.4.1 新增 `forge.nexus.connect()` 原生目录选择器与 `disconnect(vaultId)`，都要求读写权限且不接受根路径，不开放给模型工具。使用这两个接口的插件应声明 Forge `>=0.4.1 <0.5.0`。外链使用原有 `forge.browser.open` 并申请对应权限。
+5. 需要知识库时声明 `nexus` v1 与 `nexus.read`；写操作再声明 `nexus.write`。调用 `forge.nexus.request`，方法、参数和结果由 `sdk/nexus.d.ts` 约束。新文件使用 `expectedRevision: ""`，现有文件使用读取到的 SHA-256。0.4.1 新增 `forge.nexus.connect()` 原生目录选择器与 `disconnect(vaultId)`，都要求读写权限且不接受根路径，不开放给模型工具。使用这两个接口的插件应声明 Forge `>=0.4.1 <0.6.0`。外链使用原有 `forge.browser.open` 并申请对应权限。
 
 未使用 Nexus 的插件不必申请其权限。未知或不匹配的必需能力继续拒绝；可选能力不可用时插件仍可启用，但相关调用会返回 `CAPABILITY_UNAVAILABLE`。能力版本仍为独立的 v1，不随 API 主版本变为 3。
 

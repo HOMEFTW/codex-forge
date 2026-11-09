@@ -14,7 +14,7 @@ test('real MCP exposes Nexus, enforces revisions, returns actual file changes, a
   const {ForgeRegistry}=require('../runtime/forge-registry.cjs');
   const registry=new ForgeRegistry({root:forge,bundledRoot:path.join(root,'empty'),versions:{codex:config.codexVersion,forge:config.version,apiVersion:config.apiVersion}});
   const plugin=path.join(root,'plugin');fs.mkdirSync(plugin);
-  const manifest={schemaVersion:1,apiVersion:3,id:'homeftw.nexus',name:'Nexus',version:'0.1.0',compatibility:{codex:[config.codexVersion],forge:['>=0.4.0 <0.5.0']},permissions:['nexus.read','nexus.write'],capabilities:[{name:'nexus',version:1}]};
+  const manifest={schemaVersion:1,apiVersion:3,id:'homeftw.nexus',name:'Nexus',version:'0.1.0',compatibility:{codex:[config.codexVersion],forge:['>=0.4.0 <0.6.0']},permissions:['nexus.read','nexus.write'],capabilities:[{name:'nexus',version:1}]};
   fs.writeFileSync(path.join(plugin,'plugin.json'),JSON.stringify(manifest));
   const service = new NexusService({ root: path.join(store, 'nexus') }), vaultId = service.connect(vault).vault.id;
   const child = spawn(process.env.FAST_TEST_NODE || process.execPath, [path.resolve(__dirname, '../runtime/mcp.cjs')], { env: { ...process.env, CODEX_FAST_CANVAS_DIR: store, CODEX_FORGE_HOME: forge }, windowsHide: true });

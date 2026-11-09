@@ -19,7 +19,7 @@ using System.Reflection;
 
 [assembly: AssemblyTitle("Codex Forge Bootstrap")]
 [assembly: AssemblyProduct("Codex Forge")]
-[assembly: AssemblyVersion("0.4.4.0")]
+[assembly: AssemblyVersion("0.5.0.0")]
 
 internal static class BootstrapCore {
     static BootstrapCore() {
@@ -94,7 +94,7 @@ internal static class BootstrapCore {
                 if(offset>expected){File.Delete(partial);offset=0;}
                 if(offset==expected)break;
                 using(var request=new HttpRequestMessage(HttpMethod.Get,Text(adapter,"downloadUrl"))) {
-                request.Headers.UserAgent.ParseAdd("Codex-Forge/0.4.4");if(offset>0)request.Headers.Range=new System.Net.Http.Headers.RangeHeaderValue(offset,null);
+                request.Headers.UserAgent.ParseAdd("Codex-Forge/0.5.0");if(offset>0)request.Headers.Range=new System.Net.Http.Headers.RangeHeaderValue(offset,null);
                     using(var response=await http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,token)) {
                         Need(response.StatusCode==HttpStatusCode.OK||response.StatusCode==HttpStatusCode.PartialContent,"官方客户端下载失败：HTTP "+(int)response.StatusCode);
                         if(response.StatusCode==HttpStatusCode.OK)offset=0;
@@ -112,7 +112,7 @@ internal static class BootstrapCore {
         }
         Need(new FileInfo(partial).Length==expected&&Hash(partial)==Text(adapter,"packageSHA256"),"官方客户端 SHA-256 不匹配");File.Move(partial,file);
     }
-    static bool RunningFrom(string directory) {
+    internal static bool RunningFrom(string directory) {
         try {
             string prefix=Path.GetFullPath(directory).TrimEnd('\\')+"\\";
             foreach(string processName in new[]{"ChatGPT","Codex"}) {
@@ -130,8 +130,11 @@ internal static class BootstrapCore {
     }
     internal static int CleanupOldClients(string root,string keepRelative,string currentVersion) {
         string clients=SafePath(root,"clients"),keep=Path.GetFullPath(SafePath(root,keepRelative));int removed=0;
+        string previous=null;
+        try { previous=SafePath(root,Text(Read(Path.Combine(root,"current.json.previous")),"directory")); } catch { }
         if(Directory.Exists(clients)) foreach(string directory in Directory.GetDirectories(clients)) {
             if(String.Equals(Path.GetFullPath(directory),keep,StringComparison.OrdinalIgnoreCase)) continue;
+            if(String.Equals(Path.GetFullPath(directory),previous,StringComparison.OrdinalIgnoreCase)) continue;
             if(!Path.GetFileName(directory).StartsWith("Codex-Forge-",StringComparison.OrdinalIgnoreCase)) continue;
             string receipt=Path.Combine(directory,"forge-install.json");
             if(!File.Exists(receipt)||RunningFrom(directory)) continue;

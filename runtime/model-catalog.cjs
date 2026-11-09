@@ -7,6 +7,7 @@ const MODEL = 'gpt-6.1-sol';
 const CONTEXT_WINDOW = 500_000;
 const TERRA_MODEL = 'gpt-6.1-terra';
 const FAST_TIER = { id: 'priority', name: 'Fast', description: '使用优先处理档位；可用性与计费以模型服务为准。' };
+const ULTRA_TIER = { id: 'ultrafast', name: 'Ultrafast', description: '超高速档位；需要模型服务支持，额度与计费以服务方为准。' };
 
 function terraDescriptor(models) {
   const existing = models.find(model => model.slug === TERRA_MODEL);
@@ -39,7 +40,7 @@ function readModelCatalog({ codexHome = process.env.CODEX_HOME || path.join(os.h
   return { source, catalog };
 }
 
-function configuredModels(catalog, { enableTerra = true } = {}) {
+function configuredModels(catalog, { enableTerra = true, ultrafastModels = [] } = {}) {
   const models = catalog.models.map(model => ({ ...model }));
   // Derive Terra before applying Sol's per-model context override.
   const terra = enableTerra ? terraDescriptor(models) : null;
@@ -64,6 +65,9 @@ function configuredModels(catalog, { enableTerra = true } = {}) {
     terra.supported_in_api = true;
     if (!terra.service_tiers?.some(tier => tier.id === 'priority')) terra.service_tiers = [...(terra.service_tiers || []), { ...FAST_TIER }];
   }
+  for (const model of models) if (ultrafastModels.includes(model.slug) && !model.service_tiers?.some(tier => tier.id === 'ultrafast')) {
+    model.service_tiers = [...(model.service_tiers || []), { ...ULTRA_TIER }];
+  }
   return { models, target, derived };
 }
 
@@ -73,6 +77,7 @@ function modelOptions({ settings = {}, ...options } = {}) {
   return models.filter(model => model.visibility !== 'hide').map(model => ({
     id: model.slug, name: model.display_name || model.slug,
     fast: !!model.service_tiers?.some(tier => tier.id === 'priority'),
+    ultrafast: !!model.service_tiers?.some(tier => tier.id === 'ultrafast'),
   }));
 }
 

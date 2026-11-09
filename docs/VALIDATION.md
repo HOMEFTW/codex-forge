@@ -1,5 +1,16 @@
 # Forge 验证记录
 
+## 0.5.0 本地验收（2026-11-09）
+
+- 官方目标为 Windows x64 MSIX `26.1103.4239.0`，内部发行版 `26.1103.32239`，CLI `0.167.0-alpha.3.2`。从官方固定地址取得 1,061,531,069 字节包，核对 OpenAI.Codex 身份、发布者和有效签名；SHA-256 为 `9a5fdf536327ce471f9594b0ac6e369244ec3ebfd5e09ec5a66524575dbaa60c`。适配器绑定官方 ASAR、EXE、CUA globals 摘要，更新 26 个前端工厂、21 个分块及后端。
+- Node 全量回归 354 项通过、0 失败、0 跳过；独立更新器 C# 27 项断言通过。证据：`output/forge-tests-result.json`、`output/forge-tests.tap`、`output/updater050-tests.log`。UI、启动器、准备程序和独立更新器构建通过；开发教程 create/validate/install/settings/command/pack/uninstall 完整流程通过。
+- 隔离 Electron 客户端实际验证：冷启动左侧六个 Forge 插件入口、工具栏插件管理、完整视图/退出、搜索无匹配/重开/Forge 设置跳转均正常，渲染错误为 0。原生菜单和设置显示中文，Fast → Ultrafast 切换、Fast 插件配置保存后重开通过。证据：`output/playwright/nov09-navigation-result.json`、`nov09-ultrafast-result.json`、`nov09-fast-settings-result.json`。初始脚本对菜单关闭行为的错误假设已修正后重新验证。
+- Windows 应用绑定通过官方 `@oai/sky` 在自有更新器窗口实际验证应用选择、激活、可访问性树、JPEG 截图、控件输入/清空与按钮点击。真实验收发现截图不是固定 PNG，已修复并补充 PNG/JPEG 回归。证据：`output/windows-cua-updater050.json`。未对外部应用执行文件修改，也未验证 Windows 10；本机为 Windows 11。
+- 默认保留客户端内检查、下载、Windows Installer 安装流程。新增回归覆盖检查源不可用、下载失败、安装器启动失败/异常退出后的独立更新器回退；无匹配版本、成功、需重启成功及用户取消不会自动切换。真实 React 更新页面与本机模拟后端验证正常流程、三类失败、双重失败诊断及手动备用入口，错误为 0。证据：`output/playwright/update050-fallback-result.json`。安装器进程由测试替身模拟，未执行真实 MSI 安装/卸载。
+- 独立更新器验证 HTTPS 来源、代理格式、Range 续传/完整重下、取消保留、摘要拒绝、增量链成本/重建/失败回退、ZIP 路径检查、插件兼容范围、便携版真实解包、指针备份/数据保留、同版本修复和准备锁互斥。桌面检查更新成功读取 GitHub 当前清单并拒绝向旧版降级；本地验收时 0.5.0 尚未发布；线上 0.5.0 自动升级安装未在此验收中执行。
+- 使用正式 Forge payload 构建隔离客户端并核验 4,083 个文件、19,792 个 ASAR 成员和 19,827 个完整性块。最终 MSI/ZIP 逐文件、大小与摘要核验记录见 `output/release-050-package-audit.json`；发行包只包含 Forge，不含官方客户端或凭据。正式客户端、个人配置、对话和独立插件数据未修改。
+- 真实提供商是否接受 Ultrafast、速度/额度/计费、远端 500K 输入、真实账号的浏览器与电脑操作授权未在此测试中验证；本地补丁不会替代这些条件。Ultrafast 仅为目录原生支持或用户明确配置支持的模型显示。保留原生受管策略、平台限制及 peer authorization。
+
 ## 0.4.4 搜索与插件启用修复（2026-11-04）
 
 - **搜索根因与复现**：隔离客户端点击搜索正常，输入 `forge` 后复现 `TypeError: Cannot read properties of undefined (reading 'values')` 及“ChatGPT 遇到了问题”。新增 Forge 设置项进入原生命令菜单后，`xWQh` 的标题/图标查询仍只认识原生 slug。为该工厂添加精确摘要和两处映射补丁，当前适配器共固定 15 个前端工厂。
