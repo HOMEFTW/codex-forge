@@ -1,4 +1,16 @@
 import assert from 'node:assert/strict';
+export function patchNov09Metadata(source) {
+  // Replacing the MCP table drops transports injected through app-server args.
+  // Disable each server in place for native title/description/summary tasks.
+  for (const [from, to] of [
+    ['config:{mcp_servers:await async function(e,t,n,r){', 'config:{...await async function(e,t,n,r){'],
+    ['Object.fromEntries(Object.keys(s.data).filter(e=>!n||"codex_apps"!==e).map(e=>[e,{enabled:!1}]))', 'Object.fromEntries(Object.keys(s.data).filter(e=>!n||"codex_apps"!==e).map(e=>["mcp_servers."+e+".enabled",!1]))'],
+  ]) {
+    assert.equal(source.split(from).length, 2, 'Nov 09 metadata anchor changed: ' + from);
+    source = source.replace(from, () => to);
+  }
+  return source;
+}
 export function patchNov09Main(source, member) {
   function replace(from, to) {
     assert.equal(source.split(from).length, 2, 'Nov 09 main anchor changed: ' + from);

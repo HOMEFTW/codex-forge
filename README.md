@@ -2,17 +2,17 @@
 
 Codex Forge 是面向 Windows Codex 客户端的第三方插件宿主，将模型配置、信息统计、记忆管理、画布、待办和智能体协作集中到原生界面中。它为内置及独立插件提供统一的安装管理、设置入口、会话输出和版本兼容检查。
 
-当前版本 **0.5.0 / Forge API 3**，适配官方客户端 **26.1103.4239.0（Windows x64，MSIX 身份版本）**。本项目不是 OpenAI 官方插件 API。
+当前版本 **0.5.1 / Forge API 3**，适配官方客户端 **26.1103.4239.0（Windows x64，MSIX 身份版本）**。本项目不是 OpenAI 官方插件 API。
 
 [下载安装包](https://github.com/HOMEFTW/codex-forge/releases/latest) · [更新日志与版本索引](docs/CHANGELOG.md) · [从零开发插件](docs/PLUGIN-DEVELOPMENT-ZERO-TO-ONE.md) · [API 参考](docs/PLUGIN-API.md)
 
-| 下载 0.5.0 | 用途 |
+| 下载 0.5.1 | 用途 |
 | --- | --- |
-| [Windows MSI](https://github.com/HOMEFTW/codex-forge/releases/download/v0.5.0/Codex-Forge-0.5.0-Windows.msi) | 推荐用于首次安装及已有安装版升级。 |
-| [便携 ZIP](https://github.com/HOMEFTW/codex-forge/releases/download/v0.5.0/Codex-Forge-0.5.0-Windows-Portable.zip) | 解压后运行，无需 MSI 安装。 |
-| [独立更新器](https://github.com/HOMEFTW/codex-forge/releases/download/v0.5.0/Codex-Forge-0.5.0-Updater.exe) | 可选备用工具，选择已有 Forge 安装目录后检查、下载或修复。 |
+| [Windows MSI](https://github.com/HOMEFTW/codex-forge/releases/download/v0.5.1/Codex-Forge-0.5.1-Windows.msi) | 推荐用于首次安装及已有安装版升级。 |
+| [便携 ZIP](https://github.com/HOMEFTW/codex-forge/releases/download/v0.5.1/Codex-Forge-0.5.1-Windows-Portable.zip) | 解压后运行，无需 MSI 安装。 |
+| [独立更新器](https://github.com/HOMEFTW/codex-forge/releases/download/v0.5.1/Codex-Forge-0.5.1-Updater.exe) | 可选备用工具，选择已有 Forge 安装目录后检查、下载或修复。 |
 
-[SHA-256 校验文件](https://github.com/HOMEFTW/codex-forge/releases/download/v0.5.0/SHA256SUMS.txt) · [完整发布说明](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.5.0)
+[SHA-256 校验文件](https://github.com/HOMEFTW/codex-forge/releases/download/v0.5.1/SHA256SUMS.txt) · [完整发布说明](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.5.1)
 
 ## 主要功能
 
@@ -54,7 +54,7 @@ Codex Forge 是面向 Windows Codex 客户端的第三方插件宿主，将模�
 
 **默认升级流程保持不变：检查 Codex 与 Forge 更新 → 下载并校验 → 安装已验证版本。** 检查、下载或安装失败时，显示原因并切换独立更新器；也可从“升级 → 备用方式”手动打开。没有匹配版本、安装成功或用户取消安装时不会自动切换。独立更新器安装前需要完整退出客户端。
 
-独立插件须声明兼容 Forge 0.5.0 和目标 Codex 版本，API 3 相同不代表版本范围自动兼容；API 1/2 插件还须由作者迁移。升级保留用户数据，不改写第三方插件兼容声明。
+独立插件须声明兼容 Forge 0.5.1 和目标 Codex 版本，API 3 相同不代表版本范围自动兼容；API 1/2 插件还须由作者迁移。升级保留用户数据，不改写第三方插件兼容声明。
 
 独立更新器为安装目录内的 `CodexForgeUpdater.exe`，开始菜单也有入口；单独下载的更新器可选择现有 Forge 安装目录。[使用与恢复说明](docs/UPDATER.md)。Ultrafast 在模型目录已支持时自动显示；自定义服务可在 Fast 插件中填写支持该档位的模型 ID。
 

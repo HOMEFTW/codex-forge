@@ -1,5 +1,13 @@
 # Forge 验证记录
 
+## 0.5.1 自动标题修复（2026-11-09）
+
+- 当前目标仍为 `26.1103.4239.0`，Forge API 保持 3。标题生成辅助模块原先与同版本官方包逐字节一致；失败来自后台任务整表覆盖 MCP 配置，丢失 Forge 通过启动参数注入的 `fast_canvas` transport。
+- 从官方模块提取最小固定夹具，新增 3 项回归：保留 transport 的逐项禁用、只读应用例外及取消/配置读取失败处理、上游锚点缺失或重复时拒绝打补丁。Node 全量回归 **357 项通过，0 失败，0 跳过**；受限宿主阻止的 7-Zip/WinForms 用例在正常权限下执行同一套测试后通过。
+- `scripts/check-native-metadata.mjs` 使用当前官方 `codex.exe`、独立临时 CODEX_HOME、本机 HTTP 模拟服务和真实 stdio MCP。原配置在发送模型请求前复现 `invalid transport`；修复后后台任务禁用 MCP、生成结构化标题、写入会话名称并发出 `thread/name/updated` 通知，普通对话仍能列出已连接的 MCP 工具。共两次本机模拟模型请求，不携带认证，临时目录自动清理。证据：`output/native-metadata-regression.json`。
+- 发行前检查 UI 与 C# 启动器构建、MSI/ZIP 文件摘要和 payload 完整性；使用发行 payload 对固定官方包构建客户端，核验 ASAR 成员、块及 EXE 中的头摘要。详细结果记录于 `output/release-051-package-audit.json` 和 `output/release-051-client-integrity.json`。
+- 未替换或重启用户当前客户端，未执行真实 MSI 安装/卸载、真实在线模型调用或标题在桌面上的视觉验收。升级后须完整退出并重新启动 Forge；不自动批量重命名既有对话。
+
 ## 0.5.0 本地验收（2026-11-09）
 
 - 官方目标为 Windows x64 MSIX `26.1103.4239.0`，内部发行版 `26.1103.32239`，CLI `0.167.0-alpha.3.2`。从官方固定地址取得 1,061,531,069 字节包，核对 OpenAI.Codex 身份、发布者和有效签名；SHA-256 为 `9a5fdf536327ce471f9594b0ac6e369244ec3ebfd5e09ec5a66524575dbaa60c`。适配器绑定官方 ASAR、EXE、CUA globals 摘要，更新 26 个前端工厂、21 个分块及后端。

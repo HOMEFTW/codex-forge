@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "apiVersion": 3,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "compatibility": {
     "codex": [
       "26.1103.4239.0",
@@ -31,6 +31,13 @@
     }
   ],
   "changelog": [
+    {
+      "version": "0.5.1",
+      "date": "2026-11-09",
+      "items": [
+        "随 Forge 0.5.1 发布，修复宿主自动标题任务的 MCP 配置兼容问题；保持 API 3。"
+      ]
+    },
     {
       "version": "0.5.0",
       "date": "2026-11-09",

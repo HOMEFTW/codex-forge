@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { patchSettingsPage, patchSettingsVisibility } from './native-settings-patch.mjs';
 import { patchNativeTabs, patchNativeWorkspace } from './native-tabs-patch.mjs';
 import { patchFastAccess, patchModelCatalogArgs, patchOct27Network } from './native-fast-patch.mjs';
-import { patchNov09Main } from './native-nov09-main.mjs';
+import { patchNov09Main, patchNov09Metadata } from './native-nov09-main.mjs';
 import { patchRspackMember, patchRspackIndex } from './native-rspack-patch.mjs';
 const root = path.resolve(import.meta.dirname, '..');
 const config=JSON.parse(fs.readFileSync(path.join(root,'forge.config.json'),'utf8'));
@@ -23,6 +23,7 @@ assert(['legacy', 'current', 'oct23', 'oct27', 'oct27b', 'oct29', 'nov09'].inclu
 const rspackAdapter = ['oct29', 'nov09'].includes(nativeVersion);
 const currentAdapter = nativeVersion !== 'legacy';
 const members = adapter.members;
+if (nativeVersion === 'nov09') assert(members?.metadataGeneration, '适配器必须声明标题生成模块');
 assert(members && (rspackAdapter ? ['network'] : ['renderer', 'settingsPage', 'visibleSettings', 'network']).every(key => typeof members[key] === 'string' && members[key]), '适配器必须声明原生模块');
 const rspackMembers = rspackAdapter ? [...new Set(adapter.rspackModules.map(item => item.member))] : [];
 if (['oct23', 'oct27', 'oct27b'].includes(nativeVersion)) assert(members.workspaceRenderer, '适配器必须声明主页面工作区模块');
@@ -94,6 +95,7 @@ for (const { member, entry, offset } of all) {
     changed = Buffer.from(sourceText.slice(0, start) + withCatalog + sourceText.slice(end));
   }
   if (!process.env.FAST_NO_PATCH && member === adapter.members.desktopFeatures) changed = Buffer.from(patchNov09Main(original.toString(), member));
+  if (!process.env.FAST_NO_PATCH && member === members.metadataGeneration) changed = Buffer.from(patchNov09Metadata(original.toString()));
   if (!changed.equals(original)) {
     assert(entry.integrity?.algorithm === 'SHA256');
     const blockSize = entry.integrity.blockSize;
@@ -106,7 +108,7 @@ for (const { member, entry, offset } of all) {
 const expectedMembers = process.env.FAST_NO_PATCH ? [] : [
   'webview/index.html', '.vite/build/early-bootstrap.js', '.vite/build/preload.js',
   ...(rspackAdapter ? rspackMembers : [members.renderer, members.settingsPage, members.visibleSettings]), members.network,
-  ...(nativeVersion === 'nov09' ? ['package.json', members.desktopFeatures] : []),
+  ...(nativeVersion === 'nov09' ? ['package.json', members.desktopFeatures, members.metadataGeneration] : []),
   ...(members.workspaceRenderer ? [members.workspaceRenderer] : []),
 ];
 assert.deepEqual(modifications.map(item => item.member).sort(), expectedMembers.sort(), 'Native patch member set changed');

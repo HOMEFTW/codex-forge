@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "forgeVersion": "0.5.0",
+  "forgeVersion": "0.5.1",
   "apiVersion": 3,
   "codexVersion": "26.1103.4239.0",
   "codexBuildVersion": "26.1103.4239.0",
@@ -14,7 +14,8 @@
   "baseExecutableSHA256": "5586707af6624c04959ba2c5b4ad6d216a1d8ed17c04937a757495649de44b92",
   "members": {
     "network": ".vite/build/early-bootstrap-824-d144f7c160c094ea.js",
-    "desktopFeatures": ".vite/build/early-bootstrap-199-e3316cddb4ea6a6b.js"
+    "desktopFeatures": ".vite/build/early-bootstrap-199-e3316cddb4ea6a6b.js",
+    "metadataGeneration": ".vite/build/early-bootstrap-339-ce026819bf837ba7.js"
   },
   "patchSet": "nov09",
   "rspackModules": [
