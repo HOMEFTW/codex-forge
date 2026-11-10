@@ -1,5 +1,15 @@
 # Forge 验证记录
 
+## 0.5.2 新版客户端适配（2026-11-10）
+
+- 官方目标为 Windows x64 MSIX `26.1103.7773.0`，内部发行版 `26.1103.60933`，CLI `0.167.0-alpha.3.2`；Forge API 保持 3。官方固定地址取得 1,061,483,026 字节包，核对 `OpenAI.Codex` 身份、发布者与有效签名；SHA-256 为 `c043c8032b7a1e6ab383252a910176405265ac3edbc909218d875fb284dea672`。
+- 新适配器绑定官方 ASAR、EXE、原生脚本及前端工厂摘要；26 个目标工厂继续适用现有 `nov09` 补丁。新增新版真实源码夹具，与上一版共同运行行为回归，覆盖主页侧栏、设置导航、Fast / Ultrafast、受管限制、原生功能开关及摘要漂移拒绝。内置插件和开发示例增加新客户端兼容声明，第三方独立插件仍按各自清单校验。
+- Node 全量回归 **365 项通过，0 失败，0 跳过**；独立更新器 C# **27 项断言通过**。UI、启动器、准备程序与独立更新器构建通过。受限宿主阻止的 7-Zip/WinForms 用例在正常权限下执行同一套测试后通过。证据：`output/forge-tests-result.json`、`output/forge-tests.tap`。
+- 新版仍包含原生自动标题的 MCP 整表覆盖问题；保留逐项禁用修复。使用新版 `codex.exe`、独立临时 CODEX_HOME、本机 HTTP 模拟服务和真实 stdio MCP，复现原错误并验证修复后生成标题、保存标题及发送通知；元数据任务禁用 MCP，普通对话保留 MCP。共两次 localhost 模拟模型请求，无真实认证或远端模型调用。证据：`output/native-metadata-regression.json`。
+- 隔离 Electron 客户端实际验证：冷启动首次进入主页、尚未访问设置时，六个侧栏入口均能打开；完整视图及退出、搜索无匹配/重开/Forge 设置跳转、主页工具栏插件管理均正常。Fast 与 Ultrafast 默认配置保存后重开，以及原生菜单 Ultrafast → Fast → Ultrafast 切换通过；未捕获渲染错误。证据：`output/playwright/nov10-navigation-result.json`、`nov10-ui-smoke.json`、`nov10-fast-settings-result.json`、`nov10-ultrafast-result.json`，对应截图保留于同目录。
+- 使用正式发行 payload 对固定官方包构建隔离客户端，验证 4,083 个文件、19,792 个 ASAR 成员及 19,827 个完整性块，保持原生完整性检查。最终 MSI/ZIP 逐文件内容、大小、摘要、版本及 payload 清单核对见 `output/release-052-package-audit.json`；客户端完整性记录见 `output/release-052-client-integrity.json`。发行包只包含 Forge，不含官方客户端或凭据。
+- 未替换或重启用户当前客户端，未修改其个人配置、对话或独立插件数据；未执行真实 MSI 安装/卸载、远端速度/额度/账号权限测试、500K 输入或外部电脑操作。桌面测试使用隔离配置及无效本机模型地址，跳过资料导入；Windows 沙箱初始化提示未通过更改系统设置处理。本轮验证不替代真实提供商接受 Ultrafast 等运行条件。
+
 ## 0.5.1 自动标题修复（2026-11-09）
 
 - 当前目标仍为 `26.1103.4239.0`，Forge API 保持 3。标题生成辅助模块原先与同版本官方包逐字节一致；失败来自后台任务整表覆盖 MCP 配置，丢失 Forge 通过启动参数注入的 `fast_canvas` transport。

@@ -1,5 +1,5 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
-const fixture=require('./fixtures/native-metadata-nov09.json');
+
 const normalize=value=>JSON.parse(JSON.stringify(value));
 
 async function requestConfig(source,{servers={},allowlist=[],failure=false,signal}={}) {
@@ -14,8 +14,10 @@ async function requestConfig(source,{servers={},allowlist=[],failure=false,signa
  return normalize(request.config);
 }
 
-test('native title config disables MCP servers without replacing their transport definitions',async()=>{
- assert.equal(require('../adapters/26.1103.4239.0.json').members.metadataGeneration,fixture.member);
+for(const [version,fixture] of [['26.1103.4239.0',require('./fixtures/native-metadata-nov09.json')],['26.1103.7773.0',require('./fixtures/native-metadata-nov10.json')]]) {
+
+test(version+': native title config disables MCP servers without replacing their transport definitions',async()=>{
+ assert.equal(require('../adapters/'+version+'.json').members.metadataGeneration,fixture.member);
  const {patchNov09Metadata}=await import('../scripts/native-nov09-main.mjs');
  const servers={fast_canvas:{command:'node',args:['mcp.cjs'],env:{PRIVATE_VALUE:'must-not-copy'}},remote:{url:'https://fixture.invalid/mcp'},'custom-name':{command:'other'}};
  const original=await requestConfig(fixture.source,{servers});
@@ -26,7 +28,7 @@ test('native title config disables MCP servers without replacing their transport
  assert(!JSON.stringify(actual).includes('must-not-copy'));
 });
 
-test('metadata patch preserves allowed apps, disabled tools and unavailable config handling',async()=>{
+test(version+': metadata patch preserves allowed apps, disabled tools and unavailable config handling',async()=>{
  const {patchNov09Metadata}=await import('../scripts/native-nov09-main.mjs');
  const source=patchNov09Metadata(fixture.source);
  const actual=await requestConfig(source,{servers:{codex_apps:{command:'apps'},fast_canvas:{command:'node'}},allowlist:[{appId:'read-only-app',toolNames:['read']} ]});
@@ -45,9 +47,11 @@ test('metadata patch preserves allowed apps, disabled tools and unavailable conf
  await assert.rejects(requestConfig(source,{signal:controller.signal}),{name:'AbortError'});
 });
 
-test('metadata patch rejects missing, changed and duplicate upstream anchors',async()=>{
+test(version+': metadata patch rejects missing, changed and duplicate upstream anchors',async()=>{
  const {patchNov09Metadata}=await import('../scripts/native-nov09-main.mjs');
  assert.throws(()=>patchNov09Metadata('unrelated code'),/metadata anchor changed/);
  assert.throws(()=>patchNov09Metadata(fixture.source+fixture.source),/metadata anchor changed/);
  assert.throws(()=>patchNov09Metadata(fixture.source.replace('e,{enabled:!1}','e,{enabled:false}')),/metadata anchor changed/);
 });
+
+}

@@ -11,7 +11,7 @@ import {patchNov09Metadata} from './native-nov09-main.mjs';
 const root=path.resolve(import.meta.dirname,'..'),out=path.join(root,'output');
 const exe=path.resolve(process.argv[2]||'');
 assert(process.argv[2]&&fs.statSync(exe).isFile(),'Provide the verified current codex.exe');
-const fixture=JSON.parse(fs.readFileSync(path.join(root,'tests/fixtures/native-metadata-nov09.json')));
+const fixture=JSON.parse(fs.readFileSync(path.resolve(root,process.argv[3]||'tests/fixtures/native-metadata-nov09.json')));
 fs.mkdirSync(out,{recursive:true});
 const home=fs.mkdtempSync(path.join(out,'metadata-fixture-'));
 const requests=[],notifications=[],children=[];
