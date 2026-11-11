@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "apiVersion": 4,
+  "id": "forge.prompt-prediction",
+  "name": "自动提示词预测",
+  "version": "0.6.0",
+  "description": "本轮回复完成后预测下一条提示词。原生 Pro 账号开启原生预测时自动暂停，关闭后恢复。Tab 接受为可编辑草稿，Esc 关闭；使用当前模型服务，可能消耗调用额度。",
+  "compatibility": {
+    "codex": ["26.1103.7773.0"],
+    "forge": [">=0.6.0 <0.7.0"]
+  },
+  "permissions": ["conversation.read", "conversation.predict", "composer", "settings"],
+  "capabilities": [
+    { "name": "prompt-prediction", "version": 1 },
+    { "name": "composer", "version": 1 },
+    { "name": "settings", "version": 1 }
+  ],
+  "contributes": {
+    "settings": {
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "title": "自动预测下一条提示词",
+          "default": true
+        },
+        "prompt": {
+          "type": "string",
+          "title": "预测偏好",
+          "maxLength": 8000,
+          "default": "根据当前对话，预测用户下一条最可能发送的提示词。沿用用户的语言、语气和实际目标；优先给出具体、自然的下一步。信息不足、任务已经结束或没有可信后续时，返回空建议。"
+        },
+        "maxChars": {
+          "type": "number",
+          "title": "建议最大字符数（整数）",
+          "minimum": 20,
+          "maximum": 2000,
+          "default": 320
+        },
+        "timeoutSeconds": {
+          "type": "number",
+          "title": "预测超时（秒）",
+          "minimum": 1,
+          "maximum": 120,
+          "default": 30
+        }
+      }
+    }
+  },
+  "changelog": [
+    {
+      "version": "0.6.0",
+      "date": "2026-11-11",
+      "items": [
+        "新增内置提示词预测，回复完成后生成下一条建议；Tab 接受为草稿，Esc 关闭。",
+        "跟随原生账号订阅和预测开关联动：Pro 原生预测开启时暂停，关闭后恢复。",
+        "支持草稿保护、中文组词、切换聊天和新回合取消；沿用当前模型，不自动发送。"
+      ]
+    }
+  ]
+}

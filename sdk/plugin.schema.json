@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Codex Forge API 3 Plugin",
+  "title": "Codex Forge API 4 Plugin",
   "type": "object",
   "required": [
     "schemaVersion",
@@ -16,7 +16,7 @@
       "const": 1
     },
     "apiVersion": {
-      "const": 3
+      "const": 4
     },
     "id": {
       "type": "string",
@@ -63,6 +63,7 @@
           "devtools",
           "conversation.read",
           "conversation.title",
+          "conversation.predict",
           "output",
           "browser",
           "storage",

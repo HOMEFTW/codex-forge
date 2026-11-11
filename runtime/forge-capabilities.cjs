@@ -8,6 +8,7 @@
 //   3. 失败文本必须告诉插件怎么改清单，而不是只报"没有权限"。
 // permission 仍是用户授权面（安装时审阅）；capability 是技术声明，两者都要过。
 const CAPABILITIES = Object.freeze({
+  'prompt-prediction': { version: 1, permission: 'conversation.predict', description: '由内置插件预测当前会话的下一条草稿；不自动发送' },
   nexus: { version: 1, permission: 'nexus.read', description: '访问用户连接的星枢 Nexus 知识库；写入另需 nexus.write' },
   conversation: { version: 1, permission: 'conversation.title', description: '修改当前会话标题' },
   composer: { version: 1, permission: 'composer', description: '读写输入框草稿' },
@@ -45,6 +46,7 @@ function inferCapabilities(permissions = []) {
   for (const permission of permissions) {
     if (permission === 'nexus.read' || permission === 'nexus.write') set.add('nexus');
     if (permission === 'conversation.title') set.add('conversation');
+    else if (permission === 'conversation.predict') set.add('prompt-prediction');
     else if (permission === 'composer') { set.add('composer'); set.add('ui'); }
     else if (['output', 'browser', 'storage', 'settings', 'events', 'panels', 'ui', 'dsh'].includes(permission)) set.add(permission);
     else if (permission === 'sidebar' || permission === 'toolbar') set.add('ui');

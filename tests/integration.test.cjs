@@ -64,15 +64,15 @@ test('native menu opens package notes and IPC rejects other origins and subframe
   const bootstrap = await handlers.get('fast-ext:canvas')(event, { method: 'bootstrap' }); assert.equal(bootstrap.notes.revision, 'r4');
   const pluginRoot = path.join(root, 'composer-plugin'); fs.mkdirSync(pluginRoot, { recursive: true });
   fs.writeFileSync(path.join(pluginRoot, 'plugin.json'), JSON.stringify({
-    schemaVersion: 1, apiVersion: 3, id: 'test.composer', name: 'Composer fixture', version: '0.1.0',
-    compatibility: { codex: [currentCodexVersion], forge: ['>=0.4.0 <0.6.0'] }, permissions: ['composer'], contributes: {}
+    schemaVersion: 1, apiVersion: 4, id: 'test.composer', name: 'Composer fixture', version: '0.1.0',
+    compatibility: { codex: [currentCodexVersion], forge: ['>=0.6.0 <0.7.0'] }, permissions: ['composer'], contributes: {}
   }));
   services.forge.registry.install(pluginRoot); services.forge.registry.setEnabled('test.composer', true);
   await assert.rejects(api(event, { id: 'test.composer', method: 'composer.read', args: {}, threadId: 'thread-visible' }), /conversation\.read/);
   const narrowRoot = path.join(root, 'narrow-plugin'); fs.mkdirSync(narrowRoot, { recursive: true });
   fs.writeFileSync(path.join(narrowRoot, 'plugin.json'), JSON.stringify({
-    schemaVersion: 1, apiVersion: 3, id: 'test.narrow', name: 'Narrow fixture', version: '0.1.0',
-    compatibility: { codex: [currentCodexVersion], forge: ['>=0.4.0 <0.6.0'] },
+    schemaVersion: 1, apiVersion: 4, id: 'test.narrow', name: 'Narrow fixture', version: '0.1.0',
+    compatibility: { codex: [currentCodexVersion], forge: ['>=0.6.0 <0.7.0'] },
     permissions: ['panels', 'storage'], capabilities: [{ name: 'panels', version: 1 }], contributes: {}
   }));
   services.forge.registry.install(narrowRoot); services.forge.registry.setEnabled('test.narrow', true);
@@ -82,7 +82,7 @@ test('native menu opens package notes and IPC rejects other origins and subframe
   assert.match(narrowCapabilities.denied['storage.get'], /storage/);
   assert.equal(narrowCapabilities.denied['panels.open'], undefined);
   const nexusRoot = path.join(root, 'nexus-reader'); fs.mkdirSync(nexusRoot);
-  fs.writeFileSync(path.join(nexusRoot, 'plugin.json'), JSON.stringify({ schemaVersion: 1, apiVersion: 3, id: 'test.nexus', name: 'Reader', version: '1.0.0', compatibility: { codex: [currentCodexVersion], forge: ['>=0.4.0 <0.6.0'] }, permissions: ['nexus.read'], capabilities: [{ name: 'nexus', version: 1, optional: true }] }));
+  fs.writeFileSync(path.join(nexusRoot, 'plugin.json'), JSON.stringify({ schemaVersion: 1, apiVersion: 4, id: 'test.nexus', name: 'Reader', version: '1.0.0', compatibility: { codex: [currentCodexVersion], forge: ['>=0.6.0 <0.7.0'] }, permissions: ['nexus.read'], capabilities: [{ name: 'nexus', version: 1, optional: true }] }));
   services.forge.registry.install(nexusRoot); services.forge.registry.setEnabled('test.nexus', true);
   const nexusCall = (method, args = {}) => api(event, { id: 'test.nexus', method: 'nexus.request', args: { method, args } });
   assert(Array.isArray((await nexusCall('vaults')).vaults));
@@ -122,8 +122,8 @@ test('native menu opens package notes and IPC rejects other origins and subframe
    const eventPluginRoot = path.join(root, 'event-plugin'); fs.mkdirSync(eventPluginRoot, { recursive: true });
    fs.writeFileSync(path.join(eventPluginRoot, 'main.js'), 'void 0');
    fs.writeFileSync(path.join(eventPluginRoot, 'plugin.json'), JSON.stringify({
-     schemaVersion: 1, apiVersion: 3, id: 'test.events', name: 'Events fixture', version: '0.1.0',
-     compatibility: { codex: [currentCodexVersion], forge: ['>=0.4.0 <0.6.0'] }, permissions: ['events'], entry: 'main.js', contributes: { events: [{ name: 'plugin.test.events.status' }] }
+     schemaVersion: 1, apiVersion: 4, id: 'test.events', name: 'Events fixture', version: '0.1.0',
+     compatibility: { codex: [currentCodexVersion], forge: ['>=0.6.0 <0.7.0'] }, permissions: ['events'], entry: 'main.js', contributes: { events: [{ name: 'plugin.test.events.status' }] }
    }));
    services.forge.registry.install(eventPluginRoot); services.forge.registry.setEnabled('test.events', true);
    const secondEvent = { sender: secondWin.webContents, senderFrame: { processId: 21, routingId: 1 } };

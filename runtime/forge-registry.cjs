@@ -76,6 +76,11 @@ class ForgeRegistry {
     if (value !== undefined) {
       const validated = validateSettings(entry.manifest, value);
       if (id === 'forge.fast') require('./model-catalog.cjs').validateModelSelection(validated, { codexHome: this.codexHome });
+      if (id === 'forge.prompt-prediction') {
+        check(typeof validated.prompt === 'string' && validated.prompt.trim(), '预测偏好不能为空');
+        check(Number.isSafeInteger(validated.maxChars), '预测长度必须为整数');
+        check(Number.isSafeInteger(validated.timeoutSeconds), '预测超时秒数必须为整数');
+      }
       atomic(file, validated);
     }
     return validateSettings(entry.manifest, json(file, {}));

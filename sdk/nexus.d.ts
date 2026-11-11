@@ -1,4 +1,4 @@
-/** Nexus v1: request since Forge 0.4.0; connect/disconnect since 0.4.1. API 3. Paths are relative to connected vaults. */
+/** Nexus v1: request since Forge 0.4.0; connect/disconnect since 0.4.1. API 4 retains the API 3 contract. Paths are relative to connected vaults. */
 export interface NexusVault { id:string; name:string; root:string; available:boolean }
 export interface NexusFile { path:string; ext:string; size:number; mtime:number; ctime:number }
 export interface NexusCompatibility { name:string; id:string; supported:string; unsupported:string; installed?:boolean }

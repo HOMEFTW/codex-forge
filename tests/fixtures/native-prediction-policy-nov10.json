@@ -1,0 +1,8 @@
+{
+  "member": ".vite/build/early-bootstrap-480-5def667ddfcd786d.js",
+  "moduleSHA256": "be8eba3b9283d6a9784fa069a019b83a89fd02277cc13e4f7d32d57faf0ada65",
+  "settingSource": "NF={enabled:(0,NR.at)({agentAccess:\"hidden\",default:!0,description:\"Whether the composer predicts the user's next message\",key:\"composer-predictions-enabled\",schema:NC.uf})}.enabled;",
+  "controllerGuard": "this.settings.getEffective(NF.key)",
+  "attachSource": "cumberbatch-interrupt-on-cancel\")===!0),this.disposables.add(this.cumberbatchController),this.disposables.add(function({connections:e,evaluations:t,refreshDay",
+  "proPlanSource": "k:function(e){return\"prolite\"===e||\"pro\"===e||\"promax\"===e}"
+}

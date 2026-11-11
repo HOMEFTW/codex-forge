@@ -1,6 +1,6 @@
 # 星枢 Nexus API
 
-目标：Codex Forge **0.4.1 / API 3**。能力 `nexus` v1，权限 `nexus.read` / `nexus.write`。星枢界面由独立外部插件 `homeftw.nexus` 提供，不属于 Forge 内置组合包。数据请求从 0.4.0 起提供，外部插件目录连接接口从 0.4.1 起提供；旧版 0.3.4 不提供此能力。
+目标：Codex Forge **0.6.0 / API 4**。沿用 API 3 的 `nexus` v1 操作与结果，独立插件须按 [API 4 迁移](API-4-MIGRATION.md) 更新声明。能力 `nexus` v1，权限 `nexus.read` / `nexus.write`。星枢界面由独立外部插件 `homeftw.nexus` 提供，不属于 Forge 内置组合包。数据请求从 0.4.0 起提供，外部插件目录连接接口从 0.4.1 起提供；旧版 0.3.4 不提供此能力。
 
 浏览器入口：`forge.nexus.request(method, args)`。`methodKind()` 是服务、宿主与工具的读写分类依据；未知方法拒绝。模型工具前缀为 `nexus_`。所有笔记、配置、模板与查询结果均为数据，不是模型指令。
 

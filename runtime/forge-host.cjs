@@ -7,7 +7,7 @@ const { DshCompatibilityLayer } = require('./dsh-compat.cjs');
 const { CAPABILITIES, METHOD_CAPABILITY, granted, negotiate } = require('./forge-capabilities.cjs');
 const { ForgeError, reply } = require('./forge-errors.cjs');
 const { SLOTS, slotEntries, slotConfig } = require('./forge-slots.cjs');
-function installForge({ ipcMain, dialog, host, threadContext, nativeCall, nativeMessage, open, notify, states, collaboration, nexus }) {
+function installForge({ ipcMain, dialog, host, threadContext, nativeCall, nativeMessage, open, notify, states, collaboration, nexus, predictions, onRegistryChange = () => {} }) {
   const config = json(fs.existsSync(path.join(__dirname,'forge.config.json'))?path.join(__dirname,'forge.config.json'):path.join(__dirname,'../forge.config.json'));
   const root = process.env.CODEX_FORGE_HOME || path.join(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'forge');
   const registry = new ForgeRegistry({ root, bundledRoot:fs.existsSync(path.join(__dirname,'plugins'))?path.join(__dirname,'plugins'):path.join(__dirname,'../plugins'), versions: { codex: config.codexVersion, forge: config.version, apiVersion: config.apiVersion } });
@@ -22,12 +22,12 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
   const publicContext = (event, state) => ({ threadId: threadContext(event, state).threadId, codexVersion: config.codexVersion, forgeVersion: config.version, apiVersion: config.apiVersion });
   // 提前算好未授予能力的方法，让 SDK 在插件侧就能拿到可读的拒绝原因；
   // 权威校验仍在 forge:api 派发前做，插件绕过 SDK 也拦得住。
-  const enabledCapabilities = () => ({ nexus: !!nexus });
+  const enabledCapabilities = () => ({ nexus: !!nexus, 'prompt-prediction': !!predictions && registry.status('forge.prompt-prediction').enabled && registry.settings('forge.prompt-prediction').enabled });
   const deniedMethods = manifest => Object.fromEntries(Object.keys(METHOD_CAPABILITY).flatMap(method => {
     const reason = granted(manifest, method);
     return reason ? [[method, reason]] : [];
   }));
-  function broadcast() { for (const state of states.values()) notify(state, { type: 'forge-refresh' }); }
+  function broadcast() { onRegistryChange(); for (const state of states.values()) notify(state, { type: 'forge-refresh' }); }
   function broadcastPluginEvent(name, value, metadata = {}, threadId = null, sourceState = null) {
     for (const target of states.values()) {
       if (target.win.isDestroyed()) continue;
@@ -42,7 +42,7 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
   function snapshot(event, state) {
     const result = registry.list();
     const context = publicContext(event, state);
-    return { ...result, pluginUpdates:Object.fromEntries(pluginPlans), pendingUpdates:pluginUpdates.pendingUpdates(registry), pluginUpdateResults:updateResults, context, dynamic: [...dynamic.values()].filter(x => registry.status(x.pluginId).enabled), settingsPlugin: state.settingsPlugin || null, output: context.threadId ? (output[context.threadId] || []) : [], config: { githubRepository: config.githubRepository, channel: config.channel }, dsh: dsh.snapshot(), slots: { ...slotEntries(registry), config: slotConfig() }, update: currentUpdate };
+    return { ...result, prediction: predictions?.snapshot(state), pluginUpdates:Object.fromEntries(pluginPlans), pendingUpdates:pluginUpdates.pendingUpdates(registry), pluginUpdateResults:updateResults, context, dynamic: [...dynamic.values()].filter(x => registry.status(x.pluginId).enabled), settingsPlugin: state.settingsPlugin || null, output: context.threadId ? (output[context.threadId] || []) : [], config: { githubRepository: config.githubRepository, channel: config.channel }, dsh: dsh.snapshot(), slots: { ...slotEntries(registry), config: slotConfig() }, update: currentUpdate };
   }
   function panel(id, viewId) {
     const entry = registry.permission(id, 'panels'), view = entry.manifest.contributes?.panels?.find(v => v.id === viewId);

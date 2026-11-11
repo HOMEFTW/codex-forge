@@ -15,6 +15,10 @@ const { InformationStats } = require('./information-stats.cjs');
 const { runInformationProbe } = require('./information-probe.cjs');
 const { CodexMemory } = require('./codex-memory.cjs');
 const { NexusService } = require('./nexus.cjs');
+const { PromptPredictionHost } = require('./prompt-prediction-host.cjs');
+const { NativePredictionPolicy } = require('./native-prediction-policy.cjs');
+let activePredictionPolicy;
+function attachNativePredictionPolicy(options) { return activePredictionPolicy.attach(options); }
 const { applyFastModelSettings } = require('./model-catalog.cjs');
 const defaultTarget = () => ({ agent: 'codex', model: '', reasoningEffort: '' });
 function install() {
@@ -38,6 +42,23 @@ function install() {
   const informationContexts = new Map();
   const pages = new Set(['canvas', 'updates', 'todos', 'collaboration', 'skills', 'information-stats', 'codex-memory']);
   let forge;
+  const sampleOwners = new Map();
+  const predictionSettings = () => {
+    if (!forge?.enabled('forge.prompt-prediction')) return null;
+    const entry = forge.registry.get('forge.prompt-prediction');
+    if (!entry.builtin || !entry.manifest.permissions.includes('conversation.predict') || !entry.manifest.capabilities.some(c => c.name === 'prompt-prediction' && c.version === 1)) return null;
+    const settings = forge.registry.settings(entry.manifest.id);
+    if (!Number.isSafeInteger(settings.maxChars) || !Number.isSafeInteger(settings.timeoutSeconds)) return null;
+    return settings;
+  };
+  const nativePredictionPolicy = new NativePredictionPolicy(() => predictions.nativeChanged());
+  activePredictionPolicy = nativePredictionPolicy;
+  const predictions = new PromptPredictionHost({ states, settings: predictionSettings, call: nativeCall, notify, nativeStatus: () => nativePredictionPolicy.snapshot() });
+  let predictionSettingsKey = '';
+  const refreshPredictionSettings = () => {
+    const next = JSON.stringify(predictionSettings());
+    if (next !== predictionSettingsKey) { predictionSettingsKey = next; predictions.refresh(); }
+  };
   const active = id => !forge || forge.enabled(id);
   let signalNonce = ''; const contextRequests = new Map();
   const report = error => console.error('[FAST extension]', error.message || error);
@@ -66,13 +87,29 @@ function install() {
     try { for (const request of approvalQueue.list()) if (!settled.has(request.state)) approvalProcessor.process(request.id).catch(report); } catch (error) { report(error); }
   }, 350);
   approvalTimer.unref?.();
-  function nativeCall(state, method, params) {
+  function nativeCall(state, method, params, { signal, timeoutMs = 15000 } = {}) {
     if (!state.bridge || state.win.isDestroyed()) return Promise.reject(Error('原生对话连接尚未就绪'));
-    const id = 'fast-history-' + require('node:crypto').randomUUID();
+    if (signal?.aborted) return Promise.reject(signal.reason || Error('请求已取消'));
+    const id = 'fast-history-' + crypto.randomUUID(), contentsId = state.win.webContents.id;
+    const sample = method === 'thread/sample';
+    if (sample) { sampleOwners.set(id, contentsId); while (sampleOwners.size > 512) sampleOwners.delete(sampleOwners.keys().next().value); }
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => { internalRequests.delete(id); reject(Error('原生对话历史同步超时')); }, 15000);
-      internalRequests.set(id, { resolve, reject, timer });
-      Promise.resolve(state.bridge.handler(state.bridge.event, { type: 'mcp-request', hostId: 'local', request: { id, method, params }, priority: 'interactive', source: 'thread', timeoutMs: 15000 })).catch(error => { clearTimeout(timer); internalRequests.delete(id); reject(error); });
+      let timer, finished = false, dispatched = false;
+      const settle = (error, result) => {
+        if (finished) return; finished = true;
+        clearTimeout(timer); signal?.removeEventListener('abort', abort); internalRequests.delete(id);
+        error ? reject(error) : resolve(result);
+      };
+      const abort = () => {
+        if (finished) return;
+        settle(signal?.reason || Object.assign(Error('原生请求超时'), { code: 'TIMEOUT' }));
+        if (sample && dispatched && !state.win.isDestroyed()) nativeCall(state, 'thread/sample/cancel', { requestId: id }, { timeoutMs: 5000 }).catch(report);
+      };
+      timer = setTimeout(abort, Math.min(120000, Math.max(1, timeoutMs)));
+      internalRequests.set(id, { contentsId, timer, resolve: result => settle(null, result), reject: error => settle(error) });
+      signal?.addEventListener('abort', abort, { once: true });
+      if (signal?.aborted) { abort(); return; }
+      Promise.resolve().then(() => { if (finished) return; dispatched = true; return state.bridge.handler(state.bridge.event, { type: 'mcp-request', hostId: 'local', request: { id, method, params }, priority: 'interactive', source: 'thread', timeoutMs }); }).catch(error => settle(error));
     });
   }
   function threadContext(event, state) {
@@ -128,12 +165,14 @@ function install() {
         const nextThreadId = /^[A-Za-z0-9_-]{1,100}$/.test(message.conversationId || '') ? message.conversationId : null;
         if (state.threadId && !nextThreadId) { state.draftTarget = defaultTarget(); for (const id of state.pendingDraftThreads) state.composerTargets.set(id, defaultTarget()); }
         state.threadId = nextThreadId;
+        predictions.context(state);
         notify(state, { type: 'refresh' });
       }
       if (contexts.prepare(message)) contextRequests.set(message.request.id, { state: host(event), method: message.request.method });
       const submission = userSubmission(message);
       if (submission) {
         const state = host(event); contexts.bind(submission.threadId, submission.cwd);
+        predictions.invalidate(state);
         const target = active('forge.collaboration') ? composerTarget(state, submission.threadId) : defaultTarget();
         if (state.pendingDraftThreads.delete(submission.threadId)) { state.draftTarget = defaultTarget(); for (const id of state.pendingDraftThreads) state.composerTargets.set(id, defaultTarget()); }
         if (target.agent !== 'codex') {
@@ -170,8 +209,13 @@ function install() {
     contents.send = (channel, ...args) => {
       if (channel === 'codex_desktop:message-for-view') { try {
         const incoming = args[0], internal = incoming?.type === 'mcp-response' && incoming.hostId === 'local' ? internalRequests.get(incoming.message?.id) : null;
-        if (internal) { clearTimeout(internal.timer); internalRequests.delete(incoming.message.id); incoming.message.error ? internal.reject(Error(incoming.message.error.message || '原生历史操作失败')) : internal.resolve(incoming.message.result); return; }
+        if (internal && internal.contentsId === contents.id) {
+          incoming.message.error ? internal.reject(Object.assign(Error(incoming.message.error.message || '原生操作失败'), { code: incoming.message.error.code })) : internal.resolve(incoming.message.result); return;
+        }
+        if (incoming?.type === 'mcp-response' && incoming.hostId === 'local' && sampleOwners.get(incoming.message?.id) === contents.id) return;
         if (incoming?.type === 'mcp-notification' && incoming.hostId === 'local') {
+          const state = [...states.values()].find(state => state.win.webContents.id === contents.id);
+          if (state) predictions.observe(state, incoming.method, incoming.params);
           const action = { 'thread/archived': 'thread/archive', 'thread/unarchived': 'thread/unarchive', 'thread/deleted': 'thread/delete' }[incoming.method];
           if (action) directHistory.mutation(action, incoming.params);
         }
@@ -207,10 +251,11 @@ function install() {
     if (!win) throw new Error('Host window not found');
     if (!states.has(win.id)) {
       states.set(win.id, { win, visible: false, mode: 'right', page: 'canvas', canvasId: null, composerTargets: new Map(), draftTarget: defaultTarget(), pendingDraftThreads: new Set() });
-      win.once('closed', () => states.delete(win.id));
+      win.once('closed', () => { const state = states.get(win.id); if (state) predictions.close(state); states.delete(win.id); });
     }
     return states.get(win.id);
   }
+  ipcMain.handle('forge:prediction', (event, request) => predictions.request(host(event), request));
   function notify(state, payload) { if (!state.win.isDestroyed()) state.win.webContents.send('fast-ext:changed', payload); }
   function panelState(state) { return state?.visible ? { mode: state.mode, page: state.page, canvasId: state.canvasId, threadId: threadContext({ sender: state.win.webContents }, state).threadId } : null; }
   function choose() {
@@ -342,17 +387,18 @@ function install() {
       } catch (error) { report(error); }
     }, 90);
   });
-  app.once('will-quit', () => { clearInterval(approvalTimer); statistics.stop(); approvalProcessor.stop(); humanApprovals.stop(); watcher.close(); clearTimeout(refreshTimer); for (const value of internalRequests.values()) { clearTimeout(value.timer); value.reject(Error('客户端已关闭，历史引用会在下次打开时同步')); } internalRequests.clear(); });
+  app.once('will-quit', () => { nativePredictionPolicy.dispose(); predictions.stop(); clearInterval(approvalTimer); statistics.stop(); approvalProcessor.stop(); humanApprovals.stop(); watcher.close(); clearTimeout(refreshTimer); for (const value of internalRequests.values()) { clearTimeout(value.timer); value.reject(Error('客户端已关闭，历史引用会在下次打开时同步')); } internalRequests.clear(); });
   if (process.env.CODEX_FAST_EXTENSION_TEST === '1') setTimeout(() => {
     fs.writeFileSync(path.join(store.root, '.diagnostics.json'), JSON.stringify({ menu: Menu.getApplicationMenu()?.items.map(item => ({ label: item.label, id: item.id })) }, null, 2));
   }, 10000);
-  forge = require('./forge-host.cjs').installForge({ipcMain,dialog,host,threadContext,nativeCall,nativeMessage:(state,message)=>{if(!state.bridge) throw Error('原生连接尚未就绪'); return state.bridge.handler(state.bridge.event,message);},open,notify,states,collaboration,nexus});
+  forge = require('./forge-host.cjs').installForge({ipcMain,dialog,host,threadContext,nativeCall,nativeMessage:(state,message)=>{if(!state.bridge) throw Error('原生连接尚未就绪'); return state.bridge.handler(state.bridge.event,message);},open,notify,states,collaboration,nexus,predictions,onRegistryChange:refreshPredictionSettings});
+  refreshPredictionSettings();
   if (process.versions.electron) {
     try { require('./native-features.cjs').applyNativeFeatures(forge.registry); }
     catch (error) { console.error('[Forge native features]', error.message); }
     try { const result = applyFastModelSettings({ registry: forge.registry }); if (result.visibilityFallback) console.warn('[Forge models] 模型目录已变化，已恢复默认模型显示；请检查 Fast 与模型配置设置。'); }
     catch (error) { console.error('[Forge models]', error.message); }
   }
-  return { forge, states, store, todos, collaboration, contexts, skills, directHistory, addMenu };
+  return { forge, states, store, todos, collaboration, contexts, skills, directHistory, predictions, nativePredictionPolicy, addMenu };
 }
-module.exports = { install };
+module.exports = { install, attachNativePredictionPolicy };

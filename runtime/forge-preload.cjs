@@ -203,8 +203,9 @@
       frame.contentWindow?.postMessage({forgePluginReply:{id:request.id,result}},'*');
     }catch(error){frame.contentWindow?.postMessage({forgePluginReply:{id:request.id,error:{message:error.message,code:error.code||'INTERNAL_ERROR'}}},'*');}
   });
-  globalThis.__forgeBridge={configure:fn=>{nativeRequest=fn;},mount:(node,page)=>{const [,id,viewId]=page.split(':');return mount(node,id,viewId);},refresh,layout:()=>{contributions();outputView();},snapshot:()=>snapshot};
+  globalThis.__forgeBridge={editComposer:composer,configure:fn=>{nativeRequest=fn;},mount:(node,page)=>{const [,id,viewId]=page.split(':');return mount(node,id,viewId);},refresh,layout:()=>{contributions();outputView();},snapshot:()=>snapshot};
   ipcRenderer.on('fast-ext:changed',(_event,payload)=>{
+    if(payload?.type==='forge-prediction') return;
     if(payload?.type==='forge-plugin-event') {
       for(const [frame,info] of frames) {
         if(!frame.isConnected||!active(info.id)) continue;

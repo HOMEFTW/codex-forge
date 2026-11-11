@@ -7,7 +7,7 @@ const { atomic, json } = require('./collaboration-store.cjs');
 const nativeFeed = 'https://persistent.oaistatic.com/codex-app-prod/windows-store-update.json';
 const blockedVersions = new Set(['26.1013.4894.0']);
 async function fetchJSON(url, { limit = 2*1024*1024 } = {}) {
-  const response = await fetch(url, { headers: { Accept:'application/json','User-Agent':'Codex-Forge/0.5.2' }, signal:AbortSignal.timeout(20000) });
+  const response = await fetch(url, { headers: { Accept:'application/json','User-Agent':'Codex-Forge/0.6.0' }, signal:AbortSignal.timeout(20000) });
   if (!response.ok) {
     const retry = response.headers.get('retry-after');
     throw Error(`更新源 HTTP ${response.status}${response.status === 403 ? '（GitHub API 限流或拒绝匿名请求）' : response.status === 404 ? '（私有仓库或尚未发布版本）' : ''}${retry ? `；Retry-After ${retry}` : ''}`);
@@ -42,7 +42,7 @@ async function githubReleaseManifests(repository, config, readJSON) {
 }
 function releaseBuildVersion(value) { return value.codexBuildVersion || value.codexVersion; }
 function validateRelease(value, repository) {
-  check(value.schemaVersion === 3 && value.platform === 'win32-x64' && [1, 2, 3].includes(value.apiVersion), '发布清单格式不兼容');
+  check(value.schemaVersion === 3 && value.platform === 'win32-x64' && [1, 2, 3, 4].includes(value.apiVersion), '发布清单格式不兼容');
   compare(value.forgeVersion,'0.0.0'); compare(value.codexVersion,'0.0.0'); compare(releaseBuildVersion(value),'0.0.0'); check(!blockedVersions.has(value.codexVersion) && !blockedVersions.has(releaseBuildVersion(value)),'被禁止的客户端版本');
   check(value.repository === repository && value.distribution === 'msi-portable' && value.containsOfficialClient === false && /^[a-f0-9]{64}$/.test(value.sha256) && Number.isSafeInteger(value.bytes) && value.bytes > 0 && value.bytes <= 256*1024*1024 && /^[a-f0-9]{64}$/.test(value.portableSha256) && Number.isSafeInteger(value.portableBytes) && value.portableBytes > 0 && value.portableBytes <= 256*1024*1024,'发布清单身份或摘要无效');
   const url = new URL(value.url); check(url.protocol === 'https:' && url.hostname === 'github.com' && url.pathname.startsWith('/'+repository+'/releases/download/') && !url.username && !url.password,'下载地址不属于配置仓库');

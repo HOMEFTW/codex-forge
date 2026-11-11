@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { patchSettingsPage, patchSettingsVisibility } from './native-settings-patch.mjs';
 import { patchNativeTabs, patchNativeWorkspace } from './native-tabs-patch.mjs';
 import { patchFastAccess, patchModelCatalogArgs, patchOct27Network } from './native-fast-patch.mjs';
-import { patchNov09Main, patchNov09Metadata } from './native-nov09-main.mjs';
+import { patchNov09Main, patchNov09Metadata, patchNativePredictionPolicy } from './native-nov09-main.mjs';
 import { patchRspackMember, patchRspackIndex } from './native-rspack-patch.mjs';
 const root = path.resolve(import.meta.dirname, '..');
 const config=JSON.parse(fs.readFileSync(path.join(root,'forge.config.json'),'utf8'));
@@ -60,7 +60,7 @@ for (const { member, entry, offset } of all) {
     changed = Buffer.from(guard + (nativeVersion === 'nov09' ? patchNov09Main(original.toString(), member) : original.toString()));
   } else if (!process.env.FAST_NO_PATCH && member === '.vite/build/preload.js') {
     const version = hash(fs.readFileSync(path.join(root, 'dist/fast-extension/ui/app.js'))).slice(0, 16);
-    const preload = fs.readFileSync(path.join(root,'runtime','forge-preload.cjs'),'utf8')+'\n'+fs.readFileSync(path.join(root, 'runtime', 'host-preload.cjs'), 'utf8').replaceAll('__FAST_UI_VERSION__', version) + '\n' + fs.readFileSync(path.join(root, 'runtime', 'host-workspace.cjs'), 'utf8');
+    const preload = fs.readFileSync(path.join(root,'runtime','forge-preload.cjs'),'utf8')+'\n'+fs.readFileSync(path.join(root,'runtime','prompt-prediction-preload.cjs'),'utf8')+'\n'+fs.readFileSync(path.join(root, 'runtime', 'host-preload.cjs'), 'utf8').replaceAll('__FAST_UI_VERSION__', version) + '\n' + fs.readFileSync(path.join(root, 'runtime', 'host-workspace.cjs'), 'utf8');
     changed = Buffer.concat([original, Buffer.from('\n' + preload)]);
   } else if (!process.env.FAST_NO_PATCH && rspackMembers.includes(member)) {
     changed = Buffer.from(patchRspackMember(original.toString(), member, adapter.rspackModules, fs.readFileSync(path.join(root, 'runtime/native-tabs-renderer.js'), 'utf8'), nativeVersion));
@@ -96,6 +96,7 @@ for (const { member, entry, offset } of all) {
   }
   if (!process.env.FAST_NO_PATCH && member === adapter.members.desktopFeatures) changed = Buffer.from(patchNov09Main(original.toString(), member));
   if (!process.env.FAST_NO_PATCH && member === members.metadataGeneration) changed = Buffer.from(patchNov09Metadata(original.toString()));
+  if (!process.env.FAST_NO_PATCH && member === adapter.nativePredictionPolicy?.member) changed = Buffer.from(patchNativePredictionPolicy(original.toString(), changed.toString(), adapter.nativePredictionPolicy));
   if (!changed.equals(original)) {
     assert(entry.integrity?.algorithm === 'SHA256');
     const blockSize = entry.integrity.blockSize;

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "apiVersion": 3,
-  "version": "0.5.2",
+  "apiVersion": 4,
+  "version": "0.6.0",
   "compatibility": {
     "codex": [
       "26.1103.7773.0",
@@ -14,7 +14,7 @@
       "26.1021.2667.0"
     ],
     "forge": [
-      ">=0.4.0 <0.6.0"
+      ">=0.6.0 <0.7.0"
     ]
   },
   "permissions": [
@@ -32,6 +32,13 @@
     }
   ],
   "changelog": [
+    {
+      "version": "0.6.0",
+      "date": "2026-11-11",
+      "items": [
+        "随 Forge 0.6.0 升级至 API 4，保留原有功能与设置；新增内置自动提示词预测。"
+      ]
+    },
     {
       "version": "0.5.2",
       "date": "2026-11-10",

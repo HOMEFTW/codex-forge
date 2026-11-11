@@ -4,7 +4,7 @@ const { parts, ranges, compatibility } = require('./forge-versions.cjs');
 const { CAPABILITIES, normalize: normalizeCapabilities } = require('./forge-capabilities.cjs');
 const { SLOTS } = require('./forge-slots.cjs');
 const { ForgeError } = require('./forge-errors.cjs');
-const permissions = new Set(['panels', 'sidebar', 'toolbar', 'composer', 'ui', 'devtools', 'conversation.read', 'conversation.title', 'output', 'browser', 'storage', 'settings', 'network', 'events', 'dsh', 'dsh.manage', 'nexus.read', 'nexus.write', 'nexus.script']);
+const permissions = new Set(['panels', 'sidebar', 'toolbar', 'composer', 'ui', 'devtools', 'conversation.read', 'conversation.title', 'conversation.predict', 'output', 'browser', 'storage', 'settings', 'network', 'events', 'dsh', 'dsh.manage', 'nexus.read', 'nexus.write', 'nexus.script']);
 const surfaces = ['sidebar', 'toolbar', 'composer'];
 const idPattern = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/;
 const localId = /^[a-zA-Z][\w-]{0,79}$/;
@@ -24,7 +24,7 @@ function safeFile(root, relative) {
 function validate(input, root, { builtin = false } = {}) {
   check(input && typeof input === 'object' && !Array.isArray(input), '插件清单必须为对象');
   const m = JSON.parse(JSON.stringify(input));
-  check(m.schemaVersion === 1 && [1, 2, 3].includes(m.apiVersion), '不支持的清单或 API 版本');
+  check(m.schemaVersion === 1 && [1, 2, 3, 4].includes(m.apiVersion), '不支持的清单或 API 版本');
   check(idPattern.test(m.id) && m.id.length <= 100, '插件 ID 使用 publisher.name 格式');
   check(builtin || !m.id.startsWith('forge.'), 'forge.* 是内置插件保留命名空间');
   check(typeof m.name === 'string' && m.name.trim() && m.name.length <= 100, '插件名称无效');
@@ -33,6 +33,7 @@ function validate(input, root, { builtin = false } = {}) {
   check(!m.permissions.includes('nexus.write') || m.permissions.includes('nexus.read'), 'nexus.write 同时需要 nexus.read 权限');
   check(!m.permissions.includes('nexus.script') || m.permissions.includes('nexus.read') && !m.permissions.includes('network'), 'nexus.script 需要 nexus.read，且不能同时使用 network 权限');
   check(!m.permissions.includes('devtools') || (builtin && m.id === 'forge.devtools'), 'devtools 仅限内置 forge.devtools 插件');
+  check(!m.permissions.includes('conversation.predict') || (builtin && m.apiVersion === 4 && m.id === 'forge.prompt-prediction' && m.permissions.includes('conversation.read') && m.permissions.includes('composer')), 'conversation.predict 仅限内置 forge.prompt-prediction，且需要 conversation.read 和 composer 权限');
   if (m.capabilities !== undefined) {
     check(Array.isArray(m.capabilities) && m.capabilities.length <= 32, 'capabilities 必须为数组');
     const declared = new Set();

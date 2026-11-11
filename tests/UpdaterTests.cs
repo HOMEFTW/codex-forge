@@ -20,6 +20,9 @@ internal static class UpdaterTests {
     static Dictionary<string,object> Dict(string text){return BootstrapCore.Json.Deserialize<Dictionary<string,object>>(text);}
     static string Hash(byte[] bytes,string directory){string file=Path.Combine(directory,"hash");File.WriteAllBytes(file,bytes);return BootstrapCore.Hash(file);}
     static async Task Run(string root){
+        var apiRelease=new Dictionary<string,object>{{"schemaVersion",3},{"platform","win32-x64"},{"repository","A/B"},{"distribution","msi-portable"},{"containsOfficialClient",false},{"apiVersion",4},{"forgeVersion","0.6.0"},{"codexVersion","26.1103.7773.0"},{"url","https://github.com/A/B/releases/download/v0.6.0/Forge.msi"},{"sha256",new string('a',64)},{"bytes",100},{"portableUrl","https://github.com/A/B/releases/download/v0.6.0/Forge.zip"},{"portableSha256",new string('b',64)},{"portableBytes",100}};
+        ForgeUpdateCore.Validate(apiRelease,"A/B");Check(true,"API 4 release accepted");
+        foreach(int api in new[]{1,2,3,5}){apiRelease["apiVersion"]=api;Reject(()=>ForgeUpdateCore.Validate(apiRelease,"A/B"),"non API 4 release rejected");}
         var data=Encoding.UTF8.GetBytes("abcdefghij");string sha=Hash(data,root),file=Path.Combine(root,"download.msi");
         var handler=new FixtureHTTP();int calls=0;
         handler.Response=request=>{calls++;Check(request.Headers.Range.Ranges.ToString()!=null,"range request");var response=new HttpResponseMessage(HttpStatusCode.PartialContent){Content=new ByteArrayContent(Encoding.UTF8.GetBytes("fghij"))};response.Content.Headers.ContentRange=new ContentRangeHeaderValue(5,9,10);return response;};

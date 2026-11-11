@@ -29,7 +29,7 @@
 }
 ```
 
-`patch` 必须是组合包目录内的相对路径。Forge 0.4.1 的 `forge.builtin` 声明九个内置插件，包括信息统计、记忆管理和开发检查器。Nexus 是独立外部插件，不属于内置组合包。组合包格式的 `schemaVersion` 仍为 1，与 Forge API 3 分开版本管理。
+`patch` 必须是组合包目录内的相对路径。Forge 0.6.0 的 `forge.builtin` 声明十个内置插件，包括自动提示词预测、信息统计、记忆管理和开发检查器。Nexus 是独立外部插件，不属于内置组合包。组合包格式的 `schemaVersion` 仍为 1，与 Forge API 4 分开版本管理。
 
 ## patch 文件
 

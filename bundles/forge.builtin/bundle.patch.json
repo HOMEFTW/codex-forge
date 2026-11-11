@@ -2,6 +2,10 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "id": "forge.prompt-prediction",
+      "enabled": true
+    },
+    {
       "id": "forge.browser",
       "enabled": true
     },

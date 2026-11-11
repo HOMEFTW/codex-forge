@@ -1,6 +1,6 @@
 import type {ForgeAPI, NexusWriteResult, NexusDocument} from '../../sdk/index.js';
 declare const forge:ForgeAPI;
-const api:3 = forge.apiVersion;
+const api:4 = forge.apiVersion;
 forge.nexus.request('vaults').then(value => value.vaults[0]?.id);
 forge.nexus.connect().then(value => value?.vault.id);
 forge.nexus.disconnect('v');

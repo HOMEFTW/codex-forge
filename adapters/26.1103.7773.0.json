@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "forgeVersion": "0.5.2",
-  "apiVersion": 3,
+  "forgeVersion": "0.6.0",
+  "apiVersion": 4,
   "codexVersion": "26.1103.7773.0",
   "codexBuildVersion": "26.1103.7773.0",
   "architecture": "x64",
@@ -202,5 +202,9 @@
       "sha256": "10e702b74e07861151299332962cca4a8dc88238307ff74acf5651cac5d3dffd"
     }
   ],
-  "cuaGlobalsSHA256": "18b8039f846a6e00206128530c5f59ff05bd361c655a858a4a27059ec0f63d23"
+  "cuaGlobalsSHA256": "18b8039f846a6e00206128530c5f59ff05bd361c655a858a4a27059ec0f63d23",
+  "nativePredictionPolicy": {
+    "member": ".vite/build/early-bootstrap-480-5def667ddfcd786d.js",
+    "sha256": "be8eba3b9283d6a9784fa069a019b83a89fd02277cc13e4f7d32d57faf0ada65"
+  }
 }

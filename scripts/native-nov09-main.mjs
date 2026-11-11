@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 export function patchNov09Metadata(source) {
   // Replacing the MCP table drops transports injected through app-server args.
   // Disable each server in place for native title/description/summary tasks.
@@ -27,4 +28,13 @@ export function patchNov09Main(source, member) {
     }
   }
   return source;
+}
+
+export function patchNativePredictionPolicy(original, patched, spec) {
+  assert.equal(createHash('sha256').update(original).digest('hex'), spec.sha256, 'Native prediction policy module changed');
+  const anchor = 'this.disposables.add(this.cumberbatchController)';
+  assert.equal(original.split(anchor).length, 2, 'Native prediction controller anchor changed');
+  assert.equal(patched.split(anchor).length, 2, 'Native prediction controller anchor duplicated');
+  assert(original.includes('key:"composer-predictions-enabled"') && original.includes('this.settings.getEffective(NF.key)'), 'Native prediction setting contract changed');
+  return patched.replace(anchor, anchor + ',this.disposables.add(require(require("node:path").join(process.resourcesPath,"fast-extension/main.cjs")).attachNativePredictionPolicy({settings:e.settingsStore,connections:this.appServerConnectionRegistry,hostId:sy.n}))');
 }

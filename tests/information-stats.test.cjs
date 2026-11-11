@@ -146,7 +146,7 @@ test('probe cancellation is scoped to the active thread and does not save a part
 test('built-in manifest validates and registers the statistics panel enabled by default', t => {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'forge-info-registry-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
-  const registry=new ForgeRegistry({root,bundledRoot:path.join(__dirname,'../plugins'),versions:{forge:'0.4.0',codex:'26.1021.2667.0',apiVersion:3}});
+  const registry=new ForgeRegistry({root,bundledRoot:path.join(__dirname,'../plugins'),versions:{forge:'0.6.0',codex:'26.1103.7773.0',apiVersion:4}});
   const plugin=registry.list().plugins.find(item=>item.id==='forge.information-stats');
   assert.equal(registry.errors.some(item=>item.directory==='forge.information-stats'),false);
   assert.equal(plugin.builtin,true);

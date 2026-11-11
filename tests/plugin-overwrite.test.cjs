@@ -8,8 +8,8 @@ function setup(t) {
   const output = path.join(__dirname, '../output/overwrite-tests'); fs.mkdirSync(output, { recursive: true });
   const root = fs.mkdtempSync(path.join(output, 'case-')); t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const source = path.join(root, 'source'); fs.mkdirSync(source);
-  const registry = new ForgeRegistry({ root: path.join(root, 'data'), bundledRoot: path.join(root, 'bundled'), versions: { forge: config.version, codex: config.codexVersion, apiVersion: 3 } });
-  const manifest = { schemaVersion: 1, apiVersion: 3, id, name: 'Overwrite', version: '1.0.0', compatibility: { forge: ['>=0.4.0 <0.6.0'], codex: [config.codexVersion] }, permissions: ['storage', 'settings', 'network'], networkOrigins: ['https://one.example'], contributes: { settings: { properties: { greeting: { title: 'Greeting', type: 'string', default: 'hello' } } } } };
+  const registry = new ForgeRegistry({ root: path.join(root, 'data'), bundledRoot: path.join(root, 'bundled'), versions: { forge: config.version, codex: config.codexVersion, apiVersion: 4 } });
+  const manifest = { schemaVersion: 1, apiVersion: 4, id, name: 'Overwrite', version: '1.0.0', compatibility: { forge: ['>=0.6.0 <0.7.0'], codex: [config.codexVersion] }, permissions: ['storage', 'settings', 'network'], networkOrigins: ['https://one.example'], contributes: { settings: { properties: { greeting: { title: 'Greeting', type: 'string', default: 'hello' } } } } };
   const write = (change = {}, text = 'new') => { const next = { ...manifest, version: '1.1.0', ...change }; fs.writeFileSync(path.join(source, 'plugin.json'), JSON.stringify(next)); fs.writeFileSync(path.join(source, 'data.txt'), text); return next; };
   write({ version: '1.0.0' }, 'old'); registry.install(source); registry.setEnabled(id, true);
   registry.settings(id, { greeting: '保留设置' }); registry.storage(id, 'set', 'note', { text: '保留数据' });
