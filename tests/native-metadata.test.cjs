@@ -4,17 +4,18 @@ const normalize=value=>JSON.parse(JSON.stringify(value));
 
 async function requestConfig(source,{servers={},allowlist=[],failure=false,signal}={}) {
  let request;
+ const symbols=source.includes('await s4(')?{parse:'u4',generate:'s4',log:'ea',abort:'C'}:{parse:'dc',generate:'ol',log:'e_',abort:source.includes('(0,j._qC)')?'j':'B'};
  const generate=vm.runInNewContext('('+source+')',{
-  dc:{safeParse:value=>value&&typeof value==='object'?{success:true,data:value}:{success:false}},
-  ol:async value=>{request=value;return {title:'fixture'};},e_:()=>{},
-  B:{_qC:async(p,s)=>{s.throwIfAborted();return p;}}
+  [symbols.parse]:{safeParse:value=>value&&typeof value==='object'?{success:true,data:value}:{success:false}},
+  [symbols.generate]:async value=>{request=value;return {title:'fixture'};},[symbols.log]:()=>{},
+  [symbols.abort]:{_qC:async(p,s)=>{s.throwIfAborted();return p;}}
  });
  await generate({appServerClient:{getUserSavedConfiguration:async()=>{if(failure)throw Error('unavailable');return {mcp_servers:servers};}},
   model:'fixture-model',cwd:'D:/fixture',readOnlyAppToolAllowlist:allowlist,feature:'thread_title',prompt:'fixture',signal});
  return normalize(request.config);
 }
 
-for(const [version,fixture] of [['26.1103.4239.0',require('./fixtures/native-metadata-nov09.json')],['26.1103.7773.0',require('./fixtures/native-metadata-nov10.json')]]) {
+for(const [version,fixture] of [['26.1103.4239.0',require('./fixtures/native-metadata-nov09.json')],['26.1103.7773.0',require('./fixtures/native-metadata-nov10.json')],['26.1106.6628.0',require('./fixtures/native-metadata-nov12.json')]]) {
 
 test(version+': native title config disables MCP servers without replacing their transport definitions',async()=>{
  assert.equal(require('../adapters/'+version+'.json').members.metadataGeneration,fixture.member);

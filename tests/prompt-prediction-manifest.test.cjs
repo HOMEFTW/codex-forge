@@ -22,5 +22,6 @@ test('the bundled prediction plugin loads with its scoped capability and shared 
     assert.equal(registry.status(plugin.id).enabled, false);
     registry.setEnabled(plugin.id, true);
     assert.equal(registry.settings(plugin.id).enabled, false, 're-enabling the plugin preserves the automatic-prediction preference');
+    assert.equal(registry.settings(plugin.id).timeoutSeconds, 15, 'saved timeout preferences take precedence over the new default');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });

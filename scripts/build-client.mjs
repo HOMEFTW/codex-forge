@@ -19,11 +19,12 @@ const target = path.resolve(process.argv[3] || path.join(root, 'release', 'packa
 // 该字段时才回退到符号判断。members 必须由适配器提供：静默回退到 legacy 文件名
 // 会把旧补丁套到新客户端上。
 const nativeVersion = adapter.patchSet || (adapter.nativeSymbols?.registryMap === 'QL' ? 'legacy' : 'current');
-assert(['legacy', 'current', 'oct23', 'oct27', 'oct27b', 'oct29', 'nov09'].includes(nativeVersion), `适配器 patchSet 无效：${nativeVersion}`);
-const rspackAdapter = ['oct29', 'nov09'].includes(nativeVersion);
+assert(['legacy', 'current', 'oct23', 'oct27', 'oct27b', 'oct29', 'nov09', 'nov12'].includes(nativeVersion), `适配器 patchSet 无效：${nativeVersion}`);
+const modernMain = ['nov09', 'nov12'].includes(nativeVersion);
+const rspackAdapter = ['oct29', 'nov09', 'nov12'].includes(nativeVersion);
 const currentAdapter = nativeVersion !== 'legacy';
 const members = adapter.members;
-if (nativeVersion === 'nov09') assert(members?.metadataGeneration, '适配器必须声明标题生成模块');
+if (modernMain) assert(members?.metadataGeneration, '适配器必须声明标题生成模块');
 assert(members && (rspackAdapter ? ['network'] : ['renderer', 'settingsPage', 'visibleSettings', 'network']).every(key => typeof members[key] === 'string' && members[key]), '适配器必须声明原生模块');
 const rspackMembers = rspackAdapter ? [...new Set(adapter.rspackModules.map(item => item.member))] : [];
 if (['oct23', 'oct27', 'oct27b'].includes(nativeVersion)) assert(members.workspaceRenderer, '适配器必须声明主页面工作区模块');
@@ -57,7 +58,7 @@ for (const { member, entry, offset } of all) {
     else { const anchor='frame-src &#39;self&#39;';assert.equal(original.toString().split(anchor).length,2);changed=Buffer.from(original.toString().replace(anchor,anchor+' codex-forge:')); }
   } else if (!process.env.FAST_NO_PATCH && member === '.vite/build/early-bootstrap.js') {
     const guard = (process.env.FAST_EXTENSION_DEBUG ? 'require("node:fs").writeFileSync(require("node:path").join(process.env.CODEX_HOME,"early-reached.txt"),"reached");try{' : '') + 'require(require("node:path").join(process.resourcesPath,"fast-extension/main.cjs")).install();' + (process.env.FAST_EXTENSION_DEBUG ? '}catch(error){require("node:fs").writeFileSync(require("node:path").join(process.env.CODEX_HOME,"extension-error.txt"),error.stack);throw error}' : '') + '\n';
-    changed = Buffer.from(guard + (nativeVersion === 'nov09' ? patchNov09Main(original.toString(), member) : original.toString()));
+    changed = Buffer.from(guard + (modernMain ? patchNov09Main(original.toString(), member) : original.toString()));
   } else if (!process.env.FAST_NO_PATCH && member === '.vite/build/preload.js') {
     const version = hash(fs.readFileSync(path.join(root, 'dist/fast-extension/ui/app.js'))).slice(0, 16);
     const preload = fs.readFileSync(path.join(root,'runtime','forge-preload.cjs'),'utf8')+'\n'+fs.readFileSync(path.join(root,'runtime','prompt-prediction-preload.cjs'),'utf8')+'\n'+fs.readFileSync(path.join(root, 'runtime', 'host-preload.cjs'), 'utf8').replaceAll('__FAST_UI_VERSION__', version) + '\n' + fs.readFileSync(path.join(root, 'runtime', 'host-workspace.cjs'), 'utf8');
@@ -78,9 +79,9 @@ for (const { member, entry, offset } of all) {
     changed=Buffer.from(patchSettingsPage(original.toString(),{version:nativeVersion}));
   } else if(!process.env.FAST_NO_PATCH && member===members.visibleSettings) {
     changed=Buffer.from(patchSettingsVisibility(original.toString(),{version:nativeVersion}));
-  } else if (!process.env.FAST_NO_PATCH && member === members.network && ['oct27', 'oct27b', 'oct29', 'nov09'].includes(nativeVersion)) {
-    changed = Buffer.from(patchOct27Network(original.toString(), { version: nativeVersion }));
-  } else if (!process.env.FAST_NO_PATCH && nativeVersion === 'nov09' && member === 'package.json') {
+  } else if (!process.env.FAST_NO_PATCH && member === members.network && ['oct27', 'oct27b', 'oct29', 'nov09', 'nov12'].includes(nativeVersion)) {
+    changed = Buffer.from(patchOct27Network(original.toString(), { version: modernMain ? 'nov09' : nativeVersion }));
+  } else if (!process.env.FAST_NO_PATCH && modernMain && member === 'package.json') {
     const metadata = JSON.parse(original);
     assert.equal(metadata.codexWindowsAppContainedCore, '1');
     metadata.codexWindowsAppContainedCore = '0';
@@ -109,7 +110,7 @@ for (const { member, entry, offset } of all) {
 const expectedMembers = process.env.FAST_NO_PATCH ? [] : [
   'webview/index.html', '.vite/build/early-bootstrap.js', '.vite/build/preload.js',
   ...(rspackAdapter ? rspackMembers : [members.renderer, members.settingsPage, members.visibleSettings]), members.network,
-  ...(nativeVersion === 'nov09' ? ['package.json', members.desktopFeatures, members.metadataGeneration] : []),
+  ...(modernMain ? ['package.json', members.desktopFeatures, members.metadataGeneration] : []),
   ...(members.workspaceRenderer ? [members.workspaceRenderer] : []),
 ];
 assert.deepEqual(modifications.map(item => item.member).sort(), expectedMembers.sort(), 'Native patch member set changed');
@@ -147,7 +148,7 @@ fs.copyFileSync(path.join(root,'dist','CodexForge.exe'),path.join(target,'CodexF
 fs.copyFileSync(path.join(root,'dist','CodexForge.exe.config'),path.join(target,'CodexForge.exe.config'));
 fs.copyFileSync(path.join(root,'assets','codex-forge.ico'),path.join(target,'codex-forge.ico'));
 const oldCmd=path.join(target,'Start-Codex-Forge.cmd');if(fs.existsSync(oldCmd))fs.unlinkSync(oldCmd);
-if (!process.env.FAST_NO_PATCH && nativeVersion === 'nov09') installCua(source, path.join(target,'app'), path.join(root,'runtime'), adapter.cuaGlobalsSHA256);
+if (!process.env.FAST_NO_PATCH && modernMain) installCua(source, path.join(target,'app'), path.join(root,'runtime'), adapter.cuaGlobalsSHA256);
 const manifest = { product: 'Codex Forge', forgeVersion: config.version, apiVersion:config.apiVersion, fullInstallation:true, forgePayloadSHA256, sourceMSIXVersion: config.codexVersion, sourceBuildVersion: config.codexBuildVersion || adapter.codexBuildVersion || config.codexVersion, baseASARSHA256: hash(base), asarSHA256: digest.digest('hex'), headerSHA256: newHash, executableSHA256: hash(exe), executableIntegrityOffset: at, integrityChecksEnabled: true, fusesChanged: false, modifications };
 const files=[];function inventory(dir){for(const name of fs.readdirSync(dir)){const file=path.join(dir,name);if(fs.statSync(file).isDirectory())inventory(file);else if(file!==path.join(target,'forge-install.json'))files.push({path:path.relative(target,file).replaceAll('\\','/'),bytes:fs.statSync(file).size,sha256:hash(fs.readFileSync(file))});}}inventory(target);manifest.files=files;
 fs.writeFileSync(path.join(target,'forge-install.json'),JSON.stringify(manifest,null,2));

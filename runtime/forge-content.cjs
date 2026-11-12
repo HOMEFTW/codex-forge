@@ -21,7 +21,7 @@ function pluginBundle(registry,id,{viewId,slotEntry,assetsRoot=path.join(__dirna
     html=inHead(html,'<style>'+css.join('\n').replace(/<\/style/gi,'<\\/style')+'</style>');
     script=[fs.readFileSync(path.join(assetsRoot,'dsh-client.js'),'utf8'),registry.source(id,d.entry),'window.ForgeDshClient.start('+JSON.stringify({packageName:d.packageName,version:m.version})+');'].join('\n;\n');
   }
-  return {html,sdk:fs.readFileSync(path.join(__dirname,'forge-sdk.js'),'utf8'),script,networkOrigins:m.networkOrigins||[],localMedia:m.permissions.includes('nexus.read'),scriptWorker:m.permissions.includes('nexus.script')};
+  return {html,sdk:fs.readFileSync(path.join(__dirname,'forge-sdk.js'),'utf8').replace('apiVersion: 4,', 'apiVersion: '+m.apiVersion+','),script,networkOrigins:m.networkOrigins||[],localMedia:m.permissions.includes('nexus.read'),scriptWorker:m.permissions.includes('nexus.script')};
 }
 function pluginResponse(registry,requestURL,options={}) {
   try {

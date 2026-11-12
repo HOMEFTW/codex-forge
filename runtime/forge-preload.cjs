@@ -11,7 +11,7 @@
   const post = (frame, name, value, metadata) => frame.contentWindow?.postMessage({forgePluginEvent:{name,value,metadata}}, '*');
   const escapeScript = s => s.replace(/<\/script/gi, '<\\/script');
   const active = id => snapshot?.plugins.find(p=>p.id===id)?.enabled;
-  function contextFor(id) { const context={...(snapshot?.context || {threadId:null})}; const plugin=snapshot?.plugins.find(p=>p.id===id); if(!plugin?.permissions.includes('conversation.read')) context.threadId=null; return context; }
+  function contextFor(id) { const context={...(snapshot?.context || {threadId:null})}; const plugin=snapshot?.plugins.find(p=>p.id===id); if(!plugin?.permissions.includes('conversation.read')) context.threadId=null; if(plugin){context.hostApiVersion=snapshot.context.apiVersion;context.apiVersion=plugin.apiVersion;} return context; }
   function dispose(frame) {
     post(frame,'dispose',null);
     for (const [id, request] of pending) if (request.frame === frame) { clearTimeout(request.timer); pending.delete(id); request.reject(Error('插件已停止')); }
@@ -25,7 +25,7 @@
     if([...frames].some(([f,v])=>f.isConnected&&v.key===key&&v.mount===mount)) return;
     const frame=document.createElement('iframe'); frame.className='forge-plugin-frame'; frame.title=id; frame.setAttribute('sandbox','allow-scripts');
     frame.style.cssText=(viewId||slotEntry)?'border:0;width:100%;height:100%;min-height:0;flex:1':'display:none';
-    const info={id,viewId,slotEntry,key,mount,ready:false,fingerprint:snapshot?.plugins.find(p=>p.id===id)?.fingerprint}; frames.set(frame,info); mount.append(frame);
+    const info={id,viewId,slotEntry,key,mount,ready:false,apiVersion:snapshot.plugins.find(p=>p.id===id).apiVersion,fingerprint:snapshot?.plugins.find(p=>p.id===id)?.fingerprint}; frames.set(frame,info); mount.append(frame);
     try {
       frame.addEventListener('load',()=>{info.ready=true;post(frame,'context.changed',contextFor(id));},{once:true});
       frame.src='codex-forge://plugin/'+encodeURIComponent(id)+'/'+(slotEntry?'slot/'+encodeURIComponent(slotEntry):encodeURIComponent(viewId||'runtime'));
@@ -201,7 +201,7 @@
       if(result?.nativeAction==='close') result=await nativeRequest('close',{page:result.page});
       else if(result?.nativeAction?.startsWith('composer.')) result=composer(result.nativeAction,result.args);
       frame.contentWindow?.postMessage({forgePluginReply:{id:request.id,result}},'*');
-    }catch(error){frame.contentWindow?.postMessage({forgePluginReply:{id:request.id,error:{message:error.message,code:error.code||'INTERNAL_ERROR'}}},'*');}
+    }catch(error){frame.contentWindow?.postMessage({forgePluginReply:{id:request.id,error:info.apiVersion===1?error.message:{message:error.message,code:error.code||'INTERNAL_ERROR'}}},'*');}
   });
   globalThis.__forgeBridge={editComposer:composer,configure:fn=>{nativeRequest=fn;},mount:(node,page)=>{const [,id,viewId]=page.split(':');return mount(node,id,viewId);},refresh,layout:()=>{contributions();outputView();},snapshot:()=>snapshot};
   ipcRenderer.on('fast-ext:changed',(_event,payload)=>{

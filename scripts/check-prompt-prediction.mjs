@@ -6,6 +6,7 @@ import readline from 'node:readline';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { predictPrompt } from '../runtime/prompt-prediction.cjs';
+import { runLowPrediction } from '../runtime/prompt-prediction-runner.cjs';
 
 const root = path.resolve(import.meta.dirname, '..'), out = path.join(root, 'output');
 const executable = path.resolve(process.argv[2] || '');
@@ -13,8 +14,9 @@ assert(process.argv[2] && fs.statSync(executable).isFile(), 'Provide the current
 fs.mkdirSync(out, { recursive: true });
 const home = fs.mkdtempSync(path.join(out, 'prediction-fixture-'));
 const requests = [], notifications = [], rpcRequests = [], pending = new Map();
-let child, lines, sequence = 0, mode = 'text', observedHeldRequest, cancellation, stderr = '';
-let heldRequest = new Promise(resolve => { observedHeldRequest = resolve; });
+let child, lines, sequence = 0, mode = 'text', observedHeldRequest, heldClosed, stderr = '';
+const heldRequest = new Promise(resolve => { observedHeldRequest = resolve; });
+const closedRequest = new Promise(resolve => { heldClosed = resolve; });
 const server = http.createServer(async (req, res) => {
   try {
     const chunks = []; for await (const chunk of req) chunks.push(chunk);
@@ -24,10 +26,10 @@ const server = http.createServer(async (req, res) => {
     assert(!req.headers.authorization, 'Fixture must not receive credentials');
     const data = JSON.parse(bytes); requests.push(data);
     const sample = JSON.stringify(data).includes('Predict the next message the USER would type');
-    if (sample && mode === 'hold') { observedHeldRequest(); return; }
+    if (sample && mode === 'hold') { res.on('close', heldClosed); observedHeldRequest(); return; }
     const answer = sample ? JSON.stringify({ suggestion: '请把验证结果整理成表格。' }) : 'The fixture task is complete.';
     const item = sample && mode === 'tool'
-      ? { id: 'fc_' + requests.length, type: 'function_call', call_id: 'fixture_call', name: 'never_execute_this', arguments: '{}', status: 'completed' }
+      ? { id: 'fc_' + requests.length, type: 'function_call', call_id: 'fixture_call', name: 'exec_command', arguments: '{"cmd":"echo FORGE_PREDICTION_TEST_TOOL"}', status: 'completed' }
       : { id: 'msg_' + requests.length, type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: answer, annotations: [] }] };
     const response = { id: 'resp_' + requests.length, object: 'response', created_at: 0, status: 'completed', model: data.model, output: [item], usage: { input_tokens: 20, output_tokens: 10, total_tokens: 30, input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } } };
     const events = [{ type: 'response.created', response: { ...response, status: 'in_progress', output: [] } }, { type: 'response.output_item.added', output_index: 0, item: { ...item, status: 'in_progress', ...(item.type === 'message' ? { content: [] } : {}) } }];
@@ -45,8 +47,7 @@ function call(method, params, { signal, timeoutMs = 15000 } = {}) {
     const cleanup = () => { clearTimeout(timer); signal?.removeEventListener('abort', abort); pending.delete(id); };
     const abort = () => {
       cleanup();
-      if (method === 'thread/sample') cancellation = call('thread/sample/cancel', { requestId: id }).catch(error => { throw error; });
-      reject(signal.reason || Error('Cancelled'));
+      reject(signal?.reason || Error('Cancelled'));
     };
     const timer = setTimeout(() => { cleanup(); reject(Error('RPC timeout: ' + method + ' ' + stderr.slice(-800))); }, timeoutMs);
     if (signal?.aborted) { clearTimeout(timer); reject(signal.reason || Error('Cancelled')); return; }
@@ -58,7 +59,7 @@ function call(method, params, { signal, timeoutMs = 15000 } = {}) {
 }
 
 async function completedTurn(threadId) {
-  const started = await call('turn/start', { threadId, input: [{ type: 'text', text: 'Finish the synthetic fixture task in one sentence.' }], effort: 'low' });
+  const started = await call('turn/start', { threadId, input: [{ type: 'text', text: 'Finish the synthetic fixture task in one sentence.' }], effort: 'xhigh' });
   const deadline = Date.now() + 15000;
   while (Date.now() < deadline) {
     const done = notifications.find(value => value.method === 'turn/completed' && value.params?.threadId === threadId && value.params.turn.id === started.turn.id);
@@ -92,19 +93,23 @@ try {
   const sourceTurnId = await completedTurn(thread.id);
   const before = (await call('thread/read', { threadId: thread.id, includeTurns: true })).thread;
   const sourceTurnNotifications = notifications.filter(value => value.method === 'turn/started').length;
-  const context = { call, threadId: thread.id, sourceTurnId };
+  const context = { call, sample: options => runLowPrediction({ ...options, executable, env }), threadId: thread.id, sourceTurnId };
   const prediction = await predictPrompt(context);
   assert.equal(prediction.text, '请把验证结果整理成表格。');
   assert.equal(requests.length, 2);
-  const sample = rpcRequests.find(value => value.method === 'thread/sample');
-  assert.equal(sample.params.turnTrigger, 'forge_prompt_prediction');
-  assert.equal(sample.params.expectedTurnId, sourceTurnId);
+  assert.equal(requests[0].reasoning.effort, 'xhigh');
+  assert.equal(requests[1].reasoning.effort, 'low', 'Prediction must actually use low on the same model');
+  assert.equal(requests[1].model, requests[0].model);
+  assert.equal((requests[1].tools || []).length, 0, 'Prediction must not advertise tools');
+  assert.equal(rpcRequests.filter(value => ['thread/sample','thread/start','turn/start'].includes(value.method)).length, 2, 'Only the source setup may start a main-connection turn');
+  const resumed = await call('thread/resume', { threadId: thread.id, excludeTurns: true });
+  assert.equal(resumed.reasoningEffort, 'xhigh', 'Sampling must preserve the source reasoning configuration');
   const previousRequests = requests.length;
   await assert.rejects(predictPrompt({ ...context, sourceTurnId: 'stale_turn' }));
   assert.equal(requests.length, previousRequests, 'Stale samples must fail before inference');
   mode = 'tool';
-  assert.equal((await predictPrompt(context)).text, null, 'An attempted tool call is not a prediction');
-  assert.equal(requests.length, previousRequests + 1, 'A sample must never execute a tool and continue');
+  await assert.rejects(predictPrompt(context), { code: 'PREDICTION_TOOL_REQUESTED' });
+  assert.equal(requests.length, previousRequests + 1, 'A prediction must stop on a tool attempt without continuing inference');
   assert(!notifications.some(value => value.id != null && value.method), 'No tools or approvals may reach the fixture');
   mode = 'hold';
   const controller = new AbortController();
@@ -112,14 +117,12 @@ try {
   await Promise.race([heldRequest, new Promise((_, reject) => { const timeout = setTimeout(() => reject(Error('No cancellable request reached fixture')), 10000); heldRequest.finally(() => clearTimeout(timeout)); })]);
   controller.abort();
   await assert.rejects(predicting, { code: 'PREDICTION_CANCELLED' });
-  await cancellation;
-  const cancel = rpcRequests.find(value => value.method === 'thread/sample/cancel');
-  assert.equal(cancel.params.requestId, rpcRequests.filter(value => value.method === 'thread/sample').at(-1).id);
+  await Promise.race([closedRequest, new Promise((_, reject) => { const timeout = setTimeout(() => reject(Error('Prediction worker left its HTTP request alive')), 3000); closedRequest.finally(() => clearTimeout(timeout)); })]);
   const after = (await call('thread/read', { threadId: thread.id, includeTurns: true })).thread;
   assert.deepEqual(after.turns, before.turns, 'Sampling and cancellation must not mutate source turns');
   assert.equal(notifications.filter(value => value.method === 'turn/started').length, sourceTurnNotifications);
   await call('thread/unsubscribe', { threadId: thread.id });
-  const report = { passed: true, provider: 'localhost fixture', credentialsSent: false, actualCli: executable, inheritedSource: true, prediction: prediction.text, toolSuppressed: true, staleRejectedBeforeInference: true, requestIdCancellation: true, sourceHistoryUnchanged: true, extraSourceTurns: 0, modelRequests: requests.length };
+  const report = { passed: true, provider: 'localhost fixture', credentialsSent: false, actualCli: executable, inheritedSource: true, sourceEffort: resumed.reasoningEffort, predictionEffort: requests[1].reasoning.effort, sameModel: true, prediction: prediction.text, toolSuppressed: true, staleRejectedBeforeInference: true, workerCancellation: true, sourceHistoryUnchanged: true, extraSourceTurns: 0, modelRequests: requests.length };
   fs.writeFileSync(path.join(out, 'prompt-prediction-native-regression.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report));
 } finally {

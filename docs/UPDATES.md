@@ -2,9 +2,9 @@
 
 ## Forge 本体及官方客户端
 
-Forge 查询官方 `windows-store-update.json` 与配置仓库的 GitHub Release。客户端身份版本、官方 Feed 构建版本、Forge API 和已启用第三方插件都匹配时才允许更新；未知官方版本不直接套用旧适配器。0.6.0 的目标适配器为 `26.1103.7773.0`，七个旧版适配器仍保留用于回归。下方为清单格式示例。
+Forge 查询官方 `windows-store-update.json` 与配置仓库的 GitHub Release。客户端身份版本、官方 Feed 构建版本、Forge API 和已启用第三方插件都匹配时才允许更新；未知官方版本不直接套用旧适配器。0.6.1 的目标适配器为 `26.1106.6628.0`，八个旧版适配器仍保留用于回归。下方为清单格式示例。
 
-2026-11-04 后续核验：OpenAI 固定版本 URL 已提供 `26.1029.7803.0` x64 MSIX，与 Feed 构建一致；发布标识为 `26.1029.61003`。已检查包大小、SHA-256、OpenAI.Codex 身份和发布者签名，适配清单绑定此实际包。此前 0.4.2 验证时该地址尚不可用，历史记录保留。GitHub 更新检查依据 Release 中的正式清单提供版本；第三方插件也须声明新客户端兼容性。
+2026-11-04 后续核验：OpenAI 固定版本 URL 已提供 `26.1029.7803.0` x64 MSIX，与 Feed 构建一致；发布标识为 `26.1029.61003`。已检查包大小、SHA-256、OpenAI.Codex 身份和发布者签名，适配清单绑定此实际包。此前 0.4.2 验证时该地址尚不可用，历史记录保留。GitHub 更新检查依据 Release 中的正式清单提供版本；第三方插件若显式限制 Codex 版本，也须声明新客户端兼容性。
 
 每个 Forge Release 必须提供 `codex-forge-release.json`：
 
@@ -30,7 +30,7 @@ Forge 查询官方 `windows-store-update.json` 与配置仓库的 GitHub Release
 
 清单示例的下载地址、摘要与大小是占位值，不表示版本已发布，不可用于实际安装。`node scripts/build-installer.mjs` 生成真实清单与 `SHA256SUMS.txt`。
 
-0.6.0 使用 Forge API 4。当前运行时更新检查可读取 API 1/2/3/4 历史清单，并按目标 API 检查第三方插件；0.6.0 准备程序与独立更新器只接受 API 4 目标。已发布的 0.5.x / 0.4.x 更新器不接受 API 4，首次迁移须手动运行新版 MSI、解压新版便携 ZIP，或下载新版独立更新器。启用的第三方插件 API 不匹配时不提供自动更新方案，不会改写插件。
+0.6.0 使用 Forge API 4。当前运行时更新检查可读取 API 1/2/3/4 历史清单，并按目标 API 检查第三方插件；0.6.0 准备程序与独立更新器只接受 API 4 目标。已发布的 0.5.x / 0.4.x 更新器不接受 API 4，首次迁移须手动运行新版 MSI、解压新版便携 ZIP，或下载新版独立更新器。0.6.1 起 API 4 目标可加载 API 1–3 插件；0.6.0 没有该兼容能力。匹配继续检查 Forge 范围与可选 Codex 范围，不会改写插件。
 
 客户端核验下载的 MSI、在启动安装前重新计算落盘文件的 SHA-256，然后交给 Windows Installer 完成 per-user 升级；0.5.0 的便携 ZIP 可由独立更新器验证后安装。安装包仅安装 Forge；准备程序按 `adapters/<codexVersion>.json` 下载官方 MSIX；`codexVersion` 是 MSIX 身份版本，`codexBuildVersion` 是官方 Feed 构建版本，两者分别核验，检查大小、SHA-256、签名及 MSIX 产品身份，解包和应用固定版本适配器，验证最终清单后才切换 `current.json`。MSI 只在卸载时删除 `current.json`；MajorUpgrade 之后启动器会同时比对目标 payload 与当前客户端的 `forgeVersion`、`sourceMSIXVersion` 和 `forgePayloadSHA256`，任一不一致时自动重跑准备程序（复用已缓存的 MSIX），不会静默启动旧版 Forge。切换成功后保留前一客户端，删除更早的 Forge 管理客户端目录及旧 MSIX 缓存，当前正在运行的旧客户端会延迟到下一次启动清理；没有完整 Forge 清单的目录不会删除。现有进程继续运行，用户完成当前工作后退出并重新启动。MSI 允许安装同版本修订；0.3.3 用户可直接运行 0.4.1 MSI 升级。
 

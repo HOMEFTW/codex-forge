@@ -16,6 +16,7 @@ const { runInformationProbe } = require('./information-probe.cjs');
 const { CodexMemory } = require('./codex-memory.cjs');
 const { NexusService } = require('./nexus.cjs');
 const { PromptPredictionHost } = require('./prompt-prediction-host.cjs');
+const { runLowPrediction } = require('./prompt-prediction-runner.cjs');
 const { NativePredictionPolicy } = require('./native-prediction-policy.cjs');
 let activePredictionPolicy;
 function attachNativePredictionPolicy(options) { return activePredictionPolicy.attach(options); }
@@ -51,9 +52,24 @@ function install() {
     if (!Number.isSafeInteger(settings.maxChars) || !Number.isSafeInteger(settings.timeoutSeconds)) return null;
     return settings;
   };
-  const nativePredictionPolicy = new NativePredictionPolicy(() => predictions.nativeChanged());
+  const nativePredictionPolicy = new NativePredictionPolicy(() => predictions.nativeChanged(), event => {
+    if (!['turn/started', 'turn/completed'].includes(event.method)) return;
+    for (const state of states.values()) predictions.observe(state, event.method, event.params);
+  });
   activePredictionPolicy = nativePredictionPolicy;
-  const predictions = new PromptPredictionHost({ states, settings: predictionSettings, call: nativeCall, notify, nativeStatus: () => nativePredictionPolicy.snapshot() });
+  const predictions = new PromptPredictionHost({ states, settings: predictionSettings, call: nativeCall,
+    sample: options => runLowPrediction({ ...options, executable: path.join(process.resourcesPath, 'codex.exe') }),
+    notify: (state, value) => {
+      notify(state, value);
+      if (process.env.CODEX_FORGE_PREDICTION_DIAGNOSTICS === '1' && forge) {
+        try {
+          const directory = path.join(forge.registry.root, 'diagnostics'); fs.mkdirSync(directory, { recursive: true });
+          fs.writeFileSync(path.join(directory, 'prompt-prediction.json'), JSON.stringify({ at: Date.now(), pid: process.pid,
+            threadId: value.threadId, phase: value.phase, native: value.native, error: value.error, ...value.diagnostics }));
+        } catch (error) { console.warn('[Forge prediction diagnostics]', error.code || 'WRITE_FAILED'); }
+      }
+    }, nativeStatus: () => nativePredictionPolicy.snapshot(),
+    available: state => !!state.bridge || typeof nativePredictionPolicy.connection?.sendAppServerRequest === 'function' });
   let predictionSettingsKey = '';
   const refreshPredictionSettings = () => {
     const next = JSON.stringify(predictionSettings());
@@ -87,12 +103,28 @@ function install() {
     try { for (const request of approvalQueue.list()) if (!settled.has(request.state)) approvalProcessor.process(request.id).catch(report); } catch (error) { report(error); }
   }, 350);
   approvalTimer.unref?.();
-  function nativeCall(state, method, params, { signal, timeoutMs = 15000 } = {}) {
+  function nativeCall(state, method, params, { signal, timeoutMs = 15000, prediction = false } = {}) {
+    // Normal native chats use the host's app-server connection, and need not
+    // establish the legacy renderer RPC bridge exercised by older UI fixtures.
+    const connection = prediction && nativePredictionPolicy.connection;
+    if (typeof connection?.sendAppServerRequest === 'function') {
+      const check = () => {
+        if (signal?.aborted) throw signal.reason || Error('请求已取消');
+        if (state.win.isDestroyed() || connection !== nativePredictionPolicy.connection) throw Error('原生预测连接已变化');
+      };
+      return new Promise((resolve, reject) => {
+        const abort = () => reject(signal.reason || Error('请求已取消'));
+        signal?.addEventListener('abort', abort, { once: true });
+        Promise.resolve().then(() => { check(); return connection.sendAppServerRequest(method, params, check, { timeoutMs }); })
+          .then(result => { check(); resolve(result); }, reject).catch(reject)
+          .finally(() => signal?.removeEventListener('abort', abort));
+      });
+    }
     if (!state.bridge || state.win.isDestroyed()) return Promise.reject(Error('原生对话连接尚未就绪'));
     if (signal?.aborted) return Promise.reject(signal.reason || Error('请求已取消'));
     const id = 'fast-history-' + crypto.randomUUID(), contentsId = state.win.webContents.id;
     const sample = method === 'thread/sample';
-    if (sample) { sampleOwners.set(id, contentsId); while (sampleOwners.size > 512) sampleOwners.delete(sampleOwners.keys().next().value); }
+    if (sample || prediction) { sampleOwners.set(id, contentsId); while (sampleOwners.size > 512) sampleOwners.delete(sampleOwners.keys().next().value); }
     return new Promise((resolve, reject) => {
       let timer, finished = false, dispatched = false;
       const settle = (error, result) => {

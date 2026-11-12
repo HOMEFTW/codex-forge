@@ -7,8 +7,8 @@ const failure = (code, message) => Object.assign(new Error(message), { code });
 // Only main-process observations enter this controller. No renderer can nominate
 // a source turn or initiate a fresh sample without a host-issued offer.
 class PromptPredictionHost {
-  constructor({ states, settings, call, notify, nativeStatus = () => null, predict = predictPrompt }) {
-    Object.assign(this, { states, settings, call, notify, nativeStatus, predict });
+  constructor({ states, settings, call, sample, notify, nativeStatus = () => null, available = state => !!state.bridge, predict = predictPrompt }) {
+    Object.assign(this, { states, settings, call, sample, notify, nativeStatus, available, predict });
     this.views = new Map(); this.latest = new Map(); this.samples = new Map();
   }
   enabled() { return !!this.settings()?.enabled && !this.nativeStatus()?.paused; }
@@ -20,6 +20,9 @@ class PromptPredictionHost {
     return view;
   }
   clear(view, emit = true) {
+    if (view.phase === 'pending' && view.lastAttempt) {
+      view.lastAttempt = { ...view.lastAttempt, phase: 'cancelled', durationMs: Date.now() - view.lastAttempt.startedAt };
+    }
     view.abort?.abort(failure('PREDICTION_CANCELLED', '预测已取消'));
     view.abort = null; view.ticket = null; view.text = null; view.turnId = null;
     view.phase = 'idle'; view.error = null; view.generation++;
@@ -29,7 +32,8 @@ class PromptPredictionHost {
     const v = this.view(state);
     return { type: 'forge-prediction', threadId: v.threadId, generation: v.generation,
       native: this.nativeStatus(), phase: v.phase, ticket: v.ticket || null, sourceTurnId: v.turnId || null,
-      text: v.phase === 'suggestion' ? v.text : null, error: v.error || null };
+      text: v.phase === 'suggestion' ? v.text : null, error: v.error || null,
+      diagnostics: { connected: !!this.available(state), rendererBridge: !!state.bridge, lastEvent: v.lastEvent || null, lastAttempt: v.lastAttempt || null } };
   }
   emit(view) { if (!view.state.win.isDestroyed()) this.notify(view.state, this.snapshot(view.state)); }
   context(state) {
@@ -47,8 +51,9 @@ class PromptPredictionHost {
   }
   observe(state, method, params) {
     if (!['turn/started', 'turn/completed'].includes(method) || !validId(params?.threadId) || !validId(params?.turn?.id)) return;
-    if (state.threadId !== params.threadId || !state.bridge || state.win.isDestroyed()) return;
+    if (state.threadId !== params.threadId || !this.available(state) || state.win.isDestroyed()) return;
     this.context(state);
+    this.view(state).lastEvent = { threadId: params.threadId, method, sourceTurnId: params.turn.id, status: params.turn.status, at: Date.now() };
     const { threadId, turn } = params, previous = this.latest.get(threadId);
     if (method === 'turn/completed' && previous?.running && previous.turnId !== turn.id) return;
     if (previous?.turnId === turn.id && previous.running === (method === 'turn/started')) return;
@@ -88,26 +93,45 @@ class PromptPredictionHost {
     if (this.samples.has(key)) { this.clear(v); return this.snapshot(state); }
     const settings = this.settings(), ticket = v.ticket, generation = v.generation, threadId = v.threadId, sourceTurnId = v.turnId;
     const cache = { text: null }; this.samples.set(key, cache); this.trim(this.samples);
+    const attempt = { threadId, sourceTurnId, phase: 'pending', startedAt: Date.now() };
+    v.lastAttempt = attempt;
     const abort = new AbortController(); v.abort = abort; v.phase = 'pending'; this.emit(v);
     const stillCurrent = () => this.current(v, { threadId, ticket, generation }) && !abort.signal.aborted;
-    const call = (method, params, options) => {
+    let source;
+    const call = async (method, params, options) => {
       if (!stillCurrent()) throw failure('PREDICTION_STALE', '预测上下文已变化');
-      const allowed = ['threadId','expectedTurnId','prompt','disableMcp','interruptOnCancel','threadSource','turnTrigger'];
-      if (method !== 'thread/sample' || Object.keys(params || {}).some(k => !allowed.includes(k)) ||
-        params.threadId !== threadId || params.expectedTurnId !== sourceTurnId || params.disableMcp !== true || params.interruptOnCancel !== true ||
-        params.threadSource !== 'forge_prompt_prediction' || params.turnTrigger !== 'forge_prompt_prediction' || typeof params.prompt !== 'string' || params.prompt.length > 12000) {
-        throw failure('PERMISSION_DENIED', '预测只允许受限的当前回合采样');
+      if (method !== 'thread/resume' || params?.threadId !== threadId || params.excludeTurns !== true ||
+        Object.keys(params).some(key => !['threadId','excludeTurns','initialTurnsPage'].includes(key)) ||
+        JSON.stringify(params.initialTurnsPage) !== JSON.stringify({ limit: 3, itemsView: 'summary', sortDirection: 'desc' })) {
+        throw failure('PERMISSION_DENIED', '预测只允许读取当前聊天的近期文本');
       }
-      return this.call(state, method, params, options);
+      const result = await this.call(state, method, params, { ...options, prediction: true });
+      if (!stillCurrent()) throw failure('PREDICTION_STALE', '预测上下文已变化');
+      source = result; return result;
+    };
+    const sample = options => {
+      if (!stillCurrent() || options.signal?.aborted) throw failure('PREDICTION_STALE', '预测上下文已变化');
+      if (source?.thread?.id !== threadId || source.initialTurnsPage?.data?.[0]?.id !== sourceTurnId || source.initialTurnsPage.data[0].status !== 'completed' ||
+        options.sourceThreadId !== threadId || options.model !== source.model || options.modelProvider !== source.modelProvider || options.serviceTier !== (source.serviceTier ?? null) ||
+        options.maxChars !== settings.maxChars || typeof options.prompt !== 'string' || options.prompt.length > 64000 ||
+        !Number.isSafeInteger(options.timeoutMs) || options.timeoutMs < 1 || options.timeoutMs > settings.timeoutSeconds * 1000) {
+        throw failure('PERMISSION_DENIED', '预测只允许当前模型的受限后台请求');
+      }
+      if (typeof this.sample !== 'function') throw failure('PREDICTION_UNAVAILABLE', '预测后端未就绪');
+      return this.sample(options);
     };
     try {
-      const result = await this.predict({ call, threadId, sourceTurnId, signal: abort.signal,
+      const result = await this.predict({ call, sample, threadId, sourceTurnId, signal: abort.signal,
         prompt: settings.prompt, maxChars: settings.maxChars, timeoutMs: Math.round(settings.timeoutSeconds * 1000) });
       if (!stillCurrent()) return this.snapshot(state);
       if (result.threadId !== threadId || result.sourceTurnId !== sourceTurnId) throw failure('PREDICTION_STALE', '建议来源已变化');
       cache.text = result.text; v.text = result.text; v.phase = result.text ? 'suggestion' : 'idle';
+      v.lastAttempt = { ...attempt, phase: result.text ? 'suggestion' : 'empty', durationMs: Date.now() - attempt.startedAt };
     } catch (error) {
-      if (stillCurrent()) { v.phase = 'error'; v.error = { code: String(error.code || 'PREDICTION_UNAVAILABLE'), message: String(error.message || '预测不可用').slice(0, 300) }; }
+      if (stillCurrent()) {
+        v.phase = 'error'; v.error = { code: String(error.code || 'PREDICTION_UNAVAILABLE'), message: String(error.message || '预测不可用').slice(0, 300) };
+        v.lastAttempt = { ...attempt, phase: 'error', error: v.error, durationMs: Date.now() - attempt.startedAt };
+      }
     } finally {
       if (v.abort === abort) v.abort = null;
       if (v.ticket === ticket && v.generation === generation) this.emit(v);

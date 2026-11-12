@@ -35,6 +35,8 @@ export function patchNativePredictionPolicy(original, patched, spec) {
   const anchor = 'this.disposables.add(this.cumberbatchController)';
   assert.equal(original.split(anchor).length, 2, 'Native prediction controller anchor changed');
   assert.equal(patched.split(anchor).length, 2, 'Native prediction controller anchor duplicated');
-  assert(original.includes('key:"composer-predictions-enabled"') && original.includes('this.settings.getEffective(NF.key)'), 'Native prediction setting contract changed');
-  return patched.replace(anchor, anchor + ',this.disposables.add(require(require("node:path").join(process.resourcesPath,"fast-extension/main.cjs")).attachNativePredictionPolicy({settings:e.settingsStore,connections:this.appServerConnectionRegistry,hostId:sy.n}))');
+  const setting = spec.settingSymbol || 'NF', host = spec.hostSymbol || 'sy';
+  assert([setting, host].every(value => /^[A-Za-z_$][\w$]*$/.test(value)), 'Invalid native policy symbol');
+  assert(original.includes('key:"composer-predictions-enabled"') && original.includes('this.settings.getEffective(' + setting + '.key)'), 'Native prediction setting contract changed');
+  return patched.replace(anchor, anchor + ',this.disposables.add(require(require("node:path").join(process.resourcesPath,"fast-extension/main.cjs")).attachNativePredictionPolicy({settings:e.settingsStore,connections:this.appServerConnectionRegistry,hostId:' + host + '.n}))');
 }

@@ -32,7 +32,7 @@ test('package traversal, Windows aliases, duplicate paths and malformed base64 c
   for (const name of ['../escape', '/escape', 'C:/escape', 'a\\escape', 'nul.txt', 'x./file', 'a:stream', 'node_modules/x', '.git/config']) assert.throws(() => f.registry.install(f.pack([f.file(name, 'bad')])));
   assert.throws(() => f.registry.install(f.pack([f.file('A.txt', 'one'), f.file('a.txt', 'two')])));
   assert.throws(() => f.registry.install(f.pack([{ path: 'bad.txt', encoding: 'base64', content: '%%%%' }])));
-  assert.throws(() => f.registry.install(f.pack([], { apiVersion: 2 })));
+  assert.throws(() => f.registry.install(f.pack([], { apiVersion: 5 })));
   assert.equal(f.registry.list().plugins.length, 0);
   assert(!fs.readdirSync(f.registry.root).some(name => name.startsWith('.import-')));
   assert(!fs.existsSync(path.join(f.root, 'escape')));

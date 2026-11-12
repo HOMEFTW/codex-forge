@@ -1,7 +1,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-function load(){
+function load(apiVersion=3){
  const frames=[],messages=[],attributes=[],calls=[],listeners=new Map(); let response={ok:true,result:null};
- let plugin={id:'test.panel',enabled:true,builtin:false,fingerprint:'original',permissions:['panels']};
+ let plugin={apiVersion,id:'test.panel',enabled:true,builtin:false,fingerprint:'original',permissions:['panels']};
  let snapshot={plugins:[plugin],context:{threadId:null},dynamic:[],output:[],slots:{entries:[]}};
  const body={dataset:{},append(frame){frame.isConnected=true;frames.push(frame);}};
  const document={body,querySelectorAll(){return [];},querySelector(){return null;},getElementById(){return null;},createElement(){return {dataset:{},style:{},setAttribute(...value){attributes.push(value);},addEventListener(){},contentWindow:{postMessage(value){messages.push(value);}},remove(){this.isConnected=false;}};}};
@@ -34,4 +34,8 @@ test('disabling a plugin disposes its panel and notifies its lifecycle listeners
 test('updating plugin content retires the old panel before mounting a new one',async()=>{
  const h=load();await h.mount();await h.change({fingerprint:'updated'});await h.mount();
  assert.equal(h.frames[0].isConnected,false);assert.equal(h.frames.length,2);assert.equal(h.frames[1].isConnected,true);
+});
+
+test('API 1 preload keeps string errors readable by the original SDK',async()=>{
+ const h=load(1);await h.mount();h.setResponse({ok:false,error:{code:'PERMISSION_DENIED',message:'denied'}});await h.request({id:7,method:'storage.get',args:{key:'x'}});assert.equal(h.messages.at(-1).forgePluginReply.error,'denied');
 });

@@ -58,7 +58,7 @@ for (const change of [{ permissions: ['storage', 'settings', 'network', 'browser
 
 test('incompatible hosts and missing dependencies leave installed and previously staged versions intact', t => {
   const f = setup(t); f.write(); f.registry.install(f.source); const queue = updates.pendingUpdates(f.registry);
-  for (const change of [{ apiVersion: 2 }, { compatibility: { ...f.manifest.compatibility, codex: ['99.0.0.0'] } }, { dependencies: { 'test.missing': '^1.0.0' } }]) {
+  for (const change of [{ apiVersion: 5 }, { compatibility: { ...f.manifest.compatibility, codex: ['99.0.0.0'] } }, { dependencies: { 'test.missing': '^1.0.0' } }]) {
     f.write(change); assert.throws(() => f.registry.install(f.source)); unchanged(f.registry); assert.deepEqual(updates.pendingUpdates(f.registry), queue);
   }
   assert.equal(apply(f.registry).status, 'installed'); assert.equal(f.registry.get(id).manifest.version, '1.1.0');

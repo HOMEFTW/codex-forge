@@ -27,3 +27,8 @@ forge.nexus.request('query',{vaultId:'v',language:'expression',query:'file.name'
 forge.sidebar.register({id:'notes',title:'Notes',panel:'main',icon:{viewBox:'0 0 24 24',paths:['M0 0L2 2']}});
 // @ts-expect-error arbitrary viewBox is not part of the icon contract
 forge.sidebar.register({id:'notes',title:'Notes',icon:{viewBox:'0 0 1 1',paths:[]}});
+
+declare const legacy:ForgeAPI<1>;
+const legacyVersion:1 = legacy.apiVersion;
+const hostVersion:4 = legacy.hostApiVersion;
+legacy.context.get().then(context => { const api:1=context.apiVersion; });

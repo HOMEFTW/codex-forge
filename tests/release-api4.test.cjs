@@ -12,8 +12,8 @@ const read = relative => JSON.parse(fs.readFileSync(path.join(root, relative), '
 const config = read('forge.config.json');
 const versions = { codex: config.codexVersion, forge: config.version, apiVersion: config.apiVersion };
 
-test('0.6.0 release metadata, API 4 SDK, adapters, bundle and builtins agree', t => {
-  assert.equal(config.version, '0.6.0'); assert.equal(config.apiVersion, 4);
+test('0.6.1 release metadata, API 4 SDK, adapters, bundle and builtins agree', t => {
+  assert.equal(config.version, '0.6.1'); assert.equal(config.apiVersion, 4);
   assert.equal(read('package.json').version, config.version);
   const lock = read('package-lock.json');
   assert.equal(lock.version, config.version); assert.equal(lock.packages[''].version, config.version);
@@ -21,7 +21,7 @@ test('0.6.0 release metadata, API 4 SDK, adapters, bundle and builtins agree', t
     const adapter = read('adapters/' + name);
     assert.equal(adapter.forgeVersion, config.version); assert.equal(adapter.apiVersion, config.apiVersion);
   }
-  assert.equal(read('sdk/plugin.schema.json').properties.apiVersion.const, config.apiVersion);
+  assert.deepEqual(read('sdk/plugin.schema.json').properties.apiVersion.enum, [1,2,3,4]);
   const window = { parent: { postMessage() {} }, addEventListener() {} };
   vm.runInNewContext(fs.readFileSync(path.join(root, 'runtime/forge-sdk.js'), 'utf8'), { window, parent: window.parent, setTimeout() {}, clearTimeout() {} });
   assert.equal(window.CodexForge.apiVersion, config.apiVersion);
@@ -39,7 +39,7 @@ test('0.6.0 release metadata, API 4 SDK, adapters, bundle and builtins agree', t
   assert.equal(read('examples/hello-forge/plugin.json').apiVersion, 4);
 });
 
-for (const apiVersion of [1, 2, 3]) test(`API ${apiVersion} manifests and data remain diagnosable but API 4 refuses activation`, t => {
+for (const apiVersion of [1, 2, 3]) test(`API ${apiVersion} manifests preserve data and still require a compatible Forge range`, t => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'forge-api4-migration-'));
   t.after(() => fs.rmSync(home, { recursive: true, force: true }));
   const pluginRoot = path.join(home, 'plugins/test.legacy'); fs.mkdirSync(pluginRoot, { recursive: true });
@@ -51,8 +51,8 @@ for (const apiVersion of [1, 2, 3]) test(`API ${apiVersion} manifests and data r
   const data = path.join(home, 'storage/test.legacy.json'); fs.writeFileSync(data, '{"user":"keep"}');
   assert.deepEqual(registry.list().errors, []);
   assert.equal(registry.status(manifest.id).enabled, false);
-  assert.match(registry.status(manifest.id).reasons.join(';'), new RegExp(`需要 Forge API ${apiVersion}，当前 4`));
-  assert.throws(() => registry.setEnabled(manifest.id, true), /需要 Forge API/);
+  assert.match(registry.status(manifest.id).reasons.join(';'), /forge .*不在声明兼容范围内/);
+  assert.throws(() => registry.setEnabled(manifest.id, true), /forge .*不在声明兼容范围内/);
   assert.equal(JSON.parse(fs.readFileSync(path.join(pluginRoot, 'plugin.json'))).apiVersion, apiVersion);
   assert.equal(fs.readFileSync(data, 'utf8'), '{"user":"keep"}');
 });

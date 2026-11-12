@@ -52,9 +52,10 @@ async function turn(threadId,outputSchema) {
  throw Error('Turn timed out');
 }
 function generation(source) {
+ const symbols=fixture.bindings||{parse:'dc',generate:'ol',log:'e_',abort:source.includes('(0,j._qC)')?'j':'B'};
  return vm.runInNewContext('('+source+')',{
-  dc:{safeParse:data=>({success:true,data})},e_:()=>{},
-  ol:async options=>{
+  [symbols.parse]:{safeParse:data=>({success:true,data})},[symbols.log]:()=>{},
+  [symbols.generate]:async options=>{
    const started=await call('thread/start',{model:'gpt-6-astra',modelProvider:'fixture',cwd:home,ephemeral:true,sandbox:'read-only',approvalPolicy:'never',threadSource:options.threadSource,
     config:{...options.config,'mcp_servers.codex_app':{enabled:false,command:''},model_reasoning_effort:options.effort}});
    assert.equal(started.thread.ephemeral,true);
@@ -98,7 +99,7 @@ try {
  assert(notifications.some(n=>n.method==='thread/name/updated'&&n.params.threadId===regular.thread.id&&n.params.threadName===title));
  await call('thread/unsubscribe',{threadId:regular.thread.id});
  const report={forgeVersion:JSON.parse(fs.readFileSync(path.join(root,'package.json'))).version,originalFailureReproduced:true,metadataGeneration:true,metadataMcpDisabled:true,ordinaryMcpRetained:true,titlePersisted:true,titleNotification:true,modelRequests:requests.length,provider:'localhost fixture',credentialsSent:false};
- fs.writeFileSync(path.join(out,'native-metadata-regression.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
+ fs.writeFileSync(path.join(out,process.argv[4]||'native-metadata-regression.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 } finally {
  for(const process of children){const ended=new Promise(resolve=>process.once('exit',resolve));process.stdin.end();process.kill();await ended;}
  lines?.close();for(const p of pending.values())clearTimeout(p.timer);

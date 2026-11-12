@@ -4,8 +4,8 @@ const KEY = 'composer-predictions-enabled';
 // Mirrors native iKxu.k in Codex 26.1103.7773.0 (individual Pro plan family).
 const PRO_PLANS = new Set(['prolite', 'pro', 'promax']);
 class NativePredictionPolicy {
-  constructor(onChange = () => {}) {
-    this.onChange = onChange; this.epoch = 0; this.ready = false; this.nativeEnabled = null;
+  constructor(onChange = () => {}, onNotification = () => {}) {
+    this.onChange = onChange; this.onNotification = onNotification; this.epoch = 0; this.ready = false; this.nativeEnabled = null;
     this.pro = false; this.attached = false; this.disposers = []; this.connectionDisposers = [];
   }
   get allowed() { return this.nativeEnabled === false || this.ready && this.nativeEnabled === true && !this.pro; }
@@ -18,7 +18,10 @@ class NativePredictionPolicy {
     this.dispose(); this.attached = true; this.settings = settings; this.connections = connections; this.hostId = hostId;
     const readSetting = () => { try { const value = settings.getEffective(KEY); this.nativeEnabled = typeof value === 'boolean' ? value : null; } catch { this.nativeEnabled = null; } };
     readSetting();
-    this.disposers.push(settings.onDidChange(KEY, () => { readSetting(); this.changed(); }));
+    this.disposers.push(settings.onDidChange(KEY, () => {
+      const previous = this.nativeEnabled; readSetting();
+      if (this.nativeEnabled !== previous) this.changed();
+    }));
     this.disposers.push(connections.subscribe(event => {
       if (event.hostId !== hostId) return;
       if (event.type === 'removed') { if (event.connection === this.connection) this.bind(null); }
@@ -33,6 +36,7 @@ class NativePredictionPolicy {
     this.connection = connection; this.epoch++; this.ready = false; this.pro = false; this.changed();
     if (!connection) return;
     this.connectionDisposers.push(connection.registerInternalNotificationHandler(event => {
+      this.onNotification(event);
       if (event.method === 'account/updated' || event.method === 'account/login/completed') this.refresh();
     }));
     this.connectionDisposers.push(connection.registerInternalAuthenticatedPrincipalChangeHandler(() => this.refresh()));

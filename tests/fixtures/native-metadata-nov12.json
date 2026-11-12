@@ -1,0 +1,12 @@
+{
+  "member": ".vite/build/early-bootstrap-631-8a15b3cfc1548366.js",
+  "memberSHA256": "6220f9e2c741a3a1b474a6635e7b9132313b09db81b333392b8d1e5b9fad5c9b",
+  "functionName": "dt",
+  "source": "async function dt({appServerClient:e,model:t,readOnlyAppToolAllowlist:n=[],cwd:r,fallbackToFreshThread:i,experimentalPredictionMode:a,feature:s,outputSchema:o,prompt:l,responseSchema:c,serviceTier:u,serviceName:d,signal:h,sourceThreadId:p,timeoutMs:m}){let f=null,g=null,y=a?null:\"low\";try{var _;let S=await s4({prompt:l,cwd:r,model:t,effort:y,serviceTier:u,serviceName:d,threadSource:s,schema:o,config:{mcp_servers:await async function(e,t,n,r){if(r?.throwIfAborted(),null!=e.getUserSavedConfiguration)try{let i=e.getUserSavedConfiguration(t??void 0),a=null==r?await i:await (0,C._qC)(i,r),s=u4.safeParse(a.mcp_servers);if(!s.success)return;return Object.fromEntries(Object.keys(s.data).filter(e=>!n||\"codex_apps\"!==e).map(e=>[e,{enabled:!1}]))}catch{r?.throwIfAborted();return}}(e,r,n.length>0,h),\"features.enable_fanout\":!1,\"features.hooks\":!1,\"features.multi_agent\":!1,\"features.multi_agent_v2\":!1,\"features.plugins\":!1,\"features.shell_snapshot\":!1,\"features.tool_suggest\":!1,...{\"features.apps\":(_=n).length>0,apps:{...Object.fromEntries(_.map(({appId:e,toolNames:t})=>[e,{enabled:!0,destructive_enabled:!1,open_world_enabled:!1,default_tools_enabled:!1,tools:Object.fromEntries(t.map(e=>[e,{enabled:!0}]))}])),_default:{enabled:!1,destructive_enabled:!1,open_world_enabled:!1}}},web_search:\"disabled\"},timeoutMs:m,client:e,responseSchema:c,sourceThreadId:p,fallbackToFreshThread:i,experimentalPredictionMode:a,signal:h,onTokenUsage:e=>{f=f??e,g=e}});return ea({feature:s,firstTokenUsage:f,model:t,reasoningEffort:y,serviceTier:u??null,status:null==S?\"empty\":\"success\",tokenUsage:g}),S}catch(e){throw ea({feature:s,firstTokenUsage:f,model:t,reasoningEffort:y,serviceTier:u??null,status:e instanceof Error&&\"AbortError\"===e.name?\"canceled\":\"error\",tokenUsage:g}),e}}",
+  "bindings": {
+    "parse": "u4",
+    "generate": "s4",
+    "log": "ea",
+    "abort": "C"
+  }
+}

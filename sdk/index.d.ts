@@ -2,15 +2,17 @@ import type { NexusAPI } from './nexus.js';
 export * from './nexus.js';
 export interface ForgeError extends Error {code:string}
 export interface CapabilityState {name:string;version:number;optional:boolean;supported:boolean;enabled:boolean;granted:boolean}
-export interface Context {threadId:string|null;codexVersion:string;forgeVersion:string;apiVersion:4}
+export type ForgeApiVersion = 1|2|3|4;
+export interface Context<V extends ForgeApiVersion = 4> {threadId:string|null;codexVersion:string;forgeVersion:string;apiVersion:V;hostApiVersion:4}
 export interface ContributionIcon {viewBox:'0 0 24 24';paths:string[]}
 export interface Contribution {id:string;title:string;command?:string;panel?:string;icon?:ContributionIcon}
 export interface ForgeEventMetadata {sourcePluginId?:string;threadId?:string|null}
-export interface ForgeCapabilities {apiVersion:4;codexVersion:string;forgeVersion:string;permissions:string[];capabilities:{name:string;version:number;optional:boolean}[];available:Record<string,number>;negotiated:CapabilityState[];denied:Record<string,string>;slots:{id:string;kind:string;scope:string;label:string}[];events:string[];surfaces:string[]}
+export interface ForgeCapabilities<V extends ForgeApiVersion = 4> {apiVersion:V;hostApiVersion:4;supportedApiVersions:ForgeApiVersion[];codexVersion:string;forgeVersion:string;permissions:string[];capabilities:{name:string;version:number;optional:boolean}[];available:Record<string,number>;negotiated:CapabilityState[];denied:Record<string,string>;slots:{id:string;kind:string;scope:string;label:string}[];events:string[];surfaces:string[]}
 export interface ForgeDiagnostics {at:string;href:string;title:string;nodes:number;slots:{id:string;kind:string;label:string;anchor:string|null;verified:boolean;matches:number;samples:unknown[]}[];probes:{name:string;selector:string;matches:number;samples:unknown[]}[]}
-export interface ForgeAPI {
-  readonly apiVersion:4;
-  context:{get():Promise<Context>};
+export interface ForgeAPI<V extends ForgeApiVersion = 4> {
+  readonly apiVersion:V;
+  readonly hostApiVersion:4;
+  context:{get():Promise<Context<V>>};
   events:{on(name:'ready'|'context.changed'|'settings.changed'|'dispose'|'output.changed'|`plugin.${string}`,listener:(value:any,metadata?:ForgeEventMetadata)=>void):()=>void;emit(name:string,value?:unknown):Promise<{accepted:boolean;name:string}>};
   commands:{register(id:string,handler:(args:any)=>unknown|Promise<unknown>):()=>void};
   panels:{open(id:string,options?:{mode?:'right'|'expanded'}):Promise<unknown>;close(id:string):Promise<unknown>};
@@ -24,7 +26,7 @@ export interface ForgeAPI {
   settings:{get<T=Record<string,unknown>>():Promise<T>};
   nexus:NexusAPI;
   metadata:{get():Promise<Record<string,unknown>>};
-  capabilities:{get():Promise<ForgeCapabilities>};
+  capabilities:{get():Promise<ForgeCapabilities<V>>};
   diagnostics:{get():Promise<ForgeDiagnostics>};
   devtools:{eval(code:string):Promise<{ms:number;result:{type:string;value?:string;truncated?:boolean}}|{error:string}>};
 }

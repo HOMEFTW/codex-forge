@@ -1,81 +1,54 @@
 # 自动提示词预测内置插件
 
-## 目标与范围
+`forge.prompt-prediction` 在当前本地聊天的一轮回复完成后，使用该聊天实际模型和提供方的 **low** 档预测下一条用户提示词。只在空输入框显示灰字；Tab 接受为可编辑草稿，Esc 关闭，发送由用户决定。新旧聊天均支持；仅打开历史聊天不主动生成。
 
-新增 `forge.prompt-prediction`。当前本地聊天回复完成后，预测用户下一条可能输入的消息；空输入框显示灰字，Tab 接受为可编辑草稿，Esc 关闭，用户自行发送。打开历史聊天不额外采样，切换回来最多复用有效缓存。保护中文组词、非空草稿、聊天切换、新回合、插件停用与迟到结果。
+适配基线：Forge 0.6.1 / API 4、Codex Windows 26.1106.6628.0；保留 26.1103.7773.0 适配器。本次预测修复已纳入 0.6.1 安装包。
 
-用户已在宿主聊天明确同意本次升级至 Forge 0.6.0 / API 4；预测插件清单和注册验证以该目标为准。
+## 原生订阅优先
 
-模型与提供方继承当前聊天。使用普通自建预测标记，不改原生账号资格、远端预测配置或官方免费计费标记。失败不重试、不切换模型、不降级成主聊天 `turn/start`。
+主进程通过固定版本的原生接缝读取 `composer-predictions-enabled` 和 `account/read` 元数据。原生 Pro 家族（pro/prolite/promax）开启原生预测时，取消并清空 Forge 预测；关闭后恢复尚未尝试的已完成回合及后续新回合。账号状态未知且原生开关开启时等待，不发起模型请求。插件停用和插件自身的自动预测开关始终优先，不改写用户偏好。
 
-用户补充要求：读取可信原生订阅和 `composer-predictions-enabled` 设置。Pro 账号打开原生预测时，本插件取消请求、清除建议且停止采样；关闭时恢复当前已观察到、尚未尝试过的已完成回合及之后新回合的预测机会。仍须通过插件启用、自动预测开关及空草稿检查，不改写用户偏好，不等待原生灰字出现才暂停。
+仅原生开关有效值改变才通知预测宿主。同值设置通知不会取消采样或清空建议。账号切换、断开及实际资格变化仍使待处理请求失效。
 
-## 分工与接口
+## 当前调用路径
 
-本聊天负责新增 `plugins/forge.prompt-prediction/*`、`runtime/prompt-prediction.cjs`、`tests/prompt-prediction.test.cjs`、`tests/prompt-prediction-manifest.test.cjs`、`scripts/check-prompt-prediction.mjs` 和本文档。
+1. 宿主从原生 app-server 内部通知接收 `turn/completed`，核对当前可信主窗口的聊天、回合及空草稿，按回合去重。旧式渲染器通知仍可用；两条路径收到同一回合不会重复采样。
+2. `predictPrompt` 优先经宿主原生连接私下读取当前聊天最近三轮摘要和有效模型、提供方、服务档位，不依赖渲染器是否发送过旧式 MCP RPC。最新回合必须仍是指定已完成回合。仅保留用户文字和助手最终回复，忽略系统消息、工具输出、附件和中间 commentary；文本总量最多 24,000 字符。
+3. `runLowPrediction` 启动独立后端，在空临时目录创建无持久对话记录的临时聊天。使用源聊天的模型、提供方和服务档位，关闭模型回退，明确设置 `model_reasoning_effort=low`，并核对后端返回的配置。
+4. 只在该临时聊天执行一次 `turn/start`，再次固定 `effort=low`，用 JSON Schema 约束建议。原生主连接不执行主聊天的 `turn/start` 或 `thread/start`。不使用原生免费预测标记。
+5. 工具、MCP、Hooks、插件、浏览器、环境访问等关闭；拒绝工具、审批及交互请求。原始工具调用事件出现时终止该后端，不执行工具或继续推理。取消、超时、草稿变化、聊天切换和 Pro 接管均终止独立进程。
+6. 结果必须为合法 JSON `{"suggestion":"..."}` 或空建议。内容、长度和上下文再次校验后显示灰字，迟到结果丢弃。
 
-「Codex Forge客户端」聊天负责宿主现有共享文件、预测调度与灰字渲染、内置插件启停及设置注册、权限接缝和相应测试。分工和函数契约已确认；任一方接手前先确认原负责方停止修改。
+用户设置仍为 `enabled:true`、预测偏好、`maxChars:320`、`timeoutSeconds:30`（可选 1–120 秒）。此前考虑过延长默认超时，最终方案保持 30 秒并实际使用 low；主聊天的思考强度和历史不变。
 
-权限使用 `conversation.predict`，能力使用 `prompt-prediction@1`，仅内置 `forge.prompt-prediction` 可声明。宿主内部调用，不增加公共 SDK 模型调用方法。设置为 `enabled:true`、`prompt:DEFAULT_PROMPT`、`maxChars:320`、`timeoutSeconds:30`。
+权限为内置专用 `conversation.predict`，不增加公开 SDK 任意模型调用能力。源元数据请求、模型/提供方/服务档位和后台参数均由宿主校验。私有元数据请求取消后的迟到 IPC 回复不会转发给渲染器。
 
-预测模块导出：
+主要文件：`runtime/prompt-prediction.cjs`（文本上下文和结果校验）、`runtime/prompt-prediction-runner.cjs`（独立 low 后端）、`runtime/prompt-prediction-host.cjs`（调度/权限/取消）、`runtime/prompt-prediction-preload.cjs`（灰字/键盘/草稿保护）、`runtime/native-prediction-policy.cjs`（原生订阅联动）。
 
-```js
-predictPrompt({ call, threadId, sourceTurnId, signal, prompt, maxChars = 320, timeoutMs = 30000 })
-// -> Promise<{ threadId, sourceTurnId, text: string | null }>
-```
+## 原生聊天连接修复
 
-`call(method, params, { signal, timeoutMs })` 由宿主在可信的同一原生连接上执行。模块只调用 `thread/sample`，固定 `expectedTurnId`、`disableMcp: true`、`interruptOnCancel: true`、`threadSource/turnTrigger: 'forge_prompt_prediction'`。`prompt` 是预测偏好，外层始终保留只预测用户下一条消息及 JSON 输出约束。结果来源不匹配时拒绝；空、无效、过长或工具调用结果不显示。
+用户在当前聊天反馈仍无预测后，发现此前的隔离测试通过手动渲染器 RPC 建立了 `state.bridge`，没有覆盖原生宿主管理聊天且该字段为空的路径。旧实现会在处理完成事件前直接返回，无法开始预测。现改用宿主已有连接和内部完成通知；元数据回复不经过界面 IPC，取消或导航后的迟到读取不会启动推理。
 
-宿主必须以原 JSON-RPC 请求 ID 发送 `thread/sample/cancel { requestId }`，并清理超时、取消监听器和迟到响应。取消不得中断原聊天回合。
+状态快照增加 `diagnostics`，保留最近完成事件、最近尝试阶段/耗时/错误码，避免新消息清空当前错误后丢失诊断依据。不保存提示词或预测正文。仅设置进程环境变量 `CODEX_FORGE_PREDICTION_DIAGNOSTICS=1` 时，将最近状态写入 Forge 根目录的 `diagnostics/prompt-prediction.json`。
 
-## 已核对的版本依据
+对应回归先复现 `idle` 而非 `offer`，修复后在没有旧桥的情况下接收宿主完成事件、私下读取源聊天并生成建议；覆盖重复通知去重和导航取消。完整回归 411 项通过，记录为 `output/prompt-prediction-managed-tests.log`。用户随后确认修复成功；真实宿主管理连接（rendererBridge=false）产生 suggestion，耗时 3,734 ms。代理未单独复测该生产窗口的 Tab、物理 IME 或真实 Pro 接管。
 
-- 初始检查基线为 Forge 0.5.2 / API 3；本次目标为 Forge 0.6.0 / API 4，Codex Windows 仍为 `26.1103.7773.0`。
-- 当前安装 CLI 为 `0.167.0-alpha.3.2`；已通过 `app-server generate-json-schema --experimental` 离线核对真实参数和取消协议。
-- `ThreadSampleResponse.text` 在试图调用工具或无文本时为 `null`。
-- 本功能初次兼容声明只覆盖实际验证的客户端版本；不扩大到未经验证的旧适配器。
+## 2026-11-12 验证
 
-## 验收
+- 首次真实旧路径采样确认 `gpt-6-astra / xhigh` 在 30,010 ms 超时；源回合不变。记录：`output/prompt-prediction-real-sample.json`。
+- 本机 CLI 实验确认该提供方下 `thread/sample` 未应用单独的 low 覆盖，因此改为独立临时 low 聊天；不把延长超时当作提速方案。
+- 用户随后明确要求调用当前模型 low 档。真实 low 验证成功：同一 `gpt-6-astra / custom`，后端确认 low，总耗时 8,246 ms，返回 43 字符可用建议。主聊天仍为 xhigh，近期历史完全一致，主聊天新回合数为 0。记录：`output/prompt-prediction-low-real.json`。报告不保存建议正文或凭据。
+- 410 项全套回归通过，构建通过。记录：`output/prompt-prediction-low-tests.log`。
+- 真实 CLI + localhost 提供方验证通过：主聊天 xhigh、后台实际 low、同模型、无广告工具、工具尝试立即中止且不追加推理、真实连接取消、源历史不变、未新增源聊天回合。记录：`output/prompt-prediction-native-regression.json`。
+- 本次此前的九项隔离原生编辑器检查已经通过；low 路径同步本机后的复验单独记录，不把旧路径界面通过当作新路径证明。
+- Pro 接管使用受控原生账号夹具验证，真实 Pro 预测服务未测试。中文组词使用 CDP composition 验证，未测试物理输入法。仅支持当前模型后端能够确认 low 的情况，不静默换模型。
 
-1. 模块测试验证同源采样、普通调用标记、结果校验、取消、超时与无降级。
-2. 宿主测试验证真实消息触发、每回合去重、设置与启停、可信当前线程，以及原请求 ID 取消。
-3. 隔离界面验证空草稿灰字、Tab/Esc、非空草稿保护、中文组词、切换聊天和新回合丢弃过期结果。
-4. 运行受影响回归和构建；报告本机模拟与真实远端推理的各自证据范围。
+## 0.6.1 新官方基线复验
 
-本功能随 Forge 0.6.0 / API 4 分发，安装包与版本说明见 [0.6.0 发布页](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.6.0)。
+- 使用 Codex Windows `26.1106.6628.0` 的真实 CLI、本机模拟提供方和隔离 CODEX_HOME，再次确认后台 low、同模型、工具尝试终止、取消与源历史不变。证据：`output/release-061-prediction-cli.json`。
+- 在打包载荷生成的隔离 Electron 客户端中，九项编辑器交互全部通过，无渲染错误：灰字、Tab 仅写草稿、Esc、编辑中迟到结果保护、CDP 组词保护、原生装饰模拟优先、切换聊天、插件启停和实际原生账号/设置接缝。证据：`output/playwright/forge061/prediction-061-native-ui.json`。
+- 本次 UI 测试通过渲染器 RPC 创建 localhost 源回合，因此不单独证明无旧桥路径；无旧桥行为由宿主回归和上文用户已确认的真实修复证据支持。真实 Pro 服务、物理中文输入法和新版本远端计费模型未测试。
 
-## 验证记录
+## 发布与安装边界
 
-- 预测模块 11 项针对性测试通过，包含不支持时不重试或降级。
-- `scripts/check-prompt-prediction.mjs` 使用当前真实 CLI、独立 `CODEX_HOME` 和 localhost 模拟提供方通过：生成建议、拒绝过期来源、工具调用返回空建议、按 request ID 取消、源聊天历史未变化，未新增源聊天回合。
-- 上述 CLI 检查仅使用虚构内容和本地模拟模型，未发送凭据或调用真实远端；报告为 `output/prompt-prediction-native-regression.json`。
-- 插件清单注册、设置保存与启停偏好保留验证通过，已纳入宿主回归。
-- 最终宿主全量回归 398 项通过，无失败或跳过；日志为 `output/release-060-tests.log` 与 `output/forge-tests.tap`。启动器、准备程序和独立更新器编译及 UI 构建通过；更新器的 32 项校验见 `output/api4-updater-verification.json`。
-- 隔离完整原生客户端的 9 项交互检查通过：自动预测与灰字独立、Tab 填草稿而不发送、Esc、待返回时用户草稿保护、组词保护、原生装饰优先、切换聊天丢弃迟到结果、真实按钮停用及重新启用不重采样，以及原生账号/设置接缝已就绪且非 Pro 提供方仍可使用。报告为 `output/playwright/prediction-060-native-ui.json`，对应脚本为 `output/playwright/check-prediction-ui.mjs`。
-- 上述界面检查使用当前真实编辑器、真实键盘和 localhost 模拟提供方。组词使用 CDP composition 输入，未验证物理输入法；原生建议冲突使用实际 `data-cumberbatch` 标记模拟，未验证真实 Pro 账号预测服务。隔离配置中的 Windows 配置及模型菜单提示不属于本插件验收，未将普通 UI 发送计入通过。
-- 测试先完成虚构种子回合再导航已有聊天，避免原生客户端对未持久化空聊天的 `no rollout` / `list_turns` 限制；未因此修改产品代码。
-- 已核对验收客户端中 9 个相关 runtime 文件与当前源码摘要一致。完整性校验通过：4,088 个文件、19,792 个 ASAR 成员、19,827 个完整性块；记录为 `output/playwright/prediction-060-client-integrity.json`。
-
-## 使用与交付边界
-
-升级到本次构建后，在“插件管理”中管理“自动提示词预测”，并通过“设置 → Codex Forge 插件设置 → 自动提示词预测”调整开关、预测偏好、最大长度与超时。本地聊天的新回合完成后自动生成；Tab 接受后仍需用户自行发送。
-
-源码、本地构建与 MSI/ZIP 安装包均包含本功能。验证期间未实际安装或替换用户正在使用的客户端。API 3 独立插件保留数据，但需作者适配 API 4；宿主不自动改写第三方插件。
-
-## 原生订阅联动补充验收
-
-联动由固定版本的原生主进程接缝提供：读取实际设置仓库及 `account/read` 元数据，订阅原生设置、账号与连接变化；不读取凭据，不向插件 iframe 开放状态写入或任意 RPC。版本适配验证原始模块摘要及构造锚点，漂移时构建失败。
-
-| 原生状态 | 插件启用且自动预测开启时的行为 |
-| --- | --- |
-| `pro` / `prolite` / `promax`，原生预测开启 | 立即取消、清除建议并停止采样，不依赖原生灰字是否出现或模型是否支持原生预测 |
-| 原生预测明确关闭 | 恢复当前已观察到且未尝试过的已完成回合；之后的新回合正常预测 |
-| 已确认的非 Pro / API Key / 无原生认证提供方 | 保持本插件预测 |
-| 原生开关开启，但账号状态未知或读取失败 | 等待可信状态，不发起预测 |
-| 本插件停用或其自动预测关闭 | 始终不生成；原生开关变化不改写或重新启用用户偏好 |
-
-- 20 项定向回归通过，覆盖 Pro 家族、原生开关动态切换、取消与迟到结果、账号变化、未知状态、停用优先、重复切换不重试已尝试回合、原生版本适配及摘要/锚点变化拒绝。证据为 `output/native-prediction-policy-tests.log` 与 `output/native-prediction-policy-handoff.json`。
-- 最终 9 项原生界面复验使用已加入该接缝的新构建。实际原生状态快照为 `ready:true, nativeEnabled:true, pro:false, paused:false`，确认非 Pro 场景及真实桥接正常；Pro 分支使用受控订阅夹具验证，真实 Pro 账号服务未实测。
-- 界面脚本清空草稿使用真实 Ctrl+A/Backspace 并校验结果，避免直接 `fill('')` 未同步到原生草稿状态造成误判。
-- 验收完成后已停止本次测试进程，清理 6,084,671,232 字节临时副本（约 5.67 GiB）；报告、截图、客户端清单及原始 MSIX 缓存保留。清理记录为 `output/playwright/prediction-060-temp-cleanup.json`。
+初版随 Forge 0.6.0 发布，0.6.1 合入本次修复及新官方基线适配。本机修复更新 bootstrap 载荷和客户端外部运行模块，并更新完整性清单；重启后加载。恢复副本和摘要见各轮 `output/prompt-prediction-*-local-fix.json`。不修改个人模型配置、账号开关或插件偏好，开发阶段仅本地验证，后续按用户授权随 0.6.1 发布。

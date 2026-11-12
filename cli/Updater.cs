@@ -28,6 +28,10 @@ internal static class ForgeUpdateCore {
             }if(match)return true;
         }return false;
     }
+    internal static bool SupportsApi(int api,Dictionary<string,object> plan) {
+        int host=Convert.ToInt32(plan["apiVersion"]);
+        return api>=1&&api<=4&&(api==host||host==4&&new Version(S(plan,"forgeVersion"))>=new Version("0.6.1"));
+    }
     internal static void CheckPlugins(Dictionary<string,object> plan,string home) {
         string state=Path.Combine(home,"plugins.json");if(!File.Exists(state))return;
         var entries=(Dictionary<string,object>)BootstrapCore.Read(state)["plugins"];
@@ -35,7 +39,7 @@ internal static class ForgeUpdateCore {
             if(entry.Key.StartsWith("forge.")||!((Dictionary<string,object>)entry.Value).ContainsKey("enabled")||!Convert.ToBoolean(((Dictionary<string,object>)entry.Value)["enabled"]))continue;
             string file=BootstrapCore.SafePath(home,"plugins/"+entry.Key+"/plugin.json");if(!File.Exists(file))continue;
             var plugin=BootstrapCore.Read(file);var ranges=(Dictionary<string,object>)plugin["compatibility"];
-            Need(Convert.ToInt32(plugin["apiVersion"])==Convert.ToInt32(plan["apiVersion"])&&Compatible(S(plan,"forgeVersion"),(IEnumerable)ranges["forge"])&&Compatible(S(plan,"codexVersion"),(IEnumerable)ranges["codex"]),"已启用插件 "+entry.Key+" 未声明兼容目标版本，请先安装兼容版或在插件管理中停用");
+            Need(SupportsApi(Convert.ToInt32(plugin["apiVersion"]),plan)&&Compatible(S(plan,"forgeVersion"),(IEnumerable)ranges["forge"])&&(!ranges.ContainsKey("codex")||Compatible(S(plan,"codexVersion"),(IEnumerable)ranges["codex"])),"已启用插件 "+entry.Key+" 未声明兼容目标版本，请先安装兼容版或在插件管理中停用");
         }
     }
     internal static void PlainPath(string file) {
@@ -59,7 +63,7 @@ internal static class ForgeUpdateCore {
         ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
         var handler=new HttpClientHandler { AllowAutoRedirect=false };
         if(!String.IsNullOrWhiteSpace(proxy)) { Uri uri;Need(Uri.TryCreate(proxy,UriKind.Absolute,out uri)&&(uri.Scheme=="http"||uri.Scheme=="https")&&uri.UserInfo==""&&uri.AbsolutePath=="/"&&uri.Query==""&&uri.Fragment=="","代理应为 http(s)://主机:端口，不含凭据");handler.Proxy=new WebProxy(uri);handler.UseProxy=true; }
-        var client=new HttpClient(handler) { Timeout=TimeSpan.FromMinutes(30) };client.DefaultRequestHeaders.UserAgent.ParseAdd("Codex-Forge-Updater/0.6.0");return client;
+        var client=new HttpClient(handler) { Timeout=TimeSpan.FromMinutes(30) };client.DefaultRequestHeaders.UserAgent.ParseAdd("Codex-Forge-Updater/0.6.1");return client;
     }
     internal static async Task<HttpResponseMessage> Get(HttpClient client,Uri uri,long offset,CancellationToken token) {
         for(int redirects=0;redirects<6;redirects++) {
@@ -176,7 +180,7 @@ internal static class ForgeUpdateCore {
 internal sealed class ForgeUpdaterForm : Form {
     readonly string root;readonly string forgeHome=Environment.GetEnvironmentVariable("CODEX_FORGE_HOME")??Path.Combine(Environment.GetEnvironmentVariable("CODEX_HOME")??Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),".codex"),"forge");readonly TextBox repository=new TextBox(),proxy=new TextBox();readonly Label status=new Label();readonly ProgressBar progress=new ProgressBar();readonly Button check=new Button(),download=new Button(),install=new Button(),cancel=new Button(),repair=new Button();CancellationTokenSource cancellation;Dictionary<string,object> plan;string staged;bool busy;
     internal ForgeUpdaterForm(string directory,string source) {
-        root=directory;Text="Codex Forge 独立更新器 · 0.6.0";ClientSize=new Size(620,360);StartPosition=FormStartPosition.CenterScreen;FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=false;
+        root=directory;Text="Codex Forge 独立更新器 · 0.6.1";ClientSize=new Size(620,360);StartPosition=FormStartPosition.CenterScreen;FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=false;
         Controls.Add(new Label { Text="安装目录："+root,Left=20,Top=16,Width=580,Height=38 });
         Controls.Add(new Label { Text="GitHub 发布仓库",Left=20,Top=60,Width=150 });repository.SetBounds(180,58,420,25);repository.Text=source;repository.AccessibleName="GitHub 发布仓库";
         Controls.Add(new Label { Text="HTTP 代理（留空用系统）",Left=20,Top=100,Width=160 });proxy.SetBounds(180,98,420,25);proxy.AccessibleName="HTTP 代理";

@@ -49,6 +49,15 @@ internal static class UpdaterTests {
         Check(ForgeUpdateCore.Compatible("0.5.0",new[]{">=0.4.0 <0.6.0"})&&!ForgeUpdateCore.Compatible("0.5.0",new[]{">=0.4.0 <0.5.0"}),"external plugin range respected");
         string pluginHome=Path.Combine(root,"plugins-home");Directory.CreateDirectory(Path.Combine(pluginHome,"plugins","test.notes"));File.WriteAllText(Path.Combine(pluginHome,"plugins.json"),"{\"plugins\":{\"test.notes\":{\"enabled\":true}}}");File.WriteAllText(Path.Combine(pluginHome,"plugins","test.notes","plugin.json"),"{\"apiVersion\":3,\"compatibility\":{\"forge\":[\">=0.4.0 <0.5.0\"],\"codex\":[\"26.1103.4239.0\"]}}");
         var plan=Dict("{\"forgeVersion\":\"0.5.0\",\"codexVersion\":\"26.1103.4239.0\",\"apiVersion\":3}");Reject(()=>ForgeUpdateCore.CheckPlugins(plan,pluginHome),"enabled incompatible plugin blocks update");
+        var compatPlan=Dict("{\"forgeVersion\":\"0.6.1\",\"codexVersion\":\"26.1106.6628.0\",\"apiVersion\":4}");
+        string compatFile=Path.Combine(pluginHome,"plugins","test.notes","plugin.json");
+        foreach(int api in new[]{1,2,3,4}) {
+            var plugin=Dict("{\"compatibility\":{\"forge\":[\">=0.6.0 <0.7.0\"]}}");plugin["apiVersion"]=api;File.WriteAllText(compatFile,BootstrapCore.Json.Serialize(plugin));
+            ForgeUpdateCore.CheckPlugins(compatPlan,pluginHome);Check(true,"API "+api+" unpinned plugin accepted");
+            if(api<4){compatPlan["forgeVersion"]="0.6.0";Reject(()=>ForgeUpdateCore.CheckPlugins(compatPlan,pluginHome),"0.6.0 has no legacy bridge");compatPlan["forgeVersion"]="0.6.1";}
+            ((Dictionary<string,object>)plugin["compatibility"])["codex"]=new[]{"26.1103.7773.0"};File.WriteAllText(compatFile,BootstrapCore.Json.Serialize(plugin));Reject(()=>ForgeUpdateCore.CheckPlugins(compatPlan,pluginHome),"explicit Codex pin honored");
+        }
+        Check(!ForgeUpdateCore.SupportsApi(5,compatPlan)&&!ForgeUpdateCore.SupportsApi(0,compatPlan),"unknown APIs rejected");
         string source=Path.Combine(root,"zip-source"),payload=Path.Combine(source,"forge","0.5.0");Directory.CreateDirectory(payload);
         string config=Path.Combine(payload,"forge.config.json");File.WriteAllText(config,"{\"version\":\"0.5.0\"}");
         var content=new Dictionary<string,object>{{"forgeVersion","0.5.0"},{"files",new[]{new Dictionary<string,object>{{"path","forge.config.json"},{"bytes",new FileInfo(config).Length},{"sha256",BootstrapCore.Hash(config)}}}}};content["payloadDigest"]=BootstrapCore.PayloadDigest(content);File.WriteAllText(Path.Combine(payload,"forge-payload.json"),BootstrapCore.Json.Serialize(content));

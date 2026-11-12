@@ -37,6 +37,7 @@
   });
   const api = {
     apiVersion: 4,
+    hostApiVersion: 4,
     context: { async get() { return context = await request('context.get'); } },
     events: { on, emit: (name, value) => request('events.emit', { name, value }) },
     commands: { register(id, handler) { if (handlers.has(id)) throw Error('重复命令'); handlers.set(id, handler); return () => handlers.delete(id); } },

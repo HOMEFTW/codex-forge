@@ -10,7 +10,9 @@ function setup(t,{account={type:'chatgpt',planType:'pro'},nativeEnabled=true,req
  const registry={getMaybeConnection:id=>{assert.equal(id,'local');return connection;},subscribe:()=>()=>{}};
  let pluginEnabled=true,host;const policy=new NativePredictionPolicy(()=>host?.nativeChanged());
  const state={threadId:'A',bridge:{},win:{id:1,isDestroyed:()=>false}},calls=[],events=[];
- host=new PromptPredictionHost({states:new Map([[1,state]]),settings:()=>({enabled:pluginEnabled,prompt:'下一步',maxChars:320,timeoutSeconds:30}),nativeStatus:()=>policy.snapshot(),notify:(_state,value)=>events.push(value),call:(_state,method,params,options)=>new Promise((resolve,reject)=>{calls.push({method,params,options,resolve});options.signal.addEventListener('abort',()=>reject(options.signal.reason),{once:true});})});
+ host=new PromptPredictionHost({states:new Map([[1,state]]),settings:()=>({enabled:pluginEnabled,prompt:'下一步',maxChars:320,timeoutSeconds:30}),nativeStatus:()=>policy.snapshot(),notify:(_state,value)=>events.push(value),
+  call:async()=>({thread:{id:'A'},model:'gpt-6-astra',modelProvider:'fixture',initialTurnsPage:{data:[{id:host.latest.get('A').turnId,status:'completed',items:[{type:'agentMessage',text:'已完成检查。'}]}]}}),
+  sample:options=>new Promise((resolve,reject)=>{calls.push({options,resolve});options.signal.addEventListener('abort',()=>reject(options.signal.reason),{once:true});})});
  policy.attach({settings,connections:registry,hostId:'local'});
  t.after(()=>{policy.dispose();host.stop();});
  return {policy,host,state,calls,events,settings,registry,connection,get reads(){return reads;},complete:id=>host.observe(state,'turn/completed',{threadId:'A',turn:{id,status:'completed'}}),snapshot:()=>host.snapshot(state),request:action=>host.request(state,{...host.snapshot(state),action,expectedText:''}),setNative:value=>{nativeEnabled=value;for(const fn of settingsListeners)fn();},setAccount:(value,requires=true)=>{account=value;requiresOpenaiAuth=requires;for(const fn of principals)fn({});},setEnabled:value=>{pluginEnabled=value;host.refresh();},setRead:fn=>{read=fn;},notify:(method,params)=>{for(const fn of notifications)fn({method,params});}};
@@ -20,7 +22,7 @@ for(const planType of ['pro','prolite','promax'])test(`native ${planType} on blo
  f.complete('one');assert.equal(f.snapshot().phase,'idle');assert.equal(f.calls.length,0);
  f.setNative(false);assert.equal(f.snapshot().phase,'offer');const pending=f.request('ready');await tick();assert.equal(f.calls.length,1);
  f.setNative(true);await pending;assert.equal(f.calls[0].options.signal.aborted,true);assert.equal(f.snapshot().text,null);
- f.calls[0].resolve({sourceTurnId:'one',text:'{"suggestion":"late"}'});await tick();assert.equal(f.snapshot().text,null);
+ f.calls[0].resolve('{"suggestion":"late"}');await tick();assert.equal(f.snapshot().text,null);
  f.setNative(false);assert.equal(f.snapshot().phase,'idle');assert.equal(f.calls.length,1);
  f.complete('two');assert.equal(f.snapshot().phase,'offer');assert.equal(f.reads,1);
 });
@@ -55,4 +57,22 @@ test('native adapter binds only the trusted main-process services and rejects an
 test('a known Pro account is paused even when current provider needs no OpenAI auth; plugin toggles do not retry an attempted turn',async t=>{
  const f=setup(t,{requiresOpenaiAuth:false});await tick();assert.equal(f.policy.allowed,false);f.complete('one');f.setNative(false);const pending=f.request('ready');await tick();f.setNative(true);await pending;
  f.setEnabled(false);f.setEnabled(true);f.setNative(false);assert.equal(f.snapshot().phase,'idle');assert.equal(f.calls.length,1);
+});
+
+for(const nativeEnabled of [true,false])test(`unchanged native preference notifications preserve pending predictions and suggestions (${nativeEnabled})`,async t=>{
+ const f=setup(t,{account:{type:'apiKey'},nativeEnabled});await tick();
+ f.complete('one');const pending=f.request('ready');await tick();
+ const generation=f.snapshot().generation;
+ f.setNative(nativeEnabled);
+ assert.equal(f.calls[0].options.signal.aborted,false,'a notification with the same effective preference must not cancel inference');
+ assert.equal(f.snapshot().generation,generation);
+ f.calls[0].resolve('{"suggestion":"继续检查"}');await pending;
+ f.setNative(nativeEnabled);
+ assert.equal(f.snapshot().phase,'suggestion');assert.equal(f.snapshot().text,'继续检查');
+ assert.equal(f.calls.length,1);
+});
+
+test('Nov12 policy injects the new trusted settings and connection symbols',async()=>{
+ const f=require('./fixtures/native-prediction-policy-nov12.json'),a=require('../adapters/26.1106.6628.0.json');assert.equal(a.nativePredictionPolicy.sha256,f.moduleSHA256);assert.equal(a.nativePredictionPolicy.member,f.member);
+ const source='// '+f.settingSource+' '+f.controllerGuard+'\nthis.disposables.add(this.cumberbatchController);';const spec={...a.nativePredictionPolicy,sha256:crypto.createHash('sha256').update(source).digest('hex')};const {patchNativePredictionPolicy}=await import('../scripts/native-nov09-main.mjs');const patched=patchNativePredictionPolicy(source,source,spec);let received;const settings={},connections={};vm.runInNewContext(patched,{e:{settingsStore:settings},sD:{n:'local'},process:{resourcesPath:'fixture'},require:name=>name==='node:path'?require('node:path'):{attachNativePredictionPolicy:value=>{received=value;}},disposables:{add(){}},cumberbatchController:{},appServerConnectionRegistry:connections});assert.equal(received.settings,settings);assert.equal(received.connections,connections);assert.equal(received.hostId,'local');assert.throws(()=>patchNativePredictionPolicy(source+'drift',source,spec),/module changed/);
 });

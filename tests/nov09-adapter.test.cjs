@@ -1,5 +1,6 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
 const versions=[{label:'Nov09',version:'26.1103.4239.0',fixture:require('./fixtures/native-rspack-nov09.json'),digest:'9a5fdf536327ce471f9594b0ac6e369244ec3ebfd5e09ec5a66524575dbaa60c'}, {label:'Nov10',version:'26.1103.7773.0',fixture:require('./fixtures/native-rspack-nov10.json'),digest:'c043c8032b7a1e6ab383252a910176405265ac3edbc909218d875fb284dea672'}];
+versions.push({label:'Nov12',version:'26.1106.6628.0',fixture:require('./fixtures/native-rspack-nov12.json'),digest:'785189c1960a47db3c241b9bb84c4a4979c26b79329af5c0019afb016f1e56a3'});
 const normalize=v=>JSON.parse(JSON.stringify(v));
 function execute(source,id,modules={},flags={}) {
   const req=id=>{assert(Object.hasOwn(modules,id),'Unexpected dependency '+id);return modules[id];};
@@ -13,7 +14,7 @@ test(label+': adapter retains its signed package and all duplicated speed module
   assert.equal(adapter.codexVersion,version);
   assert.equal(adapter.packageSHA256,digest);
   assert.equal(adapter.rspackModules.filter(m=>m.id==='ipV4').length,7);
-  assert.equal(adapter.rspackModules.filter(m=>m.id==='PAzX').length,7);
+  assert.equal(adapter.rspackModules.filter(m=>m.id==='PAzX').length,label==='Nov12'?8:7);
 });
 test(label+': all selectors retain native and managed restrictions and expose independent Ultrafast',async()=>{
   const {patchNov09Factory}=await import('../scripts/native-nov09-patch.mjs');

@@ -158,7 +158,7 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
   ipcMain.handle('forge:bundle', (event, { id, viewId } = {}) => {
     const state = host(event), bundle = require('./forge-content.cjs').pluginBundle(registry, id, { viewId });
     check(Buffer.byteLength(bundle.html) <= 20*1024*1024, '插件页面超过20MB');
-    return { ...bundle, context: publicContext(event, state) };
+    return { ...bundle, context: { ...publicContext(event, state), apiVersion: registry.get(id).manifest.apiVersion, hostApiVersion: config.apiVersion } };
   });
   ipcMain.handle('forge:api', (event, request = {}) => reply(async () => {
     const state = host(event), { id, method, args = {} } = request, entry = registry.get(id);
@@ -166,9 +166,9 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
     if (blocked) throw new ForgeError('CAPABILITY_UNAVAILABLE', blocked);
     const permission = name => registry.permission(id, name);
     switch (method) {
-      case 'context.get': { const value=publicContext(event,state); if(!entry.manifest.permissions.includes('conversation.read')) value.threadId=null; return value; }
+      case 'context.get': { const value={...publicContext(event,state), apiVersion:entry.manifest.apiVersion, hostApiVersion:config.apiVersion}; if(!entry.manifest.permissions.includes('conversation.read')) value.threadId=null; return value; }
       case 'metadata.get': return entry.manifest;
-      case 'capabilities.get': return { apiVersion: config.apiVersion, codexVersion: config.codexVersion, forgeVersion: config.version, permissions: [...entry.manifest.permissions], capabilities: entry.manifest.capabilities.map(item => ({ ...item })), available: Object.fromEntries(Object.entries(CAPABILITIES).map(([name, spec]) => [name, spec.version])), negotiated: negotiate(entry.manifest, enabledCapabilities()), denied: deniedMethods(entry.manifest), slots: Object.entries(SLOTS).map(([id, spec]) => ({ id, kind: spec.kind, scope: spec.scope, label: spec.label })), events: ['ready','context.changed','settings.changed','dispose','output.changed',...(entry.manifest.contributes?.events || []).map(item => item.name)], surfaces: ['panels','sidebar','toolbar','composer'] };
+      case 'capabilities.get': return { apiVersion: entry.manifest.apiVersion, hostApiVersion: config.apiVersion, supportedApiVersions: [1,2,3,4], codexVersion: config.codexVersion, forgeVersion: config.version, permissions: [...entry.manifest.permissions], capabilities: entry.manifest.capabilities.map(item => ({ ...item })), available: Object.fromEntries(Object.entries(CAPABILITIES).map(([name, spec]) => [name, spec.version])), negotiated: negotiate(entry.manifest, enabledCapabilities()), denied: deniedMethods(entry.manifest), slots: Object.entries(SLOTS).map(([id, spec]) => ({ id, kind: spec.kind, scope: spec.scope, label: spec.label })), events: ['ready','context.changed','settings.changed','dispose','output.changed',...(entry.manifest.contributes?.events || []).map(item => item.name)], surfaces: ['panels','sidebar','toolbar','composer'] };
       case 'settings.get': permission('settings'); return registry.settings(id);
       case 'nexus.request': {
         permission('nexus.read'); check(nexus, '宿主不支持 Nexus', 'CAPABILITY_UNAVAILABLE');

@@ -36,7 +36,7 @@ class DshCompatibilityLayer {
       for (const name of fs.readdirSync(info.root).filter(name => /^licen[cs]e(?:\.|$)/i.test(name))) fs.copyFileSync(safeFile(info.root, name), path.join(staging, name));
       fs.writeFileSync(path.join(staging, 'ui.html'), '<!doctype html><html><head></head><body><p class="forge-dsh-notice">此页面运行于 Codex Forge。导入后请在 Forge 插件管理中审阅权限并启用；浏览器插件无需重启。依赖 DSH 服务端的功能暂不支持。</p><div id="forge-dsh-root"></div><div id="forge-dsh-status" role="status"></div></body></html>');
       const manifest = { schemaVersion: 1, apiVersion: this.registry.versions.apiVersion, id, name: info.name.slice(0, 100), version: info.version, description: info.description,
-        compatibility: { codex: [this.registry.versions.codex], forge: [this.registry.versions.forge] },
+        compatibility: { forge: [this.registry.versions.forge] },
         permissions: ['panels', 'sidebar', 'storage', 'dsh', ...(market ? ['dsh.manage', 'network'] : [])], ...(market ? { networkOrigins: ['https://avatars.githubusercontent.com', 'https://raw.githubusercontent.com', 'https://awesome-dsh-plugin.com'] } : {}),
         dshClient: { packageName: info.name, entry: 'client/client.js', ...(info.css ? { css: 'client/client.css' } : {}) },
         contributes: { panels: [{ id: 'ui', title: info.name.slice(0, 100), entry: 'ui.html', placement: 'right' }], sidebar: [{ id: 'ui', title: info.name.slice(0, 100), panel: 'ui' }] } };

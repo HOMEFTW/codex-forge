@@ -23,10 +23,14 @@ function satisfies(version, range) {
   }).every(Boolean)).some(Boolean);
 }
 function ranges(value) { if (!Array.isArray(value) || !value.length || value.length > 20) throw Error('兼容版本必须为非空数组'); for (const range of value) satisfies('0.0.0', range); return value; }
+// Backward support was introduced in Forge 0.6.1, not in every API 4 host.
+function supportsApi(api, versions) {
+  return [1, 2, 3, 4].includes(api) && (api === versions.apiVersion || versions.apiVersion === 4 && compare(versions.forge, '0.6.1') >= 0);
+}
 function compatibility(manifest, versions) {
   const reasons = [];
-  if (manifest.apiVersion !== versions.apiVersion) reasons.push(`需要 Forge API ${manifest.apiVersion}，当前 ${versions.apiVersion}`);
-  for (const key of ['codex', 'forge']) if (!ranges(manifest.compatibility?.[key]).some(range => satisfies(versions[key], range))) reasons.push(`${key} ${versions[key]} 不在声明兼容范围内`);
+  if (!supportsApi(manifest.apiVersion, versions)) reasons.push(`需要 Forge API ${manifest.apiVersion}，当前 ${versions.apiVersion}`);
+  for (const key of ['forge', ...(Object.hasOwn(manifest.compatibility || {}, 'codex') ? ['codex'] : [])]) if (!ranges(manifest.compatibility?.[key]).some(range => satisfies(versions[key], range))) reasons.push(`${key} ${versions[key]} 不在声明兼容范围内`);
   return { compatible: reasons.length === 0, reasons };
 }
-module.exports = { parts, compare, satisfies, ranges, compatibility };
+module.exports = { parts, compare, satisfies, ranges, compatibility, supportsApi };

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Codex Forge API 4 Plugin",
+  "title": "Codex Forge Plugin (API 1-4)",
   "type": "object",
   "required": [
     "schemaVersion",
@@ -16,7 +16,14 @@
       "const": 1
     },
     "apiVersion": {
-      "const": 4
+      "type": "integer",
+      "enum": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "default": 4
     },
     "id": {
       "type": "string",
@@ -38,12 +45,12 @@
     "compatibility": {
       "type": "object",
       "required": [
-        "codex",
         "forge"
       ],
       "properties": {
         "codex": {
-          "$ref": "#/$defs/ranges"
+          "$ref": "#/$defs/ranges",
+          "description": "Optional upstream restriction. Omit when using only the Forge API (Forge 0.6.1+)."
         },
         "forge": {
           "$ref": "#/$defs/ranges"

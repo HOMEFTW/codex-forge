@@ -28,7 +28,8 @@ function validate(input, root, { builtin = false } = {}) {
   check(idPattern.test(m.id) && m.id.length <= 100, '插件 ID 使用 publisher.name 格式');
   check(builtin || !m.id.startsWith('forge.'), 'forge.* 是内置插件保留命名空间');
   check(typeof m.name === 'string' && m.name.trim() && m.name.length <= 100, '插件名称无效');
-  parts(m.version); ranges(m.compatibility?.codex); ranges(m.compatibility?.forge);
+  parts(m.version); ranges(m.compatibility?.forge);
+  if (Object.hasOwn(m.compatibility, 'codex')) ranges(m.compatibility.codex);
   check(Array.isArray(m.permissions) && m.permissions.every(p => permissions.has(p)) && new Set(m.permissions).size === m.permissions.length, '插件声明了未知或重复权限');
   check(!m.permissions.includes('nexus.write') || m.permissions.includes('nexus.read'), 'nexus.write 同时需要 nexus.read 权限');
   check(!m.permissions.includes('nexus.script') || m.permissions.includes('nexus.read') && !m.permissions.includes('network'), 'nexus.script 需要 nexus.read，且不能同时使用 network 权限');
