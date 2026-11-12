@@ -8,7 +8,7 @@
 - UI、启动器、准备程序与独立更新器构建成功。MSI / ZIP 按文件与构建目录比较，检查载荷摘要、版本、UpgradeCode、发行文件大小及 SHA-256；不含官方客户端或凭据。证据：`output/release-062-package-audit.json`。0.6.1 正式五件套按字节保留在 `release/archive/v0.6.1`。
 - 正式载荷对已验证官方包生成隔离客户端，并通过文件、ASAR 成员/块及 EXE 内嵌摘要检查，证据：`output/release-062-client-integrity.json`。复用已释放的隔离客户端目录，不启动或替换用户正式客户端。
 - 修复对话的只读交接证据显示无旧 rendererBridge 的正常回合产生 suggestion（4,039 ms），后续输出归档模块已重启加载；它不等于独立观察到灰字，也不等于后台/新聊天场景的现场验收。此次打包不发起真实模型请求，不重启正式客户端；后台时序和原文归档由回归测试验证。真实 Pro 服务、物理输入法和 MSI 实际安装/卸载未在本轮执行。
-- 本轮完成本地源码提交和安装包；GitHub 仍为已发布的 0.6.1，README 下载区保留有效链接。
+- 上述打包阶段完成本地源码提交和安装包；后续用户授权发布 0.6.2，更新 README 下载链接并重新打包，复用摘要未变化的已测产品代码。发布包审计为 `output/release-062-package-audit-publish.json`，远端附件回下载校验为 `output/release-062-github-verification.json`。
 
 ## 0.6.1 本地构建验收（2026-11-12）
 
