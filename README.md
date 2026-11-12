@@ -2,11 +2,11 @@
 
 Codex Forge 是面向 Windows Codex 客户端的第三方插件宿主，将模型配置、信息统计、记忆管理、画布、待办和智能体协作集中到原生界面中。它为内置及独立插件提供统一的安装管理、设置入口、会话输出和版本兼容检查。
 
-当前版本 **0.6.1 / Forge API 4**，适配官方客户端 **26.1106.6628.0（Windows x64，MSIX 身份版本）**。本项目不是 OpenAI 官方插件 API。
+当前源码与本地构建 **0.6.2 / Forge API 4**，适配官方客户端 **26.1106.6628.0（Windows x64，MSIX 身份版本）**。本项目不是 OpenAI 官方插件 API。
 
 [下载安装包](https://github.com/HOMEFTW/codex-forge/releases/latest) · [更新日志与版本索引](docs/CHANGELOG.md) · [从零开发插件](docs/PLUGIN-DEVELOPMENT-ZERO-TO-ONE.md) · [API 参考](docs/PLUGIN-API.md)
 
-| 下载 0.6.1 | 用途 |
+| 已发布下载 0.6.1 | 用途 |
 | --- | --- |
 | [Windows MSI](https://github.com/HOMEFTW/codex-forge/releases/download/v0.6.1/Codex-Forge-0.6.1-Windows.msi) | 推荐用于首次安装及已有安装版升级。 |
 | [便携 ZIP](https://github.com/HOMEFTW/codex-forge/releases/download/v0.6.1/Codex-Forge-0.6.1-Windows-Portable.zip) | 解压后运行，无需 MSI 安装。 |

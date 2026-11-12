@@ -9,7 +9,7 @@ const tick=()=>new Promise(resolve=>setImmediate(resolve));
 test('prediction reads bounded current context and uses its actual model/provider without changing source settings',async()=>{
  const calls=[],samples=[];
  const result=await predictPrompt(options({call:async(...args)=>{calls.push(args);return source();},sample:async args=>{samples.push(args);return '{"suggestion":"开始测试。"}';}}));
- assert.deepEqual(result,{...context,text:'开始测试。'});assert.equal(calls.length,1);
+ assert.deepEqual(result,{...context,text:'开始测试。',outcome:'suggestion',reason:null,rawOutput:'{"suggestion":"开始测试。"}',rawOutputType:'string'});assert.equal(calls.length,1);
  assert.equal(calls[0][0],'thread/resume');assert.deepEqual(calls[0][1],{threadId:context.threadId,excludeTurns:true,initialTurnsPage:{limit:3,itemsView:'summary',sortDirection:'desc'}});
  assert.equal(calls[0][2].timeoutMs,15000);assert.equal(samples.length,1);
  const s=samples[0];assert.equal(s.model,'gpt-6-astra');assert.equal(s.modelProvider,'fixture');assert.equal(s.serviceTier,'priority');assert.equal(s.sourceThreadId,context.threadId);assert.equal(s.timeoutMs,30000);
@@ -28,7 +28,27 @@ test('empty, malformed, tool-only and oversized predictions never become drafts'
 });
 
 test('an empty sampler response produces no suggestion',async()=>{
- assert.deepEqual(await predictPrompt(options({sample:async()=>null})),{...context,text:null});
+ assert.deepEqual(await predictPrompt(options({sample:async()=>null})),{...context,text:null,outcome:'validation_failed',reason:'NON_TEXT_OUTPUT',rawOutput:null,rawOutputType:'null'});
+});
+
+test('explicit empty suggestions and validation failures retain distinct reasons and exact raw output',async()=>{
+ const cases=[
+  [' \r\n{"suggestion":null}\r\n','empty','NULL_SUGGESTION'],
+  ['{"suggestion":"  "}','empty','BLANK_SUGGESTION'],
+  ['','validation_failed','EMPTY_OUTPUT'],
+  ['PRIVATE_MODEL_OUTPUT_ONLY_ON_DISK\n{broken}','validation_failed','INVALID_JSON'],
+  ['null','validation_failed','INVALID_SHAPE'],
+  ['{}','validation_failed','MISSING_SUGGESTION'],
+  ['{"suggestion":42}','validation_failed','INVALID_SUGGESTION_TYPE'],
+  [JSON.stringify({suggestion:'a'.repeat(321)}),'validation_failed','SUGGESTION_TOO_LONG'],
+  [JSON.stringify({suggestion:'a\u0000b'}),'validation_failed','CONTROL_CHARACTERS'],
+ ];
+ for(const [raw,outcome,reason] of cases){
+  const result=await predictPrompt(options({sample:async()=>raw}));
+  assert.equal(result.text,null);assert.equal(result.outcome,outcome);assert.equal(result.reason,reason);assert.equal(result.rawOutput,raw);
+ }
+ const raw='x'.repeat(20001),long=await predictPrompt(options({sample:async()=>raw}));
+ assert.equal(long.outcome,'validation_failed');assert.equal(long.reason,'OUTPUT_TOO_LONG');assert.equal(long.rawOutput.length,raw.length);
 });
 
 test('stale, running and unconfirmed source turns fail before inference',async()=>{

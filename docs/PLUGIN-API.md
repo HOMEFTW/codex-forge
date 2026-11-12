@@ -1,6 +1,6 @@
 # Forge API 4
 
-Forge API 4 当前对应 Codex Forge 0.6.1。宿主兼容 API 1–3 的公共操作；API 4 预测能力仍仅限内置插件。插件清单 schema 1 与更新协议 schema 3 独立管理。
+Forge API 4 当前对应 Codex Forge 0.6.2。宿主兼容 API 1–3 的公共操作；API 4 预测能力仍仅限内置插件。插件清单 schema 1 与更新协议 schema 3 独立管理。
 
 旧插件可保留 apiVersion，更新 Forge 兼容范围后加载。宿主注入 SDK、上下文和能力查询使用插件声明的 apiVersion，hostApiVersion 表示宿主版本 4；API 1 错误继续返回字符串。权限和能力约束仍生效。详见 [兼容说明](API-4-MIGRATION.md)。
 

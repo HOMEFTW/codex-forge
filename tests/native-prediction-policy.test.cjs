@@ -41,6 +41,13 @@ test('unknown or failed account reads do not spend samples, and failed turns are
  f.host.observe(f.state,'turn/completed',{threadId:'A',turn:{id:'failed',status:'failed'}});
  f.setRead(async()=>({requiresOpenaiAuth:true,account:{type:'chatgpt',planType:'pro'}}));f.notify('account/updated',{});await tick();f.setNative(false);assert.equal(f.snapshot().phase,'idle');
 });
+
+test('returning to a completed background chat still respects native Pro precedence',async t=>{
+ const f=setup(t);await tick();
+ f.host.observeNotification('turn/completed',{threadId:'B',turn:{id:'background',status:'completed'}});
+ f.state.threadId='B';f.host.context(f.state);assert.equal(f.snapshot().phase,'idle');assert.equal(f.calls.length,0);
+ f.setNative(false);assert.equal(f.snapshot().phase,'offer');assert.equal(f.snapshot().sourceTurnId,'background');assert.equal(f.calls.length,0);
+});
 test('native adapter binds only the trusted main-process services and rejects anchor or digest drift',async()=>{
  const fixture=require('./fixtures/native-prediction-policy-nov10.json'),adapter=require('../adapters/26.1103.7773.0.json');
  assert.equal(adapter.nativePredictionPolicy.sha256,fixture.moduleSHA256);assert.equal(adapter.nativePredictionPolicy.member,fixture.member);

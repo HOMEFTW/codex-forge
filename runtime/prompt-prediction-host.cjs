@@ -7,9 +7,9 @@ const failure = (code, message) => Object.assign(new Error(message), { code });
 // Only main-process observations enter this controller. No renderer can nominate
 // a source turn or initiate a fresh sample without a host-issued offer.
 class PromptPredictionHost {
-  constructor({ states, settings, call, sample, notify, nativeStatus = () => null, available = state => !!state.bridge, predict = predictPrompt }) {
-    Object.assign(this, { states, settings, call, sample, notify, nativeStatus, available, predict });
-    this.views = new Map(); this.latest = new Map(); this.samples = new Map();
+  constructor({ states, settings, call, sample, notify, recordOutput = () => null, nativeStatus = () => null, available = state => !!state.bridge, predict = predictPrompt }) {
+    Object.assign(this, { states, settings, call, sample, notify, recordOutput, nativeStatus, available, predict });
+    this.views = new Map(); this.latest = new Map(); this.samples = new Map(); this.attempts = new Map(); this.completedTurns = new Map();
   }
   enabled() { return !!this.settings()?.enabled && !this.nativeStatus()?.paused; }
   trim(map) { while (map.size > 256) map.delete(map.keys().next().value); }
@@ -19,9 +19,12 @@ class PromptPredictionHost {
     if (!view) { view = { state, threadId: state.threadId || null, generation: 0, phase: 'idle' }; this.views.set(state.win.id, view); }
     return view;
   }
-  clear(view, emit = true) {
+  rememberAttempt(view, attempt) {
+    view.lastAttempt = attempt; this.attempts.delete(attempt.threadId); this.attempts.set(attempt.threadId, attempt); this.trim(this.attempts);
+  }
+  clear(view, emit = true, reason = 'cleared') {
     if (view.phase === 'pending' && view.lastAttempt) {
-      view.lastAttempt = { ...view.lastAttempt, phase: 'cancelled', durationMs: Date.now() - view.lastAttempt.startedAt };
+      this.rememberAttempt(view, { ...view.lastAttempt, phase: 'cancelled', reason, durationMs: Date.now() - view.lastAttempt.startedAt });
     }
     view.abort?.abort(failure('PREDICTION_CANCELLED', '预测已取消'));
     view.abort = null; view.ticket = null; view.text = null; view.turnId = null;
@@ -33,15 +36,19 @@ class PromptPredictionHost {
     return { type: 'forge-prediction', threadId: v.threadId, generation: v.generation,
       native: this.nativeStatus(), phase: v.phase, ticket: v.ticket || null, sourceTurnId: v.turnId || null,
       text: v.phase === 'suggestion' ? v.text : null, error: v.error || null,
-      diagnostics: { connected: !!this.available(state), rendererBridge: !!state.bridge, lastEvent: v.lastEvent || null, lastAttempt: v.lastAttempt || null } };
+      diagnostics: { connected: !!this.available(state), rendererBridge: !!state.bridge, lastEvent: this.latest.get(v.threadId) || null,
+        lastAttempt: this.attempts.get(v.threadId) || null,
+        recentEvents: [...this.latest.values()].slice(-32), recentAttempts: [...this.attempts.values()].slice(-32) } };
   }
   emit(view) { if (!view.state.win.isDestroyed()) this.notify(view.state, this.snapshot(view.state)); }
-  context(state) {
+  context(state, restore = true) {
     const v = this.view(state), threadId = state.threadId || null;
     if (v.threadId === threadId) return;
-    this.clear(v, false); v.threadId = threadId;
+    this.clear(v, false, 'chat-changed'); v.threadId = threadId;
+    if (!restore) return;
     const latest = this.latest.get(threadId), cached = latest && !latest.running && this.samples.get(this.key(threadId, latest.turnId));
     if (this.enabled() && cached?.text) this.offer(v, latest.turnId, cached.text);
+    else if (this.enabled() && latest?.completed && !latest.running && !cached) this.offer(v, latest.turnId);
     else this.emit(v);
   }
   offer(v, turnId, text = null) {
@@ -50,19 +57,30 @@ class PromptPredictionHost {
     this.emit(v);
   }
   observe(state, method, params) {
+    if (!this.available(state) || state.win.isDestroyed()) return;
+    this.observeNotification(method, params);
+  }
+  observeNotification(method, params) {
     if (!['turn/started', 'turn/completed'].includes(method) || !validId(params?.threadId) || !validId(params?.turn?.id)) return;
-    if (state.threadId !== params.threadId || !this.available(state) || state.win.isDestroyed()) return;
-    this.context(state);
-    this.view(state).lastEvent = { threadId: params.threadId, method, sourceTurnId: params.turn.id, status: params.turn.status, at: Date.now() };
     const { threadId, turn } = params, previous = this.latest.get(threadId);
+    if (this.completedTurns.has(this.key(threadId, turn.id))) return;
     if (method === 'turn/completed' && previous?.running && previous.turnId !== turn.id) return;
+    // A delayed renderer copy of turn/started must not reopen a turn already
+    // completed on the native host connection.
+    if (method === 'turn/started' && previous?.turnId === turn.id && !previous.running) return;
     if (previous?.turnId === turn.id && previous.running === (method === 'turn/started')) return;
-    this.latest.set(threadId, { turnId: turn.id, running: method === 'turn/started', completed: method === 'turn/completed' && turn.status === 'completed' }); this.trim(this.latest);
-    for (const view of this.views.values()) if (view.threadId === threadId) this.clear(view);
-    if (method !== 'turn/completed' || turn.status !== 'completed' || !this.enabled()) return;
-    const key = this.key(threadId, turn.id);
-    if (this.samples.has(key)) return;
-    this.offer(this.view(state), turn.id);
+    if (method === 'turn/completed') { this.completedTurns.set(this.key(threadId, turn.id), true); this.trim(this.completedTurns); }
+    this.latest.delete(threadId);
+    this.latest.set(threadId, { threadId, method, turnId: turn.id, sourceTurnId: turn.id, status: turn.status, at: Date.now(),
+      running: method === 'turn/started', completed: method === 'turn/completed' && turn.status === 'completed' }); this.trim(this.latest);
+    // Remember all trusted local completions. Sampling still requires that
+    // chat's visible composer; background work only records bounded metadata.
+    for (const state of this.states.values()) {
+      if (state.threadId !== threadId || !this.available(state) || state.win.isDestroyed()) continue;
+      this.context(state, false);
+      const view = this.view(state); this.clear(view, true, method === 'turn/started' ? 'new-turn' : 'turn-completed');
+      if (method === 'turn/completed' && turn.status === 'completed' && this.enabled() && !this.samples.has(this.key(threadId, turn.id))) this.offer(view, turn.id);
+    }
   }
   current(v, request) {
     const latest = this.latest.get(v.threadId);
@@ -77,7 +95,7 @@ class PromptPredictionHost {
     if (!this.current(v, request)) throw failure('PREDICTION_STALE', '预测上下文已变化');
     if (request.action === 'dismiss') {
       const cached = this.samples.get(this.key(v.threadId, v.turnId)); if (cached) cached.text = null;
-      this.clear(v); return true;
+      this.clear(v, true, 'dismissed-in-editor'); return true;
     }
     if (!['ready', 'accept'].includes(request.action)) throw failure('INVALID_ARGUMENT', '不支持的预测操作');
     if (typeof request.expectedText !== 'string' || request.expectedText.length > 64 || request.expectedText.trim()) throw failure('PREDICTION_DRAFT_CHANGED', '输入框已有草稿');
@@ -94,7 +112,7 @@ class PromptPredictionHost {
     const settings = this.settings(), ticket = v.ticket, generation = v.generation, threadId = v.threadId, sourceTurnId = v.turnId;
     const cache = { text: null }; this.samples.set(key, cache); this.trim(this.samples);
     const attempt = { threadId, sourceTurnId, phase: 'pending', startedAt: Date.now() };
-    v.lastAttempt = attempt;
+    this.rememberAttempt(v, attempt);
     const abort = new AbortController(); v.abort = abort; v.phase = 'pending'; this.emit(v);
     const stillCurrent = () => this.current(v, { threadId, ticket, generation }) && !abort.signal.aborted;
     let source;
@@ -126,11 +144,19 @@ class PromptPredictionHost {
       if (!stillCurrent()) return this.snapshot(state);
       if (result.threadId !== threadId || result.sourceTurnId !== sourceTurnId) throw failure('PREDICTION_STALE', '建议来源已变化');
       cache.text = result.text; v.text = result.text; v.phase = result.text ? 'suggestion' : 'idle';
-      v.lastAttempt = { ...attempt, phase: result.text ? 'suggestion' : 'empty', durationMs: Date.now() - attempt.startedAt };
+      const outcome = result.outcome || (result.text ? 'suggestion' : 'empty');
+      const completed = { ...attempt, phase: outcome, reason: result.reason || null, durationMs: Date.now() - attempt.startedAt };
+      if (Object.hasOwn(result, 'rawOutput')) {
+        try {
+          completed.outputFile = this.recordOutput({ schemaVersion: 1, threadId, sourceTurnId, recordedAt: Date.now(), outcome,
+            reason: result.reason || null, maxChars: settings.maxChars, rawOutput: result.rawOutput, rawOutputType: result.rawOutputType }) || null;
+        } catch (error) { completed.outputRecordError = String(error.code || 'WRITE_FAILED').slice(0, 80); }
+      }
+      this.rememberAttempt(v, completed);
     } catch (error) {
       if (stillCurrent()) {
         v.phase = 'error'; v.error = { code: String(error.code || 'PREDICTION_UNAVAILABLE'), message: String(error.message || '预测不可用').slice(0, 300) };
-        v.lastAttempt = { ...attempt, phase: 'error', error: v.error, durationMs: Date.now() - attempt.startedAt };
+        this.rememberAttempt(v, { ...attempt, phase: 'error', error: v.error, durationMs: Date.now() - attempt.startedAt });
       }
     } finally {
       if (v.abort === abort) v.abort = null;
@@ -143,15 +169,15 @@ class PromptPredictionHost {
     // attempted turn IDs so a cancelled/failed sample is never retried.
     for (const cache of this.samples.values()) cache.text = null;
     for (const v of this.views.values()) {
-      this.clear(v, false);
+      this.clear(v, false, 'native-policy-changed');
       const latest = this.latest.get(v.threadId);
       if (this.enabled() && latest?.completed && !latest.running && !this.samples.has(this.key(v.threadId, latest.turnId))) this.offer(v, latest.turnId);
       else this.emit(v);
     }
   }
-  refresh() { for (const v of this.views.values()) this.clear(v); for (const cache of this.samples.values()) cache.text = null; }
-  invalidate(state) { this.clear(this.view(state)); }
-  close(state) { const v = this.views.get(state.win.id); if (v) this.clear(v, false); this.views.delete(state.win.id); }
-  stop() { for (const v of this.views.values()) this.clear(v, false); this.views.clear(); this.samples.clear(); this.latest.clear(); }
+  refresh() { for (const v of this.views.values()) this.clear(v, true, 'settings-changed'); for (const cache of this.samples.values()) cache.text = null; }
+  invalidate(state) { this.clear(this.view(state), true, 'submitted'); }
+  close(state) { const v = this.views.get(state.win.id); if (v) this.clear(v, false, 'window-closed'); this.views.delete(state.win.id); }
+  stop() { for (const v of this.views.values()) this.clear(v, false, 'stopped'); this.views.clear(); this.samples.clear(); this.latest.clear(); this.attempts.clear(); this.completedTurns.clear(); }
 }
 module.exports = { PromptPredictionHost };

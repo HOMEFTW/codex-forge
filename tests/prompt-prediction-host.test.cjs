@@ -57,7 +57,49 @@ test('managed native chats predict without a legacy renderer RPC bridge',async t
  notify('turn/completed','next','completed');const cancelled=h.request('ready');await tick();
  await h.navigate('B');await cancelled;finishRead();await tick();
  assert.equal(h.samples.length,1);assert.equal(h.sourceRequests.length,0);
- assert.equal(h.status().diagnostics.lastAttempt.phase,'cancelled');
+ assert.equal(h.status().diagnostics.lastAttempt,null);
+ assert.equal(h.service.predictions.attempts.get('A').phase,'cancelled');
+});
+
+test('background replies wait for their own composer, then offer once when that chat becomes active',async t=>{
+ const h=harness(t);await h.initialize();
+ h.observe('turn/started','background','inProgress','local','B');
+ h.observe('turn/completed','background','completed','local','B');
+ assert.equal(h.status().phase,'idle');assert.equal(h.samples.length,0);assert.equal(h.sourceRequests.length,0);
+ await h.navigate('B');assert.equal(h.status().phase,'offer');
+ const pending=h.request('ready');await tick();assert.equal(h.samples.length,1);assert.equal(h.samples[0].sourceThreadId,'B');
+ h.samples[0].resolve('{"suggestion":"核对译文中的条款"}');await pending;
+ await h.navigate('A');await h.navigate('B');assert.equal(h.status().text,'核对译文中的条款');assert.equal(h.samples.length,1);
+ await h.request('dismiss');await h.navigate('A');await h.navigate('B');assert.equal(h.status().phase,'idle');assert.equal(h.samples.length,1);
+});
+
+test('a new chat completion arriving before the route notification is recovered on selection',async t=>{
+ const h=harness(t);await h.initialize();await h.navigate(null);
+ h.observe('turn/started','first-turn','inProgress','local','new-chat');
+ h.observe('turn/completed','first-turn','completed','local','new-chat');
+ assert.equal(h.samples.length,0);await h.navigate('new-chat');assert.equal(h.status().phase,'offer');
+ assert.equal(h.status().sourceTurnId,'first-turn');
+});
+
+test('host notifications remember completions before any window has registered',async t=>{
+ const h=harness(t);await h.initialize();const state=h.service.states.get(1);h.service.states.clear();
+ h.service.predictions.observeNotification('turn/completed',{threadId:'B',turn:{id:'before-window',status:'completed'}});
+ assert.equal(h.samples.length,0);h.service.states.set(1,state);await h.navigate('B');assert.equal(h.status().phase,'offer');
+});
+
+test('a background completion reaches its matching window even when another window is registered first',async t=>{
+ const h=harness(t);await h.initialize();const first=h.service.states.get(1);
+ const other={...first,threadId:'B',win:{id:2,isDestroyed:()=>false,webContents:{id:2,send(){}}}};h.service.states.set(2,other);
+ h.service.predictions.observeNotification('turn/completed',{threadId:'B',turn:{id:'window-two',status:'completed'}});
+ assert.equal(h.status().phase,'idle');assert.equal(h.service.predictions.snapshot(other).phase,'offer');assert.equal(h.samples.length,0);
+});
+
+test('delayed renderer events cannot reopen completed turns or clear a newer prediction',async t=>{
+ const h=harness(t);await h.initialize();h.observe('turn/completed','one');h.observe('turn/started','two','inProgress');h.observe('turn/completed','two');
+ const pending=h.request('ready');await tick();const generation=h.status().generation;
+ h.observe('turn/started','two','inProgress');h.observe('turn/completed','one');h.observe('turn/started','one','inProgress');
+ assert.equal(h.status().generation,generation);assert.equal(h.status().phase,'pending');assert.equal(h.samples[0].signal.aborted,false);
+ h.samples[0].resolve('{"suggestion":"继续"}');await pending;assert.equal(h.status().text,'继续');
 });
 
 test('trusted completed turns infer once on the current model; Tab authorizes only a draft',async t=>{
@@ -108,4 +150,29 @@ test('unchanged plugin settings preserve the worker; changed settings cancel wit
 test('returning restores only valid suggestions and dismissing prevents restoration',async t=>{
  const h=harness(t);await h.initialize();h.observe('turn/completed','one');const pending=h.request('ready');await tick();h.samples[0].resolve('{"suggestion":"恢复建议"}');await pending;
  await h.navigate('B');assert.equal(h.status().text,null);await h.navigate('A');assert.equal(h.status().text,'恢复建议');await h.request('dismiss');await h.navigate('B');await h.navigate('A');assert.equal(h.status().phase,'idle');assert.equal(h.samples.length,1);
+});
+
+test('empty and invalid model output is archived per turn without entering renderer payloads',async t=>{
+ const h=harness(t);await h.initialize();
+ const cases=[['empty',' \r\n{"suggestion":null}\r\n','empty','NULL_SUGGESTION'],
+  ['invalid','PRIVATE_MODEL_OUTPUT_ONLY_ON_DISK\n{broken}','validation_failed','INVALID_JSON']];
+ const saved=[];
+ for(const [turnId,raw,phase,reason] of cases){
+  h.observe('turn/completed',turnId);const pending=h.request('ready');await tick();h.samples.at(-1).resolve(raw);await pending;
+  const status=h.status(),attempt=status.diagnostics.lastAttempt;
+  assert.equal(status.text,null);assert.equal(attempt.phase,phase);assert.equal(attempt.reason,reason);
+  const file=attempt.outputFile;assert(file.startsWith(h.service.forge.registry.root+path.sep));
+  const record=JSON.parse(fs.readFileSync(file,'utf8'));
+  assert.equal(record.threadId,'A');assert.equal(record.sourceTurnId,turnId);assert.equal(record.outcome,phase);assert.equal(record.reason,reason);assert.equal(record.rawOutput,raw);saved.push(file);
+  assert(!JSON.stringify(status).includes('"rawOutput"'));
+ }
+ assert(saved.every(file=>fs.existsSync(file)));assert.equal(h.samples.length,2);
+ assert(!JSON.stringify(h.sent).includes('PRIVATE_MODEL_OUTPUT_ONLY_ON_DISK'));
+ assert(!fs.readdirSync(path.dirname(saved[0])).some(name=>name.endsWith('.tmp')));
+});
+
+test('archive write failures remain visible in diagnostics while a usable suggestion stays available',async t=>{
+ const h=harness(t);await h.initialize();h.service.predictions.recordOutput=()=>{throw Object.assign(Error('write failed'),{code:'ENOSPC'});};
+ h.observe('turn/completed','disk-full');const pending=h.request('ready');await tick();h.samples[0].resolve('{"suggestion":"继续检查"}');await pending;
+ assert.equal(h.status().text,'继续检查');assert.equal(h.status().diagnostics.lastAttempt.outputRecordError,'ENOSPC');
 });

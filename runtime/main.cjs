@@ -6,6 +6,7 @@ const { CanvasStore } = require('./store.cjs');
 const { TodoStore } = require('./todos.cjs');
 const { ThreadContexts, userSubmission } = require('./context.cjs');
 const { CollaborationService } = require('./collaboration.cjs');
+const { atomic } = require('./collaboration-store.cjs');
 const { NativeDirectHistory } = require('./native-direct-history.cjs');
 const { SkillsStore } = require('./skills.cjs');
 const { ApprovalQueue, ApprovalProcessor, settled } = require('./approval-broker.cjs');
@@ -53,19 +54,27 @@ function install() {
     return settings;
   };
   const nativePredictionPolicy = new NativePredictionPolicy(() => predictions.nativeChanged(), event => {
-    if (!['turn/started', 'turn/completed'].includes(event.method)) return;
-    for (const state of states.values()) predictions.observe(state, event.method, event.params);
+    predictions.observeNotification(event.method, event.params);
   });
   activePredictionPolicy = nativePredictionPolicy;
   const predictions = new PromptPredictionHost({ states, settings: predictionSettings, call: nativeCall,
     sample: options => runLowPrediction({ ...options, executable: path.join(process.resourcesPath, 'codex.exe') }),
+    recordOutput: record => {
+      if (process.env.CODEX_FORGE_PREDICTION_DIAGNOSTICS === '0') return null;
+      const directory = path.join(forge.registry.root, 'diagnostics', 'prompt-prediction-outputs', record.threadId);
+      fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+      const file = path.join(directory, record.sourceTurnId + '.json');
+      atomic(file, record); return file;
+    },
     notify: (state, value) => {
       notify(state, value);
-      if (process.env.CODEX_FORGE_PREDICTION_DIAGNOSTICS === '1' && forge) {
+      if (process.env.CODEX_FORGE_PREDICTION_DIAGNOSTICS !== '0' && forge) {
         try {
           const directory = path.join(forge.registry.root, 'diagnostics'); fs.mkdirSync(directory, { recursive: true });
+          const safeAttempt = attempt => attempt ? { ...attempt, error: attempt.error ? { code: attempt.error.code } : undefined } : null;
           fs.writeFileSync(path.join(directory, 'prompt-prediction.json'), JSON.stringify({ at: Date.now(), pid: process.pid,
-            threadId: value.threadId, phase: value.phase, native: value.native, error: value.error, ...value.diagnostics }));
+            threadId: value.threadId, phase: value.phase, native: value.native, error: value.error ? { code: value.error.code } : null,
+            ...value.diagnostics, lastAttempt: safeAttempt(value.diagnostics.lastAttempt), recentAttempts: value.diagnostics.recentAttempts.map(safeAttempt) }));
         } catch (error) { console.warn('[Forge prediction diagnostics]', error.code || 'WRITE_FAILED'); }
       }
     }, nativeStatus: () => nativePredictionPolicy.snapshot(),
