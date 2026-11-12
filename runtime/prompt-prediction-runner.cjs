@@ -93,7 +93,7 @@ async function runLowPrediction({ executable, signal, timeoutMs = 30000, env = p
     deadline = setTimeout(() => stop(failure('TIMEOUT', '预测超时')), timeoutMs);
     try {
       if (signal?.aborted) throw signal.reason || failure('PREDICTION_CANCELLED', '预测已取消');
-      await call('initialize', { clientInfo: { name: 'forge_prompt_prediction', version: '0.6.2' }, capabilities: { experimentalApi: true } });
+      await call('initialize', { clientInfo: { name: 'forge_prompt_prediction', version: '0.6.3' }, capabilities: { experimentalApi: true } });
       child.stdin.write('{"method":"initialized"}\n');
       return await lowPredictionWithRpc({ ...context, cwd, call, subscribe: fn => { listeners.add(fn); return () => listeners.delete(fn); }, signal: controller.signal, stop });
     } finally {

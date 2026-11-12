@@ -4,7 +4,7 @@
   "apiVersion": 4,
   "id": "example.hello",
   "name": "Hello Forge",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "演示原生标签、输入框、独立存储、会话输出、浏览器和统一设置。",
   "compatibility": {
     "forge": [
@@ -113,6 +113,13 @@
     }
   },
   "changelog": [
+    {
+      "version": "0.6.3",
+      "date": "2026-11-12",
+      "items": [
+        "随 Forge 0.6.3 更新；官方客户端基线与 API 4 保持，保留原有设置和功能。"
+      ]
+    },
     {
       "version": "0.6.2",
       "date": "2026-11-12",

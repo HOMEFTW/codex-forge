@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "apiVersion": 4,
-  "version": "0.6.2",
+  "version": "0.6.3",
   "compatibility": {
     "codex": [
       "26.1106.6628.0",
@@ -21,7 +21,8 @@
   "permissions": [
     "panels",
     "conversation.read",
-    "sidebar"
+    "sidebar",
+    "settings"
   ],
   "capabilities": [
     {
@@ -31,9 +32,21 @@
     {
       "name": "ui",
       "version": 1
+    },
+    {
+      "name": "settings",
+      "version": 1
     }
   ],
   "changelog": [
+    {
+      "version": "0.6.3",
+      "date": "2026-11-12",
+      "items": [
+        "接入 lm-detector 的 69 类指纹库及冻结离线评分器，区分共享类别与仅供参考的结果。",
+        "增加默认关闭的自动检测；空闲采样，同配置缓存复用 24 小时，支持取消和失败冷却。"
+      ]
+    },
     {
       "version": "0.6.2",
       "date": "2026-11-12",
@@ -159,8 +172,17 @@
   ],
   "id": "forge.information-stats",
   "name": "信息统计插件",
-  "description": "Agent 速度、ModelTrace 数字指纹与 is-gpt-nerfed 一致性诊断。",
+  "description": "Agent 速度、lm-detector 离线模型指纹、可选自动检测与配置变更记录。",
   "contributes": {
+    "settings": {
+      "properties": {
+        "autoDetect": {
+          "type": "boolean",
+          "title": "空闲时自动检测模型指纹（每配置 24 小时一次，每次 3 次模型请求）",
+          "default": false
+        }
+      }
+    },
     "panels": [
       {
         "id": "main",

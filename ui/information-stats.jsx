@@ -2,9 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import './information-stats.css';
 
 const VERDICT_LABELS = {
-  MATCH: '指纹一致',
-  MISMATCH: '指纹不一致',
-  SUSPICIOUS: '存在差异 · 待复核',
+  MATCH: '指纹接近',
+  MISMATCH: '疑似不一致',
+  SUSPICIOUS: '证据不足 · 待复核',
+  SHARED: '共享类别 · 无法区分',
+  REFERENCE_ONLY: '仅供参考',
+  LEGACY: '旧版结果 · 需重测',
+  INVALID_SAMPLE: '序列不符合参考特征',
   UNLISTED: '参考库未收录',
   UNKNOWN: '当前模型未知',
   NO_SAMPLE: '等待检测',
@@ -12,6 +16,7 @@ const VERDICT_LABELS = {
 
 const SOURCE_LABELS = {
   probe: '内置检测',
+  auto: '自动检测',
   manual: '粘贴样本',
   'is-gpt-nerfed': '导入样本',
 };
@@ -76,11 +81,11 @@ function CandidateList({ candidates, expected }) {
     {candidates.map((item, index) => <li key={item.model}>
       <div>
         <span className="info-rank">{index + 1}</span>
-        <code>{item.model}</code>
+        <code>{item.display_name || item.model}</code>
         {item.model === expected && <small>当前</small>}
-        <b>{formatPercent(item.probability)}</b>
+        <b>{Number.isFinite(item.probability) ? formatPercent(item.probability) : `得分 ${formatNumber(item.score)}`}</b>
       </div>
-      <div className="info-bar"><i style={{ width: `${Math.min(100, Math.max(0, item.probability * 100))}%` }} /></div>
+      {Number.isFinite(item.probability) && <div className="info-bar"><i style={{ width: `${Math.min(100, Math.max(0, item.probability * 100))}%` }} /></div>}
     </li>)}
   </ol>;
 }
@@ -155,7 +160,8 @@ export default function InformationStatsPanel({ api, threadId, mode, onMode, onC
   const job = data?.job;
   const running = job?.status === 'running';
   const candidates = (fingerprint.results || []).slice(0, 5);
-  const expected = fingerprint.results?.find(item => item.model === fingerprint.expected);
+  const expected = fingerprint.results?.find(item => item.model === (fingerprint.expectedClass || fingerprint.expected));
+  const automatic = data?.automatic || {};
   if (expected && !candidates.some(item => item.model === expected.model)) candidates.push(expected);
 
   function updateSample(index, patch) {
@@ -171,7 +177,7 @@ export default function InformationStatsPanel({ api, threadId, mode, onMode, onC
 
   const warning = fingerprint.warning;
   const tone = warning ? 'warning' : fingerprint.verdict === 'MATCH' && !fingerprint.stale ? 'match' : '';
-  const status = fingerprint.stale
+  const status = fingerprint.verdict === 'LEGACY' ? VERDICT_LABELS.LEGACY : fingerprint.stale
     ? '结果已过期 · 请重新检测'
     : VERDICT_LABELS[fingerprint.verdict] || '等待检测';
   const modeChange = () => Promise.resolve().then(() => onMode?.()).catch(failure => setError(errorText(failure)));
@@ -225,8 +231,8 @@ export default function InformationStatsPanel({ api, threadId, mode, onMode, onC
         <div className="info-window-track" role="progressbar" aria-label="上下文占用" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Number.isFinite(contextPercent) ? Math.min(100, contextPercent * 100) : undefined}><i style={{ width: `${Math.min(100, Math.max(0, (contextPercent || 0) * 100))}%` }} /></div>
         <p className="info-note">{Number.isFinite(contextPercent) ? `占用 ${formatPercent(contextPercent)} · 最近请求输入与输出` : '等待会话 token_count 记录；累计输入 Token 不等于当前上下文。'}{data?.model === 'gpt-6.1-sol' && ' Forge 目标为 500,000，原生 95% 可用窗口为 475,000。'}</p>
       </section>
-      <section className="info-card" aria-label="被动一致性检查">
-        <div className="info-label"><span>被动一致性检查</span><b className={observation.warnings ? 'info-alert-text' : 'info-status'}>{observation.warnings ? `${observation.warnings} 条待复核` : speed.found ? '未见异常变更' : '等待日志'}</b></div>
+      <section className="info-card" aria-label="配置变更记录">
+        <div className="info-label"><span>配置变更记录</span><b className={observation.warnings ? 'info-alert-text' : 'info-status'}>{observation.warnings ? `${observation.warnings} 条待复核` : speed.found ? '日志未见异常变更' : '等待日志'}</b></div>
         <p className="info-note">比较日志中的模型、思考强度和上下文窗口。设置变更单独标记，日志无法证明服务端真实模型身份。</p>
         <div className="info-events">{observation.events?.length ? observation.events.slice(0, 8).map((event, index) => <article key={`${event.at}-${index}`} className={event.severity}><div><b>{({ model_change: '模型变更', effort_change: '思考强度', context_change: '上下文变更', internal_model: '内部模型' })[event.kind] || event.kind}</b><time>{formatTime(event.at)}</time></div><p>{event.detail}</p></article>) : <div className="info-event-empty">{speed.found ? '尚无变更记录' : '尚未找到当前对话的日志'}</div>}</div>
       </section>
@@ -239,12 +245,12 @@ export default function InformationStatsPanel({ api, threadId, mode, onMode, onC
           <span className="info-arrow" aria-hidden="true">↓</span>
           <div>
             <span>{fingerprint.verdict === 'UNLISTED' ? '参考库内最近候选' : '数字指纹候选'}</span>
-            <strong className="info-prediction">{fingerprint.prediction || '尚无数字样本'}</strong>
+            <strong className="info-prediction">{fingerprint.predictionName || fingerprint.prediction || '尚无数字样本'}</strong>
           </div>
         </div>
         {fingerprint.prediction && <div className="info-confidence">
-          <b>{formatPercent(fingerprint.probability)}</b>
-          <span>参考库内概率 · {fingerprint.usedOutputs} 组有效回答</span>
+          <b>{Number.isFinite(fingerprint.probability) ? formatPercent(fingerprint.probability) : '参考排名'}</b>
+          <span>{Number.isFinite(fingerprint.probability) ? '参考库内概率' : '当前条件下不提供置信度'} · {fingerprint.usedOutputs} 组有效回答</span>
         </div>}
         <p className={`info-note ${warning ? 'info-warning-copy' : ''}`}>
           {fingerprint.verdict === 'UNLISTED'
@@ -255,6 +261,14 @@ export default function InformationStatsPanel({ api, threadId, mode, onMode, onC
                 : '当前样本偏向其他模型，但证据不足；建议补齐样本后复测。'
               : '数字偏好用于辅助判断；参考库内概率不代表真实模型身份认证。'}
         </p>
+        {fingerprint.sharedClass && <p className="info-note">Astra 与 6.1-Sol 共用这一指纹类别，当前方法无法可靠区分两者；命中共享类别不能确认独立型号。</p>}
+        {fingerprint.sampling && <p className="info-note" aria-label="采样条件">{fingerprint.sampling.reason}</p>}
+        <div className="info-auto">
+          <label><input type="checkbox" checked={!!automatic.enabled} disabled={pending || !data} onChange={event => request('auto', { enabled: event.target.checked })} />空闲时自动检测</label>
+          <p className="info-note">每个模型、渠道和思考强度 24 小时检测一次，每次使用当前思考强度发送 3 次请求，可能消耗模型额度。</p>
+          {automatic.enabled && <p className="info-note" role="status">{running && job.automatic ? '正在自动采样' : automatic.reason || '等待聊天空闲与配置确认'}{automatic.nextCheckAt && !running ? `；下次可检测：${formatTime(automatic.nextCheckAt)}` : ''}</p>}
+          {automatic.enabled && automatic.error && <p className="info-note">上次检测：{automatic.error}。可手动重试。</p>}
+        </div>
         <div className="info-actions">
           <button className="info-primary" disabled={pending || running || !threadId || !data?.model || !data?.provider} onClick={() => request('probe')}>
             {running ? `检测中 ${job.completed} / 3` : '运行检测'}
@@ -272,14 +286,14 @@ export default function InformationStatsPanel({ api, threadId, mode, onMode, onC
         {job?.status === 'failed' && <p className="info-error" role="alert">检测失败：{job.error}</p>}
         {job?.status === 'cancelled' && <p className="info-note" role="status">检测已取消，可重新运行。</p>}
         <div className="info-caption info-result">
-          <span>{SOURCE_LABELS[fingerprint.source] || '尚无检测结果'}</span>
+          <span>{SOURCE_LABELS[fingerprint.source] || '尚无检测结果'}{fingerprint.reused ? ' · 复用同配置结果' : ''}</span>
           <time>{formatTime(fingerprint.createdAt)}</time>
         </div>
       </section>}
 
       {tab === 'evidence' ? <section className="info-evidence" aria-label="检测依据">
-        <div className="info-label"><span>MODELTRACE × IS-GPT-NERFED</span><small>{data?.bank?.models?.length || 18} 个参考模型</small></div>
-        <CandidateList candidates={candidates} expected={fingerprint.expected} />
+        <div className="info-label"><span>LM-DETECTOR · 离线评分</span><small>{data?.bank?.models?.length || 0} 个指纹类别</small></div>
+        <CandidateList candidates={candidates} expected={fingerprint.expectedClass || fingerprint.expected} />
         {!!fingerprint.families?.length && <div className="info-diagnostics" aria-label="模型家族概率">{fingerprint.families.map(family => <div key={family.family}><span>{family.display_name}</span><b>{formatPercent(family.probability)}</b></div>)}</div>}
         {!!fingerprint.diagnostics?.length && <div className="info-diagnostics">
           {fingerprint.diagnostics.map((item, index) => <div key={index}>
@@ -289,12 +303,12 @@ export default function InformationStatsPanel({ api, threadId, mode, onMode, onC
         <details className="info-disclosure">
           <summary>统计口径与判断依据</summary>
           <p>速度 = 输出 Token ÷ 该次请求耗时，包含推理 Token；会话均速按总输出与总耗时加权。数据来自当前对话的本地日志。</p>
-          <p>ModelTrace 分析 1–355 整数的频数与顺序特征。高置信差异要求至少两组有效样本、候选概率 ≥ 80%、当前模型概率 ≤ 20%、得分差 ≥ 0.5。弱差异标为待复核。</p>
-          <p>参考库更新于 {data?.bank?.builtAt?.slice(0, 10) || '2026-10-09'}；结果 {data?.bank?.ttlHours || 24} 小时后过期。输出随机性、上下文和模型版本都可能影响判断。</p>
+          <p>lm-detector 分析 1–355 整数的频率与位置、顺序特征。仅三组有效标准挑战、思考强度与参考记录相符且校准匹配时显示库内概率。候选概率 ≥ 80%、当前类别概率 ≤ 20% 时提示疑似不一致；共享类别和条件不同的样本不会据此标红。</p>
+          <p>参考库更新于 {data?.bank?.builtAt?.slice(0, 10) || '—'}；结果 {data?.bank?.ttlHours || 24} 小时后过期。库外模型也可能得到高候选概率，Codex 系统提示与参考 API 环境不同，不能将上游准确率直接套用到当前聊天。</p>
         </details>
         <details className="info-disclosure">
           <summary>粘贴数字样本分析</summary>
-          <p>每组粘贴待测模型输出的整数序列；允许重复，不排序。样本只在本机计算。</p>
+          <p>每组粘贴待测模型输出的整数序列；允许重复，不排序。外部样本只在本机计算参考排名，不作为标准挑战的置信度或告警证据。</p>
           <form onSubmit={analyzeSamples}>
             {samples.map((item, index) => <div className="info-sample" key={index}>
               <label htmlFor={`info-sample-${index}`}>样本 {index + 1}</label>
@@ -312,13 +326,13 @@ export default function InformationStatsPanel({ api, threadId, mode, onMode, onC
         <p className="info-note info-import-hint">导入只接受与当前对话、模型、提供商和思考强度一致的近期本地样本，并重新计算指纹。</p>
       </section> : tab === 'history' && <section className="info-history" aria-label="检测历史">
         {data?.history?.length ? data.history.map(item => <article key={item.id}>
-          <div><strong>{item.prediction || '无有效候选'}</strong><b>{VERDICT_LABELS[item.verdict] || item.verdict}</b></div>
+          <div><strong>{item.predictionName || item.prediction || '无有效候选'}</strong><b>{VERDICT_LABELS[item.verdict] || item.verdict}</b></div>
           <span>{item.model} · {SOURCE_LABELS[item.source] || item.source}</span>
           <time>{formatTime(item.createdAt)}</time>
         </article>) : <div className="info-empty"><strong>暂无检测历史</strong><span>本机保留最近 20 条检测结果。</span></div>}
       </section>}
 
-      <footer className="info-attribution">Agent Speed · ModelTrace · is-gpt-nerfed <span>MIT · 仅主动检测消耗额度</span></footer>
+      <footer className="info-attribution">Agent Speed · lm-detector · is-gpt-nerfed <span>MIT · 指纹采样消耗额度</span></footer>
     </div>
   </main>;
 }

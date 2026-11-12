@@ -8,9 +8,8 @@ const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
 const { StringDecoder } = require('node:string_decoder');
-const { analyzeGlobalOutputs } = require('./information-modeltrace.cjs');
+const { analyzeGlobalOutputs, modelClass, samplingContext, ENGINE_VERSION, bank, provenance } = require('./information-modeltrace.cjs');
 const { SessionObservation } = require('./information-observation.cjs');
-const bank = require('./information-bank.json');
 
 const MAX_LINE = 32 * 1024 * 1024;
 const MAX_READ_PER_REFRESH = 64 * 1024 * 1024;
@@ -21,7 +20,7 @@ const MAX_HISTORY = 20;
 const MAX_OPEN_READERS = 8;
 const MAX_THREAD_CACHES = 32;
 const FINGERPRINT_TTL = 24 * 60 * 60 * 1000;
-const SOURCES = new Set(['probe', 'manual', 'is-gpt-nerfed']);
+const SOURCES = new Set(['probe', 'auto', 'manual', 'is-gpt-nerfed']);
 
 const validId = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(value);
 const count = value => typeof value === 'number' && !Number.isNaN(value)
@@ -259,37 +258,21 @@ class CodexMetrics {
 
 function assess(expected, analysis) {
   const results = Array.isArray(analysis?.results) ? analysis.results : [];
-  const model = normalizeModel(expected);
+  const declaredClass = modelClass(expected);
   const best = results[0];
-  if (!best) {
-    const listed = bank.models.some(item => item.id === model);
-    return { verdict: !model || listed ? 'NO_SAMPLE' : 'UNLISTED', warning: false };
-  }
-  if (!model) return { verdict: 'UNKNOWN', warning: false };
-
-  const declared = results.find(item => normalizeModel(item.model) === model);
-  if (!declared) return { verdict: 'UNLISTED', warning: false };
-  const margin = best.score - declared.score;
-  const expectedProbability = declared.probability;
-  if (normalizeModel(best.model) === model) {
-    return {
-      verdict: 'MATCH', warning: false,
-      confidence: best.probability >= 0.8 ? 'high' : 'low',
-      pExpected: expectedProbability, margin,
-    };
-  }
-
-  const strongEvidence = best.probability + 1e-9 >= 0.8
-    && expectedProbability <= 0.2 + 1e-9
-    && margin + 1e-9 >= 0.5
-    && analysis.used_outputs >= 2;
-  return {
-    verdict: strongEvidence ? 'MISMATCH' : 'SUSPICIOUS',
-    warning: true,
-    confidence: strongEvidence ? 'high' : 'low',
-    pExpected: expectedProbability,
-    margin,
-  };
+  if (analysis && analysis.engineVersion !== ENGINE_VERSION) return { verdict: 'LEGACY', warning: false };
+  if (analysis?.decision === 'not_model') return { verdict: 'INVALID_SAMPLE', warning: false };
+  if (!best) return { verdict: !expected || declaredClass ? 'NO_SAMPLE' : 'UNLISTED', warning: false };
+  if (!declaredClass) return { verdict: expected ? 'UNLISTED' : 'UNKNOWN', warning: false };
+  const declared = results.find(item => item.model === declaredClass.id);
+  if (!declared) return { verdict: 'UNKNOWN', warning: false };
+  if (!analysis.sampling?.compatible) return { verdict: 'REFERENCE_ONLY', warning: false };
+  if (best.model === 'gpt-6-astra' && declaredClass.id === best.model) return { verdict: 'SHARED', warning: false };
+  if (analysis.used_outputs !== 3 || !Number.isFinite(best.probability) || !Number.isFinite(declared.probability)) return { verdict: 'SUSPICIOUS', warning: false };
+  const strong = best.probability >= 0.8 && (best.model === declaredClass.id || declared.probability <= 0.2);
+  return { verdict: !strong ? 'SUSPICIOUS' : best.model === declaredClass.id ? 'MATCH' : 'MISMATCH',
+    warning: strong && best.model !== declaredClass.id, confidence: strong ? 'high' : 'low',
+    pExpected: declared.probability, margin: best.score - declared.score };
 }
 
 function analyze(outputs) {
@@ -406,13 +389,17 @@ function isStoredRecord(record, threadId) {
 }
 
 class InformationStats {
-  constructor({ root, codexHome = process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), nerfedHome, now = Date.now, probeRunner } = {}) {
+  constructor({ root, codexHome = process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), nerfedHome, now = Date.now, probeRunner, settings = () => ({ autoDetect: false }) } = {}) {
     const home = path.resolve(codexHome);
     this.root = path.resolve(root || path.join(home, 'forge', 'information-stats'));
     this.sessions = path.join(home, 'sessions');
     this.nerfedHome = path.resolve(nerfedHome || process.env.NERFED_HOME || path.join(home, 'is-gpt-nerfed'));
     this.now = now;
     this.probeRunner = probeRunner;
+    this.settings = settings;
+    this.autoStates = new Map();
+    this.runningThreads = new Map();
+    this.completedTurns = new Set();
     this.readers = new Map();
     this.fileCache = new Map();
     this.locks = new Map();
@@ -538,6 +525,7 @@ class InformationStats {
       model: context.model,
       provider: context.provider || '',
       effort: context.effort || '',
+      providerKey: context.providerKey || '',
       createdAt,
       source,
       analysis,
@@ -569,7 +557,119 @@ class InformationStats {
         await fsp.rm(temporary, { force: true }).catch(() => {});
       }
     });
+    if (source === 'probe' || source === 'auto') await this.updateCache(context, { result: record, status: 'completed', error: '' });
     return record;
+  }
+
+  cacheKey(context) {
+    if (!context.providerKey || !context.model || !context.provider || !context.effort) return '';
+    return crypto.createHash('sha256').update(JSON.stringify([context.providerKey,
+      normalizeModel(context.model), context.provider, context.effort, ENGINE_VERSION])).digest('hex');
+  }
+
+  async cacheRecords() {
+    const file = path.join(this.root, 'configuration-cache.json');
+    if (!await safePath(this.root, file)) return [];
+    try {
+      const handle = await fsp.open(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+      try {
+        if ((await handle.stat()).size > MAX_HISTORY_BYTES) return [];
+        const rows = JSON.parse(await handle.readFile('utf8'));
+        return Array.isArray(rows) ? rows.filter(row => /^[a-f0-9]{64}$/.test(row?.key) && Number.isFinite(row.attemptedAt)).slice(0, 64).map(row => ({
+          key: row.key, attemptedAt: row.attemptedAt,
+          status: row.status === 'completed' && !isStoredRecord(row.result, row.result?.threadId) ? 'failed' : ['running', 'completed', 'cancelled', 'failed'].includes(row.status) ? row.status : 'failed',
+          error: typeof row.error === 'string' ? row.error.slice(0, 500) : '',
+          result: isStoredRecord(row.result, row.result?.threadId) ? row.result : null,
+        })) : [];
+      } finally { await handle.close(); }
+    } catch { return []; }
+  }
+
+  async updateCache(context, patch) {
+    const key = this.cacheKey(context);
+    if (!key) return;
+    await this.exclusive('configuration-cache', async () => {
+      await fsp.mkdir(this.root, { recursive: true, mode: 0o700 });
+      if ((await fsp.lstat(this.root)).isSymbolicLink()) throw new Error('统计记录目录无效');
+      const file = path.join(this.root, 'configuration-cache.json');
+      try { const stat = await fsp.lstat(file); if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('统计缓存文件无效'); }
+      catch (error) { if (error.code !== 'ENOENT') throw error; }
+      const rows = await this.cacheRecords();
+      const record = { key, attemptedAt: this.now(), ...rows.find(row => row.key === key), ...patch };
+      const temporary = file + '.' + crypto.randomUUID() + '.tmp';
+      try {
+        const handle = await fsp.open(temporary, 'wx', 0o600);
+        try { await handle.writeFile(JSON.stringify([record, ...rows.filter(row => row.key !== key)].slice(0, 64))); await handle.sync(); }
+        finally { await handle.close(); }
+        await fsp.rename(temporary, file);
+      } finally { await fsp.rm(temporary, { force: true }).catch(() => {}); }
+    });
+  }
+
+  cancelAutomatic(threadId) {
+    for (const [id, job] of this.jobs) if (job.automatic && (!threadId || id === threadId)) job.controller.abort();
+  }
+
+  settingsChanged() { if (!this.settings()?.autoDetect) this.cancelAutomatic(); }
+
+  userSubmitted() { this.notBefore = this.now() + 5_000; this.cancelAutomatic(); }
+
+  observeNotification(method, params = {}) {
+    const threadId = params.threadId, turnId = params.turn?.id || params.turnId;
+    if (!validId(threadId)) return;
+    const key = threadId + ':' + turnId;
+    if (method === 'turn/started') {
+      if (turnId && this.completedTurns.has(key)) return;
+      this.runningThreads.set(threadId, turnId || 'pending');
+      this.cancelAutomatic();
+    } else if (method === 'turn/completed') {
+      if (turnId) this.completedTurns.add(key);
+      if (!this.runningThreads.has(threadId) || this.runningThreads.get(threadId) === turnId) this.runningThreads.delete(threadId);
+    }
+    while (this.completedTurns.size > 512) this.completedTurns.delete(this.completedTurns.values().next().value);
+    while (this.runningThreads.size > 256) this.runningThreads.delete(this.runningThreads.keys().next().value);
+  }
+
+  async automatic(context, isCurrent = () => true) {
+    if (!this.settings()?.autoDetect || !validId(context.threadId)) return;
+    const state = { phase: 'waiting', reason: '等待当前聊天空闲' };
+    this.autoStates.set(context.threadId, state);
+    while (this.autoStates.size > MAX_THREAD_CACHES) this.autoStates.delete(this.autoStates.keys().next().value);
+    if (!this.probeRunner || !this.cacheKey(context)) { state.reason = '等待确认模型、渠道身份与思考强度'; return; }
+    if ([...this.jobs.values()].some(job => job.status === 'running')) { state.reason = '已有指纹检测在运行'; return; }
+    const entry = (await this.cacheRecords()).find(row => row.key === this.cacheKey(context));
+    const nextCheckAt = entry ? Math.max(entry.attemptedAt, entry.result?.createdAt || 0) + FINGERPRINT_TTL : null;
+    if (entry && entry.attemptedAt <= this.now() + 60_000 && this.now() < nextCheckAt) {
+      Object.assign(state, { phase: 'cooldown', nextCheckAt, reason: entry.status === 'completed' ? '复用同配置的近期检测结果' : '上次检测未完成，冷却期间可手动重试', error: entry.error || '' });
+      return;
+    }
+    const snapshot = await this.snapshot(context);
+    if (this.now() < (this.notBefore || 0) || this.runningThreads.size || context.nativeIdle === false || !snapshot.speed.found || snapshot.speed.reading || snapshot.speed.phase !== 'idle') return;
+    if (!this.settings()?.autoDetect || !isCurrent()) return;
+    state.phase = 'running'; state.reason = '自动采集三组数字回答';
+    await this.startProbe(context, 'auto', () => !!this.settings()?.autoDetect && isCurrent() && !this.runningThreads.size);
+  }
+
+  async startProbe(context, source = 'probe', allowed = () => true) {
+    if (!this.probeRunner) throw new Error('当前客户端没有可用的检测运行时，可粘贴数字样本分析');
+    if ([...this.jobs.values()].some(job => job.status === 'running')) throw new Error('已有模型检测在运行，请稍候');
+    const pinned = { ...context }, controller = new AbortController();
+    const job = { status: 'running', completed: 0, controller, error: '', automatic: source === 'auto', context: pinned };
+    this.jobs.set(pinned.threadId, job); this.pruneJobs();
+    job.work = Promise.resolve().then(async () => {
+      await this.updateCache(pinned, { attemptedAt: this.now(), status: 'running', error: '' });
+      if (!allowed() || controller.signal.aborted) throw new Error('检测已取消');
+      return this.probeRunner({ ...pinned, signal: controller.signal,
+        onProgress: completed => { job.completed = Math.max(0, Math.min(3, Math.trunc(completed || 0))); } });
+    }).then(async outputs => {
+      if (!allowed() || controller.signal.aborted) throw new Error('检测已取消');
+      await this.save(pinned, samplingContext(analyze(outputs), pinned.model, pinned.effort, true), source);
+      job.status = 'completed';
+    }).catch(async error => {
+      job.status = controller.signal.aborted || !allowed() ? 'cancelled' : 'failed';
+      job.error = String(error?.message || error).slice(0, 500);
+      await this.updateCache(pinned, { status: job.status, error: job.error }).catch(() => {});
+    });
   }
 
   async snapshot(context = {}) {
@@ -579,11 +679,20 @@ class InformationStats {
     const provider = context.provider || speed.provider || '';
     const effort = context.effort || speed.effort || '';
     const records = await this.records(threadId);
-    const current = records.find(record => normalizeModel(record.model) === normalizeModel(model)
+    let current = records.find(record => normalizeModel(record.model) === normalizeModel(model)
       && (record.provider || '') === provider
-      && (record.effort || '') === effort);
+      && (record.effort || '') === effort && (!record.providerKey || record.providerKey === context.providerKey));
+    const cache = (await this.cacheRecords()).find(row => row.key === this.cacheKey({ ...context, model, provider, effort }));
+    const cached = cache?.result;
+    const reusable = cached && cached.providerKey === context.providerKey && cached.provider === provider
+      && normalizeModel(cached.model) === normalizeModel(model) && cached.effort === effort
+      && cached.analysis?.engineVersion === ENGINE_VERSION && Number.isFinite(cached.createdAt)
+      && cached.createdAt <= this.now() + 60_000 && this.now() - cached.createdAt <= FINGERPRINT_TTL;
+    const reused = Boolean(reusable && (!current || current.createdAt < cached.createdAt));
+    if (reused) current = cached;
+    const legacy = current && current.analysis?.engineVersion !== ENGINE_VERSION;
     const createdAt = current?.createdAt || null;
-    const stale = Boolean(current && (this.now() - createdAt > FINGERPRINT_TTL || createdAt > this.now() + 60_000));
+    const stale = Boolean(current && (current.analysis?.engineVersion !== ENGINE_VERSION || this.now() - createdAt > FINGERPRINT_TTL || createdAt > this.now() + 60_000));
     const judgment = assess(model, current?.analysis);
     const fingerprint = {
       ...judgment,
@@ -591,12 +700,17 @@ class InformationStats {
       warning: !stale && judgment.warning,
       expected: model,
       prediction: current?.analysis?.prediction || null,
-      probability: current?.analysis?.probability ?? null,
+      predictionName: current?.analysis?.prediction_name || current?.analysis?.prediction || null,
+      expectedClass: modelClass(model)?.id || '',
+      sharedClass: !legacy && current?.analysis?.prediction === 'gpt-6-astra',
+      sampling: current?.analysis?.sampling || null,
+      reused,
+      probability: legacy ? null : current?.analysis?.probability ?? null,
       usedOutputs: current?.analysis?.used_outputs || 0,
-      results: current?.analysis?.results || [],
+      results: legacy ? current.analysis.results.map(item => ({ ...item, probability: null })) : current?.analysis?.results || [],
       diagnostics: current?.analysis?.diagnostics || [],
       families: current?.analysis?.family_probabilities || [],
-      calibration: current?.analysis?.calibration || null,
+      calibration: legacy ? null : current?.analysis?.calibration || null,
       createdAt,
       source: current?.source || '',
       pExpected: judgment.pExpected ?? null,
@@ -608,6 +722,7 @@ class InformationStats {
       createdAt: record.createdAt,
       source: record.source,
       prediction: record.analysis?.prediction,
+      predictionName: record.analysis?.prediction_name,
       verdict: assess(record.model, record.analysis).verdict,
     }));
 
@@ -620,7 +735,11 @@ class InformationStats {
       fingerprint,
       history,
       job: this.publicJob(threadId),
-      bank: { builtAt: bank.built_at, models: bank.models.map(item => item.id), ttlHours: 24 },
+      automatic: { enabled: !!this.settings()?.autoDetect, ...(this.autoStates.get(threadId) || {}),
+        ...(cache && cache.status !== 'running' ? { phase: 'cooldown', reason: cache.status === 'completed' ? '复用同配置的近期检测结果' : '上次检测未完成，冷却期间可手动重试' } : {}),
+        error: cache?.error || '',
+        nextCheckAt: cache ? Math.max(cache.attemptedAt, cache.result?.createdAt || 0) + FINGERPRINT_TTL : null },
+      bank: { builtAt: bank.built_at, models: bank.models.map(item => item.id), ttlHours: 24, source: 'lm-detector', commit: provenance.commit },
     };
   }
 
@@ -632,6 +751,7 @@ class InformationStats {
       completed: job.completed,
       total: 3,
       error: job.error || '',
+      automatic: job.automatic,
     };
   }
 
@@ -672,10 +792,10 @@ class InformationStats {
         if (!provider || provider !== context.provider || (effort || '') !== (context.effort || '')
           || !Array.isArray(outputs)) continue;
 
-        const result = analyze(outputs.slice(0, 3).map(item => ({
+        const result = samplingContext(analyze(outputs.slice(0, 3).map(item => ({
           text: item?.text,
           expected_count: item?.expected_count,
-        })));
+        }))), context.model, context.effort, false);
         await this.save(context, result, 'is-gpt-nerfed', finished);
         return true;
       } catch {
@@ -713,7 +833,7 @@ class InformationStats {
     };
     if (method === 'analyze') {
       if (!pinnedContext.model) throw new Error('尚未确认当前模型，请先发送一条消息');
-      await this.save(pinnedContext, analyze(args.outputs), 'manual');
+      await this.save(pinnedContext, samplingContext(analyze(args.outputs), pinnedContext.model, pinnedContext.effort, false), 'manual');
       return this.snapshot(pinnedContext);
     }
     if (method === 'import') {
@@ -729,30 +849,7 @@ class InformationStats {
     }
 
     if (!pinnedContext.model || !pinnedContext.provider) throw new Error('尚未确认当前模型及提供商');
-    if (!this.probeRunner) throw new Error('当前客户端没有可用的检测运行时，可粘贴数字样本分析');
-    if (this.jobs.get(pinnedContext.threadId)?.status === 'running') throw new Error('此对话正在检测');
-    if ([...this.jobs.values()].some(job => job.status === 'running')) throw new Error('已有模型检测在运行，请稍候');
-
-    const controller = new AbortController();
-    const job = { status: 'running', completed: 0, controller, error: '' };
-    this.jobs.set(pinnedContext.threadId, job);
-    this.pruneJobs();
-
-    Promise.resolve()
-      .then(() => this.probeRunner({
-        ...pinnedContext,
-        signal: controller.signal,
-        onProgress: completed => { job.completed = Math.max(0, Math.min(3, Math.trunc(completed || 0))); },
-      }))
-      .then(outputs => {
-        if (controller.signal.aborted) throw new Error('检测已取消');
-        return this.save(pinnedContext, analyze(outputs), 'probe');
-      })
-      .then(() => { job.status = 'completed'; })
-      .catch(error => {
-        job.status = controller.signal.aborted ? 'cancelled' : 'failed';
-        job.error = String(error?.message || error).slice(0, 500);
-      });
+    await this.startProbe(pinnedContext);
     return this.snapshot(pinnedContext);
   }
 

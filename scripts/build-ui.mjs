@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { build } from 'esbuild';
 const root = path.resolve(import.meta.dirname, '..');
+await import('./build-information-detector.mjs');
 const destination = path.join(root, 'dist', 'fast-extension');
 if (!destination.startsWith(root + path.sep)) throw new Error('Invalid build path');
 fs.rmSync(destination, { recursive: true, force: true });

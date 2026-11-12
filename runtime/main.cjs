@@ -14,6 +14,7 @@ const { runCodexReview } = require('./approval-reviewer.cjs');
 const { NativeApprovals } = require('./native-approvals.cjs');
 const { InformationStats } = require('./information-stats.cjs');
 const { runInformationProbe } = require('./information-probe.cjs');
+const { providerIdentity, requiresAccount } = require('./information-identity.cjs');
 const { CodexMemory } = require('./codex-memory.cjs');
 const { NexusService } = require('./nexus.cjs');
 const { PromptPredictionHost } = require('./prompt-prediction-host.cjs');
@@ -38,7 +39,9 @@ function install() {
   const skills = new SkillsStore({ root: path.join(store.root, 'skills') });
   const collaboration = new CollaborationService({ root: path.join(store.root, 'collaboration'), nodePath: path.join(process.resourcesPath || '', 'cua_node/bin/node.exe'), promptCatalog: agent => skills.promptCatalog(agent) });
   const directHistory = new NativeDirectHistory(collaboration.store), nativeRequests = new Map(), internalRequests = new Map();
-  const statistics = new InformationStats({ root:path.join(store.root,'information-stats'), probeRunner:context => runInformationProbe({ executable:path.join(process.resourcesPath,'codex.exe'), ...context }) });
+  const statistics = new InformationStats({ root:path.join(store.root,'information-stats'),
+    settings: () => forge?.enabled('forge.information-stats') ? forge.registry.settings('forge.information-stats') : { autoDetect: false },
+    probeRunner:context => runInformationProbe({ executable:path.join(process.resourcesPath,'codex.exe'), ...context }) });
   const codexMemory = new CodexMemory();
   const nexus = new NexusService({ root: path.join(store.root, 'nexus') });
   const informationContexts = new Map();
@@ -55,6 +58,7 @@ function install() {
   };
   const nativePredictionPolicy = new NativePredictionPolicy(() => predictions.nativeChanged(), event => {
     predictions.observeNotification(event.method, event.params);
+    statistics.observeNotification(event.method, event.params);
   });
   activePredictionPolicy = nativePredictionPolicy;
   const predictions = new PromptPredictionHost({ states, settings: predictionSettings, call: nativeCall,
@@ -167,7 +171,11 @@ function install() {
       effort:selected.effort ?? result.reasoningEffort ?? thread.reasoningEffort ?? previous.effort ?? '',
       cwd:thread.cwd || previous.cwd || contexts.binding(thread.id).cwd || '',
       sessionPath:thread.path || previous.sessionPath,
+      nativeIdle: thread.status?.type === 'active' ? false : thread.status?.type === 'idle' ? true : previous.nativeIdle,
     };
+    if (value.provider !== previous.provider) { value.providerKey = ''; value.identityAt = 0; }
+    const job = statistics.jobs.get(thread.id);
+    if (job?.automatic && (job.context.model !== value.model || job.context.provider !== value.provider || job.context.effort !== value.effort)) statistics.cancelAutomatic(thread.id);
     informationContexts.set(thread.id,value);
     while (informationContexts.size > 64) informationContexts.delete(informationContexts.keys().next().value);
   }
@@ -179,8 +187,35 @@ function install() {
     }
     if (threadContext(event,state).threadId !== context.threadId) throw Error('当前对话已变化，请刷新信息统计');
     const saved=informationContexts.get(context.threadId);
+    if (saved?.provider && (!saved.providerKey || Date.now() - (saved.identityAt || 0) > 30_000)) {
+      saved.identityAt = Date.now();
+      try {
+        const result = await nativeCall(state, 'config/read', { includeLayers: false });
+        const account = requiresAccount(result.config, saved.provider) ? await nativeCall(state, 'account/read', { refreshToken: false }) : null;
+        saved.providerKey = providerIdentity(result.config, saved.provider, account);
+      } catch { saved.providerKey = ''; }
+    }
+    if (threadContext(event,state).threadId !== context.threadId) throw Error('当前对话已变化，请刷新信息统计');
     return { ...context, ...saved, cwd:saved?.cwd || context.cwd };
   }
+  let informationTickRunning = false;
+  const informationTimer = setInterval(() => {
+    if (informationTickRunning || !statistics.settings()?.autoDetect) return;
+    informationTickRunning = true;
+    (async () => {
+      const seen = new Set();
+      for (const state of states.values()) {
+        if (!state.bridge || state.win.isDestroyed() || !state.threadId || seen.has(state.threadId)) continue;
+        seen.add(state.threadId);
+        const context = await informationContext({ sender: state.win.webContents }, state);
+        await statistics.automatic(context, () => !state.win.isDestroyed() && state.threadId === context.threadId
+          && informationContexts.get(context.threadId)?.model === context.model
+          && informationContexts.get(context.threadId)?.effort === context.effort
+          && informationContexts.get(context.threadId)?.providerKey === context.providerKey);
+      }
+    })().catch(report).finally(() => { informationTickRunning = false; });
+  }, 10_000);
+  informationTimer.unref?.();
   function composerTarget(state, threadId = state.threadId) { return threadId ? state.composerTargets.get(threadId) || defaultTarget() : state.draftTarget; }
   // The app's original request handler is registered after early-bootstrap.
   // Preserve its behavior and only add per-thread MCP environment configuration.
@@ -204,6 +239,7 @@ function install() {
       if (message?.type === 'remote-hosted-pip-active-thread-changed') {
         const state = host(event);
         const nextThreadId = /^[A-Za-z0-9_-]{1,100}$/.test(message.conversationId || '') ? message.conversationId : null;
+        if (state.threadId && state.threadId !== nextThreadId) statistics.cancelAutomatic(state.threadId);
         if (state.threadId && !nextThreadId) { state.draftTarget = defaultTarget(); for (const id of state.pendingDraftThreads) state.composerTargets.set(id, defaultTarget()); }
         state.threadId = nextThreadId;
         predictions.context(state);
@@ -212,6 +248,7 @@ function install() {
       if (contexts.prepare(message)) contextRequests.set(message.request.id, { state: host(event), method: message.request.method });
       const submission = userSubmission(message);
       if (submission) {
+        statistics.userSubmitted();
         const state = host(event); contexts.bind(submission.threadId, submission.cwd);
         predictions.invalidate(state);
         const target = active('forge.collaboration') ? composerTarget(state, submission.threadId) : defaultTarget();
@@ -255,6 +292,7 @@ function install() {
         }
         if (incoming?.type === 'mcp-response' && incoming.hostId === 'local' && sampleOwners.get(incoming.message?.id) === contents.id) return;
         if (incoming?.type === 'mcp-notification' && incoming.hostId === 'local') {
+          statistics.observeNotification(incoming.method, incoming.params);
           const state = [...states.values()].find(state => state.win.webContents.id === contents.id);
           if (state) predictions.observe(state, incoming.method, incoming.params);
           const action = { 'thread/archived': 'thread/archive', 'thread/unarchived': 'thread/unarchive', 'thread/deleted': 'thread/delete' }[incoming.method];
@@ -331,9 +369,15 @@ function install() {
   ipcMain.handle('fast-ext:statistics', async (event, { method = 'snapshot', args = {}, threadId } = {}) => {
     const state = host(event);
     if (!active('forge.information-stats')) throw Error('信息统计插件已停用');
-    if (!['snapshot','analyze','import','probe','cancel'].includes(method)) throw Error('不支持的统计操作');
+    if (!['snapshot','analyze','import','probe','cancel','auto'].includes(method)) throw Error('不支持的统计操作');
     if (threadId !== undefined && threadId !== threadContext(event,state).threadId) throw Error('当前对话已变化，请刷新信息统计');
     const context = await informationContext(event,state);
+    if (method === 'auto') {
+      if (typeof args.enabled !== 'boolean') throw Error('自动检测开关无效');
+      forge.registry.settings('forge.information-stats', { ...forge.registry.settings('forge.information-stats'), autoDetect: args.enabled });
+      statistics.settingsChanged();
+      return statistics.snapshot(context);
+    }
     // Paths and model settings come only from the native bridge, never iframe arguments.
     return statistics.dispatch(method, { outputs:args.outputs, threadId:context.threadId }, context);
   });
@@ -428,11 +472,11 @@ function install() {
       } catch (error) { report(error); }
     }, 90);
   });
-  app.once('will-quit', () => { nativePredictionPolicy.dispose(); predictions.stop(); clearInterval(approvalTimer); statistics.stop(); approvalProcessor.stop(); humanApprovals.stop(); watcher.close(); clearTimeout(refreshTimer); for (const value of internalRequests.values()) { clearTimeout(value.timer); value.reject(Error('客户端已关闭，历史引用会在下次打开时同步')); } internalRequests.clear(); });
+  app.once('will-quit', () => { nativePredictionPolicy.dispose(); predictions.stop(); clearInterval(approvalTimer); clearInterval(informationTimer); statistics.stop(); approvalProcessor.stop(); humanApprovals.stop(); watcher.close(); clearTimeout(refreshTimer); for (const value of internalRequests.values()) { clearTimeout(value.timer); value.reject(Error('客户端已关闭，历史引用会在下次打开时同步')); } internalRequests.clear(); });
   if (process.env.CODEX_FAST_EXTENSION_TEST === '1') setTimeout(() => {
     fs.writeFileSync(path.join(store.root, '.diagnostics.json'), JSON.stringify({ menu: Menu.getApplicationMenu()?.items.map(item => ({ label: item.label, id: item.id })) }, null, 2));
   }, 10000);
-  forge = require('./forge-host.cjs').installForge({ipcMain,dialog,host,threadContext,nativeCall,nativeMessage:(state,message)=>{if(!state.bridge) throw Error('原生连接尚未就绪'); return state.bridge.handler(state.bridge.event,message);},open,notify,states,collaboration,nexus,predictions,onRegistryChange:refreshPredictionSettings});
+  forge = require('./forge-host.cjs').installForge({ipcMain,dialog,host,threadContext,nativeCall,nativeMessage:(state,message)=>{if(!state.bridge) throw Error('原生连接尚未就绪'); return state.bridge.handler(state.bridge.event,message);},open,notify,states,collaboration,nexus,predictions,onRegistryChange:() => { refreshPredictionSettings(); statistics.settingsChanged(); }});
   refreshPredictionSettings();
   if (process.versions.electron) {
     try { require('./native-features.cjs').applyNativeFeatures(forge.registry); }

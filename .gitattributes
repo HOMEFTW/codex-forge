@@ -1,5 +1,11 @@
 * text=auto eol=lf
 # Preserve upstream skill bytes: catalog.json records exact SHA-256 digests.
 bundled-skills/** -text
+# Fingerprint provenance verifies exact upstream/data bytes, including line endings.
+vendor/lm-detector/** -text -whitespace
+runtime/information-bank.json -text
+runtime/information-challenges.json -text whitespace=cr-at-eol
+runtime/information-reference.json -text whitespace=cr-at-eol
+runtime/information-detector.bin binary
 *.ico binary
 *.png binary

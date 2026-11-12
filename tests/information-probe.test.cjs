@@ -36,7 +36,7 @@ function fixture({ startPatch, onStart, turnError, tool = false, itemType, compl
     if (method === 'turn/start') {
       if (turnError) throw Error(turnError);
       const id = 'turn_' + threads;
-      const count = Number(params.input[0].text.match(/(?:choose |选择 )(\d+)/)[1]);
+      const count = Number(params.input[0].text.match(/\d+/)[0]);
       setImmediate(() => {
         const emit = message => { for (const listener of listeners) listener(message); };
         if (itemType) emit({ method: completedOnly ? 'item/completed' : 'item/started', params: { threadId: params.threadId, turnId: id, item: { type: itemType } } });

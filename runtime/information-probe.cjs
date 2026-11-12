@@ -4,7 +4,8 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const readline = require('node:readline');
-const { randomInt } = require('node:crypto');
+const { challenges } = require('./information-modeltrace.cjs');
+const { providerIdentity, requiresAccount } = require('./information-identity.cjs');
 const { normalizeModel } = require('./information-stats.cjs');
 function prompt(count, language) {
   return language === 'zh' ?
@@ -29,6 +30,10 @@ async function probeWithRpc({ call, subscribe, signal, onProgress, ...context })
   const config={ 'features.shell_tool':false, 'features.apply_patch_freeform':false, 'features.multi_agent':false, 'features.apps':false,
     'features.code_mode':false, 'features.code_mode_host':false, 'features.plugins':false, web_search:'disabled' };
   const original=await call('config/read',{includeLayers:false});
+  if (context.providerKey) {
+    const account = requiresAccount(original.config, context.provider) ? await call('account/read', { refreshToken: false }) : null;
+    if (providerIdentity(original.config, context.provider, account) !== context.providerKey) throw Error('检测渠道或账号设置已变化，请刷新后重试');
+  }
   for (const name of Object.keys(original.config?.mcp_servers || {})) config['mcp_servers.'+name+'.enabled']=false;
   if (context.effort) config.model_reasoning_effort=context.effort;
   const outputs=[];
@@ -47,7 +52,7 @@ async function probeWithRpc({ call, subscribe, signal, onProgress, ...context })
     try {
       verifyProbeThread(response,context);
       if (signal?.aborted) throw Error('检测已取消');
-      const n=randomInt(292,333);
+      const challenge = challenges[query], n = challenge.expected_count;
       signal?.addEventListener('abort',abort,{once:true});
       unsubscribe=subscribe(message=>{
         const p=message.params || {};
@@ -68,7 +73,7 @@ async function probeWithRpc({ call, subscribe, signal, onProgress, ...context })
         }
       });
       if (signal?.aborted) throw Error('检测已取消');
-      const started=await call('turn/start',{threadId:id,input:[{type:'text',text:prompt(n,query%2 ? 'zh':'en')}]});
+      const started=await call('turn/start',{threadId:id,input:[{type:'text',text:challenge.prompt}]});
       turnId=started?.turn?.id;
       if (!turnId) throw Error('客户端未返回检测回合');
       const answer=await done;
@@ -125,7 +130,7 @@ async function runInformationProbe({ executable, timeoutMs=240000, signal, ...co
   const deadline=setTimeout(()=>{fail(Error('检测超时，请稍后重试'));child.kill();},timeoutMs);
   try {
     if(signal?.aborted)throw Error('检测已取消');
-    await call('initialize',{clientInfo:{name:'forge_information_stats',version:'0.6.2'},capabilities:{experimentalApi:true}});
+    await call('initialize',{clientInfo:{name:'forge_information_stats',version:'0.6.3'},capabilities:{experimentalApi:true}});
     child.stdin.write('{"method":"initialized"}\n');
     return await probeWithRpc({...context,call,subscribe:listener=>{listeners.add(listener);return()=>listeners.delete(listener);},signal:controller.signal,probeCwd});
   } finally {

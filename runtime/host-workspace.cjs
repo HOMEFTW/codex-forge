@@ -194,14 +194,14 @@
       const value=await ipcRenderer.invoke('fast-ext:statistics',{method:'snapshot',threadId});
       if (epoch!==infoEpoch||overview.threadId!==threadId||value.threadId!==threadId) return;
       const fp=value.fingerprint||{};
-      const status=fp.stale?'结果已过期':({MATCH:'与当前模型一致',MISMATCH:'与当前模型不符',SUSPICIOUS:'证据不足，待确认',UNLISTED:'参考库未收录',UNKNOWN:'当前模型未知',NO_SAMPLE:'等待检测'}[fp.verdict]||'等待检测');
+      const status=fp.verdict==='LEGACY'?'旧版结果，需重测':fp.stale?'结果已过期':({MATCH:'指纹接近当前模型',MISMATCH:'疑似与当前模型不符',SUSPICIOUS:'证据不足，待确认',SHARED:'共享类别，无法区分',REFERENCE_ONLY:'采样条件不同，仅供参考',INVALID_SAMPLE:'序列不符合参考特征',UNLISTED:'参考库未收录',UNKNOWN:'当前模型未知',NO_SAMPLE:'等待检测'}[fp.verdict]||'等待检测');
       const measured=value.speed?.latest?.tps;
       const speed=Number.isFinite(measured)&&measured>=0?measured:null;
       infoSummary={threadId,speed,
-        fingerprint:fp.prediction?fp.prediction+(fp.stale?' · 已过期':fp.verdict==='UNLISTED'?' · 未收录':fp.verdict==='SUSPICIOUS'?' · 待确认':''):status,
+        fingerprint:fp.prediction?(fp.predictionName||fp.prediction)+(fp.stale?' · 已过期':fp.verdict==='UNLISTED'?' · 未收录':fp.verdict==='SUSPICIOUS'?' · 待确认':fp.verdict==='REFERENCE_ONLY'?' · 仅参考':fp.verdict==='SHARED'?' · 共享类别':''):status,
         warning:fp.verdict==='MISMATCH'&&!fp.stale,
         status,phase:value.speed?.phase||'idle',
-        title:`当前模型：${value.model||'未知'}\n模型指纹：${fp.prediction||'尚无样本'} · ${status}\nAgent 速度（最近响应）：${speed==null?'等待生成':speed.toFixed(1)+' tok/s'}\n点击查看信息统计`};
+        title:`当前模型：${value.model||'未知'}\n模型指纹：${fp.predictionName||fp.prediction||'尚无样本'} · ${status}\nAgent 速度（最近响应）：${speed==null?'等待生成':speed.toFixed(1)+' tok/s'}\n点击查看信息统计`};
       queue();
     } catch { /* The compact summary is optional while the native session is opening. */ }
     finally { if(epoch===infoEpoch) infoFetching=false; }

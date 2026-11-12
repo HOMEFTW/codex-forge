@@ -63,7 +63,7 @@ internal static class ForgeUpdateCore {
         ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
         var handler=new HttpClientHandler { AllowAutoRedirect=false };
         if(!String.IsNullOrWhiteSpace(proxy)) { Uri uri;Need(Uri.TryCreate(proxy,UriKind.Absolute,out uri)&&(uri.Scheme=="http"||uri.Scheme=="https")&&uri.UserInfo==""&&uri.AbsolutePath=="/"&&uri.Query==""&&uri.Fragment=="","代理应为 http(s)://主机:端口，不含凭据");handler.Proxy=new WebProxy(uri);handler.UseProxy=true; }
-        var client=new HttpClient(handler) { Timeout=TimeSpan.FromMinutes(30) };client.DefaultRequestHeaders.UserAgent.ParseAdd("Codex-Forge-Updater/0.6.2");return client;
+        var client=new HttpClient(handler) { Timeout=TimeSpan.FromMinutes(30) };client.DefaultRequestHeaders.UserAgent.ParseAdd("Codex-Forge-Updater/0.6.3");return client;
     }
     internal static async Task<HttpResponseMessage> Get(HttpClient client,Uri uri,long offset,CancellationToken token) {
         for(int redirects=0;redirects<6;redirects++) {
@@ -180,7 +180,7 @@ internal static class ForgeUpdateCore {
 internal sealed class ForgeUpdaterForm : Form {
     readonly string root;readonly string forgeHome=Environment.GetEnvironmentVariable("CODEX_FORGE_HOME")??Path.Combine(Environment.GetEnvironmentVariable("CODEX_HOME")??Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),".codex"),"forge");readonly TextBox repository=new TextBox(),proxy=new TextBox();readonly Label status=new Label();readonly ProgressBar progress=new ProgressBar();readonly Button check=new Button(),download=new Button(),install=new Button(),cancel=new Button(),repair=new Button();CancellationTokenSource cancellation;Dictionary<string,object> plan;string staged;bool busy;
     internal ForgeUpdaterForm(string directory,string source) {
-        root=directory;Text="Codex Forge 独立更新器 · 0.6.2";ClientSize=new Size(620,360);StartPosition=FormStartPosition.CenterScreen;FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=false;
+        root=directory;Text="Codex Forge 独立更新器 · 0.6.3";ClientSize=new Size(620,360);StartPosition=FormStartPosition.CenterScreen;FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=false;
         Controls.Add(new Label { Text="安装目录："+root,Left=20,Top=16,Width=580,Height=38 });
         Controls.Add(new Label { Text="GitHub 发布仓库",Left=20,Top=60,Width=150 });repository.SetBounds(180,58,420,25);repository.Text=source;repository.AccessibleName="GitHub 发布仓库";
         Controls.Add(new Label { Text="HTTP 代理（留空用系统）",Left=20,Top=100,Width=160 });proxy.SetBounds(180,98,420,25);proxy.AccessibleName="HTTP 代理";

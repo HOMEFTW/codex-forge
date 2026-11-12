@@ -8,6 +8,8 @@ import {createRequire} from 'node:module';
 import assert from 'node:assert/strict';
 const require=createRequire(import.meta.url);
 const {runInformationProbe}=require('../runtime/information-probe.cjs');
+const {challenges}=require('../runtime/information-modeltrace.cjs');
+const {providerIdentity}=require('../runtime/information-identity.cjs');
 const root=path.resolve(import.meta.dirname,'..'),out=path.join(root,'output');
 assert(process.argv[2],'Usage: node scripts/check-information-probe.mjs <verified-codex.exe>');
 const exe=path.resolve(process.argv[2]);assert(fs.statSync(exe).isFile());
@@ -26,7 +28,7 @@ const server=http.createServer(async(req,res)=>{
   const data=JSON.parse(body.toString());
   assert.equal(!!req.headers.authorization,false,'local fixture must never receive credentials');
   const index=requests.push(data);
-  const count=Number(JSON.stringify(data.input).match(/(?:choose |选择 )(\d+)/)?.[1]||3);
+  const count=challenges.find(challenge=>JSON.stringify(data.input).includes(challenge.prompt))?.expected_count||3;
   const answer=JSON.stringify(Array.from({length:count},(_,i)=>i%355+1));
   const item={id:'msg_'+index,type:'message',role:'assistant',status:'completed',content:[{type:'output_text',text:answer,annotations:[]}]};
   const response={id:'resp_'+index,object:'response',created_at:0,status:'completed',model:data.model,output:[item],usage:{input_tokens:10,output_tokens:5,total_tokens:15,input_tokens_details:{cached_tokens:0},output_tokens_details:{reasoning_tokens:0}}};
@@ -60,13 +62,18 @@ try{
  await waitFor(host,n=>n.method==='turn/completed'&&n.params.threadId===sourceId);
  const active=await host.call('turn/start',{threadId:sourceId,input:[{type:'text',text:'Stay active; do not finish before this isolated verification completes.'}]});
  let waitTimer;try{await Promise.race([held,new Promise((_,reject)=>{waitTimer=setTimeout(()=>reject(Error('fixture request did not arrive')),15000);})]);}finally{clearTimeout(waitTimer);}
+ const effective=await host.call('config/read',{includeLayers:false});
+ const providerKey=providerIdentity(effective.config,'fixture',null,env);
+ assert(providerKey,'fixture channel identity must be available');
  const progress=[],savedEnv={...process.env};let outputs;
  try {
  for(const key of Object.keys(process.env))if(!(key in env))delete process.env[key];
  Object.assign(process.env,env);delete process.env.CODEX_FORGE_MODEL_CATALOG;
- outputs=await runInformationProbe({executable:exe,threadId:sourceId,model:'gpt-6-sol',provider:'fixture',effort:'high',cwd:project,onProgress:value=>progress.push(value),timeoutMs:45000});
+ outputs=await runInformationProbe({executable:exe,threadId:sourceId,model:'gpt-6-sol',provider:'fixture',providerKey,effort:'high',cwd:project,onProgress:value=>progress.push(value),timeoutMs:45000});
  }finally{for(const key of Object.keys(process.env))if(!(key in savedEnv))delete process.env[key];Object.assign(process.env,savedEnv);}
  assert.equal(outputs.length,3);assert.deepEqual(progress,[1,2,3]);assert.equal(requests.length,5);
+ assert.deepEqual(outputs.map(item=>item.expected_count),[218,233,247]);
+ assert(outputs.every(item=>JSON.parse(item.text).length===item.expected_count),'fixture replies must match the fixed challenges');
  const probeRequests=requests.slice(2),serialized=probeRequests.map(request=>JSON.stringify(request));
  assert(probeRequests.every(request=>request.model==='gpt-6-sol'),'probe retained the active model');
  assert(probeRequests.every(request=>request.reasoning?.effort==='high'),'probe retained the requested effort');

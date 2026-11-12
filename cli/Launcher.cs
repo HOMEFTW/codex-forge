@@ -8,7 +8,7 @@ using System.Reflection;
 [assembly: AssemblyTitle("Codex Forge")]
 [assembly: AssemblyProduct("Codex Forge")]
 [assembly: AssemblyDescription("Codex Forge plugin host launcher")]
-[assembly: AssemblyVersion("0.6.2.0")]
+[assembly: AssemblyVersion("0.6.3.0")]
 internal static class Launcher {
     static string Quote(string value) { return "\""+value.Replace("\"", "\\\"")+"\""; }
     // 同版本修订也可能更新客户端或插件内容；不能只比较 Forge 版本号。

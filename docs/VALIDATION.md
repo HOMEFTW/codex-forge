@@ -1,5 +1,24 @@
 # Forge 验证记录
 
+## 0.6.3 整合发行验证（2026-11-12）
+
+- Forge 统一为 0.6.3，API 保持 4，官方客户端基线保持 `26.1106.6628.0`；整合下方信息统计更新和预测输入框伸缩修复。保留 API 1–3 兼容与独立插件可省略 Codex 版本限制。
+- 最终整合源码运行 `node scripts/run-tests.mjs`：**462 项通过、0 失败、0 跳过**，证据为 `output/release-063-tests-result.json` 与 `output/release-063-tests.tap`。首轮兼容性测试因目标版本固定为 0.6.2 而正确触发禁止降级；改用当前配置版本后完整回归通过，未改变更新器行为。
+- `npm run build` 和 C# 启动器、准备程序、更新器编译通过；`scripts/test-updater.ps1` 的 **44 项断言通过**。源码与构建文件摘要按最终载荷复核。
+- 信息统计复用已核对的 10 项 React/Playwright 交互与布局验收，控制台错误 0；真实 CLI + localhost 模拟服务验证保留当前 high 档位、三次隔离挑战及父回合继续运行。仅使用模拟响应，不代表真实远端归因准确率。
+- 预测预加载源码仍与原生键盘验收摘要 `f7206d7210b088971c269ed0e4b2e9b56a11145560179f789f10168fcff54bea` 一致。实际 Windows Esc 清除并收缩至 40px，Tab 单次接受为可编辑草稿且不发送，粘贴输入移除灰字并保留新草稿；原生 `turn/start=0`。长中文、连续英文、换行、窄宽度重排、最大高度滚动与短建议收缩已有原生编辑器证据。报告为 `output/prompt-prediction-layout-keyboard-ui.json` 与 `output/prompt-prediction-layout-native.json`。
+- 发行验收以 `output/release-063-package-audit.json`、`output/release-063-client-integrity.json`、`output/release-063-source-audit.json` 和 `output/release-063-github-verification.json` 为准：核对 MSI/ZIP 载荷、ASAR 成员与块、EXE 内嵌摘要以及远端附件回下载摘要；发布包不使用含合成 IPC 的 keyboard-stage 测试客户端。
+- 没有替换或重启正式客户端。真实远端指纹准确率、真实 Pro 服务、物理 IME 与 MSI 实际安装/卸载未在本轮执行；原生键盘验收使用隔离客户端和合成预测响应。
+
+## 信息统计：lm-detector 与自动指纹（2026-11-12，本地改动）
+
+- Forge 仍为 0.6.2 / API 4；本轮未提交、打包发布或替换当前客户端。参考库切换到 lm-detector `a7e9d3056e019827904dd50722c20b4a0c896738` 的 69 类/15 家族/2,560 条回答及配套冻结评分器。
+- `node scripts/run-tests.mjs`：最终 **462 项通过、0 失败、0 跳过**。本次专用报告为 `output/information-v2-full-tests-result.json` 与 `output/information-v2-full-tests.tap`。覆盖自动默认关闭、空闲条件、跨聊天/重启缓存、配置隔离、取消/冷却、手动重试、共享类别、旧历史、畸形缓存、思考强度差异和既有宿主回归。
+- `npm run build` 成功；12 个相关运行文件/数据与 `dist/fast-extension` 逐字节一致，6 份固定上游源码摘要一致。69 类 JSON SHA-256 为 `a6e8d6291b50e7cf25744b5fbad46460ed4cc0b94e156bb2719a9d714684b635`，二进制评分器 SHA-256 为 `8c7d48ea242026d123baa7cfbbe377701ac8d6899e6796f319ce555d3ae06b6c`。
+- `scripts/check-information-probe.mjs` 使用当前已安装版本的真实 `codex.exe` 与独立 CODEX_HOME、localhost Responses 模拟服务：验证固定三条挑战、原 high 档位、渠道摘要一致、工具关闭、项目指令/父聊天历史未泄漏、父回合保持运行。共 5 次本机无认证请求（2 次父聊天、3 次采样），远端模型请求为 0。证据：`output/information-probe-fresh-session.json`。
+- Chrome/Playwright 使用真实 React 面板、隔离插件设置与真实 InformationStats 服务，10 项交互/布局检查通过：手动检测、共享类别、开关持久化、缓存复用、自动新档位、xhigh 隐藏概率且不标红、可比较条件疑似不一致、关闭后停止自动、保留手动、280 像素无横向溢出。另核对 360/960 像素、深浅主题与全宽显示，控制台错误 0；参考回答由测试提供，不调用真实模型。证据：`output/playwright/information-v2/verification.json` 及同目录截图。
+- 参考回答固定样例仅用于功能回归，不是独立识别准确率评测。未验证真实远端模型的归因准确率、实际账号额度或当前运行客户端的安装升级。自动检测默认关闭；操作说明见 `docs/INFORMATION-STATS.md`。
+
 ## 0.6.2 提示词预测修复打包（2026-11-12）
 
 - 版本统一到 0.6.2 / API 4，官方基线保持 `26.1106.6628.0`。保留 API 1–3 兼容从 0.6.1 开始的边界、独立插件可省略官方版本限制和现有权限规则。

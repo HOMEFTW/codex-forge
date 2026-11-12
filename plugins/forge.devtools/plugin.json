@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "apiVersion": 4,
-  "version": "0.6.2",
+  "version": "0.6.3",
   "compatibility": {
     "codex": [
       "26.1106.6628.0",
@@ -54,6 +54,13 @@
     ]
   },
   "changelog": [
+    {
+      "version": "0.6.3",
+      "date": "2026-11-12",
+      "items": [
+        "随 Forge 0.6.3 更新；官方客户端基线与 API 4 保持，保留原有设置和功能。"
+      ]
+    },
     {
       "version": "0.6.2",
       "date": "2026-11-12",

@@ -2,7 +2,7 @@
 ;(() => {
   const { ipcRenderer } = require('electron');
   let current = null, generation = -1, epoch = 0, composing = false, accepting = false, blockedTicket = null;
-  let hint = null, decoratedRoot = null, observer;
+  let hint = null, decoratedRoot = null, decoratedInput = null, layoutParent = null, observer;
   const request = args => ipcRenderer.invoke('forge:prediction', args);
   function editor() {
     const root = [...document.querySelectorAll('[data-codex-composer-root]')].find(node => node.getBoundingClientRect().height > 0);
@@ -20,7 +20,12 @@
     return value && !composing && !value.input.disabled && value.input.getAttribute('aria-disabled') !== 'true' &&
       !value.root.querySelector('[data-cumberbatch]') && readDraft(value.input).empty ? value : null;
   }
-  function removeHint() { hint?.remove(); hint = null; decoratedRoot?.removeAttribute('data-forge-prediction-active'); decoratedRoot = null; }
+  function removeHint() {
+    hint?.remove(); hint = null;
+    decoratedRoot?.removeAttribute('data-forge-prediction-active'); decoratedRoot = null;
+    decoratedInput?.removeAttribute('data-forge-prediction-editor'); decoratedInput = null;
+    layoutParent?.removeAttribute('data-forge-prediction-layout'); layoutParent = null;
+  }
   function dismiss() {
     const prior = current; current = null; epoch++; accepting = false; removeHint();
     if (!prior?.ticket) return;
@@ -29,16 +34,21 @@
   }
   function position(value) {
     if (!hint || !value) return;
-    const rect = value.input.getBoundingClientRect(), style = window.getComputedStyle(value.input);
-    Object.assign(hint.style, { position: 'fixed', left: (rect.left + (parseFloat(style.paddingLeft) || 0)) + 'px',
-      top: (rect.top + (parseFloat(style.paddingTop) || 0)) + 'px', width: Math.max(0, rect.width - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0)) + 'px',
-      font: style.font, lineHeight: style.lineHeight, color: style.color, opacity: '0.5', whiteSpace: 'pre-wrap',
-      overflow: 'hidden', maxHeight: Math.max(rect.height, 44) + 'px', pointerEvents: 'none', userSelect: 'none', zIndex: '1' });
+    const style = window.getComputedStyle(value.input);
+    for (const name of ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing', 'wordSpacing',
+      'whiteSpace', 'overflowWrap', 'wordBreak', 'textAlign', 'textIndent', 'direction', 'tabSize',
+      'paddingTop', 'paddingBottom', 'paddingLeft', 'paddingRight']) hint.style[name] = style[name];
+    Object.assign(hint.style, { color: style.color, opacity: '0.5', pointerEvents: 'none', userSelect: 'none', zIndex: '1' });
   }
   function render(value) {
+    if (decoratedInput !== value.input || layoutParent !== value.input.parentElement || hint?.parentElement !== layoutParent) removeHint();
     if (!hint) {
       hint = document.createElement('div'); hint.setAttribute('data-forge-prediction', ''); hint.setAttribute('aria-hidden', 'true');
-      hint.textContent = current.text + '  [Tab 接受 · Esc 关闭]'; document.body.append(hint);
+      hint.textContent = current.text + '  [Tab 接受 · Esc 关闭]';
+      // Share a grid cell with the empty editor, outside ProseMirror. The hint
+      // contributes its wrapped height; the native parent keeps its scroll cap.
+      decoratedInput = value.input; decoratedInput.setAttribute('data-forge-prediction-editor', '');
+      layoutParent = value.input.parentElement; layoutParent.setAttribute('data-forge-prediction-layout', ''); layoutParent.append(hint);
       decoratedRoot = value.root; decoratedRoot.setAttribute('data-forge-prediction-active', '');
     }
     position(value);
@@ -90,7 +100,10 @@
   ipcRenderer.on('fast-ext:changed', (_event, value) => { if (value?.type === 'forge-prediction') receive(value); });
   window.addEventListener('DOMContentLoaded', () => {
     const style = document.createElement('style');
-    style.textContent = '[data-forge-prediction-active] [data-placeholder]::before,[data-forge-prediction-active] [data-placeholder]::after{content:none!important}';
+    style.textContent = '[data-forge-prediction-active] [data-placeholder]::before,[data-forge-prediction-active] [data-placeholder]::after{content:none!important}' +
+      '[data-forge-prediction-layout]{display:grid!important}' +
+      '[data-forge-prediction-layout]>[data-forge-prediction-editor],[data-forge-prediction-layout]>[data-forge-prediction]{grid-area:1/1;min-width:0}' +
+      '[data-forge-prediction]{margin:0;box-sizing:border-box}';
     document.head.append(style);
     document.addEventListener('keydown', keydown, true);
     for (const name of ['beforeinput', 'input']) document.addEventListener(name, event => { if (inComposer(event)) dismiss(); }, true);

@@ -3,7 +3,7 @@
   "apiVersion": 4,
   "id": "forge.prompt-prediction",
   "name": "自动提示词预测",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "本轮回复完成后，使用当前模型的 low 档预测下一条提示词。原生 Pro 预测开启时自动暂停，关闭后恢复。Tab 接受为可编辑草稿，Esc 关闭；可能消耗调用额度。",
   "compatibility": {
     "codex": [
@@ -66,6 +66,14 @@
     }
   },
   "changelog": [
+    {
+      "version": "0.6.3",
+      "date": "2026-11-12",
+      "items": [
+        "预测灰字参与输入框自然伸缩，保留原生高度上限与滚动；清除、接受、输入和原生接管后恢复布局。",
+        "保留原生 Pro 优先、当前模型 low 预测与 Tab 仅填入草稿、不自动发送。"
+      ]
+    },
     {
       "version": "0.6.2",
       "date": "2026-11-12",

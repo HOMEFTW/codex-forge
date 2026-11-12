@@ -36,7 +36,7 @@ test('unpinned plugin import, enable, overwrite and host upgrade retain data and
 });
 
 test('normal updater permits an unpinned plugin and still blocks explicit Codex restrictions', () => {
-  const release = { forgeVersion: '0.6.2', codexVersion: '99.0.0.0', apiVersion: 4 };
+  const release = { forgeVersion: config.version, codexVersion: '99.0.0.0', apiVersion: 4 };
   const plugin = manifest();
   assert(matchUpdate({config, releases: [release], plugins: [plugin]}).plan);
   assert(!matchUpdate({config, releases: [release], plugins: [{ ...plugin, compatibility: { ...plugin.compatibility, codex: [versions.codex] } }]}).plan);

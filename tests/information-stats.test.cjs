@@ -7,17 +7,18 @@ const path = require('node:path');
 const { CodexMetrics, InformationStats, assess, normalizeModel, analyze } = require('../runtime/information-stats.cjs');
 const { probeWithRpc, verifyFork } = require('../runtime/information-probe.cjs');
 const { ForgeRegistry } = require('../runtime/forge-registry.cjs');
+const { ENGINE_VERSION } = require('../runtime/information-modeltrace.cjs');
 
 test('fingerprint warnings require strong evidence and never flag an unlisted model', () => {
-  const evidence = { used_outputs:3, results:[
+  const evidence = { engineVersion: ENGINE_VERSION, sampling: { compatible: true }, used_outputs:3, results:[
     { model:'gpt-6-sol', score:1, probability:.9 },
     { model:'gpt-5.6-sol', score:0, probability:.1 },
   ] };
   assert.equal(assess('gpt-6-sol', evidence).verdict, 'MATCH');
   assert.equal(assess('gpt-5.6-sol', evidence).verdict, 'MISMATCH');
   assert.equal(assess('gpt-5.6-sol', { ...evidence, used_outputs:1 }).verdict, 'SUSPICIOUS');
-  assert.deepEqual(assess('gpt-6.1-sol', evidence), { verdict:'UNLISTED', warning:false });
-  assert.equal(assess('gpt-6-sol', { results:[] }).verdict, 'NO_SAMPLE');
+  assert.deepEqual(assess('unlisted-model', evidence), { verdict:'UNLISTED', warning:false });
+  assert.equal(assess('gpt-6-sol', { engineVersion: ENGINE_VERSION, results:[] }).verdict, 'NO_SAMPLE');
 });
 
 test('Codex session usage yields a model-scoped rate including reasoning output', () => {
@@ -46,7 +47,8 @@ test('normalization keeps GPT-6.1 separate and numerical samples are validated',
   const result=analyze([{ text:JSON.stringify(sequence),expected_count:320 }]);
   assert.equal(result.used_outputs,1);
   assert.equal(result.diagnostics[0].accepted,true);
-  assert(Math.abs(result.results.reduce((sum,item)=>sum+item.probability,0)-1)<1e-9);
+  assert.equal(result.probability, null);
+  assert(result.results.every(item => item.probability === null));
   assert.throws(()=>analyze([{text:'no numbers',expected_count:320}]),/没有可用回答/);
 });
 
@@ -61,7 +63,7 @@ test('probe collects three sequential replies only from verified fresh ephemeral
     if(method==='config/read') return {config:{mcp_servers:{sample:{enabled:true}}}};
     if(method==='thread/start') { forkParams.push(params); const id='probe_'+(++fork); return {model:params.model,modelProvider:params.modelProvider,reasoningEffort:'high',thread:{id,ephemeral:true,path:null,forkedFromId:null,model:params.model,modelProvider:params.modelProvider,reasoningEffort:'high'}}; }
     if(method==='turn/start') {
-      const id='turn_'+fork, count=Number(params.input[0].text.match(/(?:choose |选择 )(\d+)/)?.[1]);
+      const id='turn_'+fork, count=Number(params.input[0].text.match(/\d+/)[0]);
       setImmediate(()=>{
         listener({method:'item/started',params:{threadId:params.threadId,turnId:id,item:{type:'agentMessage'}}});
         listener({method:'item/completed',params:{threadId:params.threadId,turnId:id,item:{type:'agentMessage',phase:'final',text:JSON.stringify(Array.from({length:count},(_,i)=>i%355+1))}}});

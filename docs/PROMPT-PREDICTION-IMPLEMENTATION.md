@@ -25,6 +25,12 @@
 
 主要文件：`runtime/prompt-prediction.cjs`（文本上下文和结果校验）、`runtime/prompt-prediction-runner.cjs`（独立 low 后端）、`runtime/prompt-prediction-host.cjs`（调度/权限/取消）、`runtime/prompt-prediction-preload.cjs`（灰字/键盘/草稿保护）、`runtime/native-prediction-policy.cjs`（原生订阅联动）。
 
+## 预测内容与输入框高度
+
+预测灰字作为编辑器的兄弟节点，与空编辑器共享同一 CSS Grid 单元，参与原生输入容器的高度计算。中文、长单词和显式换行沿用编辑器排版；宽度变化时自动重排，超过原生最大高度后在原有容器内滚动。预测内容不进入 editable DOM。取消、开始输入、组词、接受或原生预测接管时，移除灰字和临时布局标记，恢复原生布局；编辑器被替换时重新绑定并清理旧标记。
+
+2026-11-12 源码回归 457 项通过；真实 0.6.2 编辑器的合成预测验证了长中文、连续英文、换行、窄输入区、原生高度上限与滚动、短建议收缩。后续在独立客户端启动时载入相同预加载源码，仅替换预测 IPC 为本机夹具，完成实际 Windows 按键验收：Esc 清除预测并恢复 40px，Tab 仅填入可编辑长草稿，开始输入清除预测且保留新草稿。可信键盘事件到达原生编辑器，未调用模型或发送消息；测试草稿、临时监听器和布局标记已清理，隔离窗口已退出。正式客户端的早期调试夹具亦已卸除，没有替换或重启正式安装。证据：`output/prompt-prediction-layout-native.json`、`output/prompt-prediction-layout-keyboard-ui.json`；打包整合交接：`output/prompt-prediction-layout-release-handoff.md`。
+
 ## 原生聊天连接修复
 
 用户在当前聊天反馈仍无预测后，发现此前的隔离测试通过手动渲染器 RPC 建立了 `state.bridge`，没有覆盖原生宿主管理聊天且该字段为空的路径。旧实现会在处理完成事件前直接返回，无法开始预测。现改用宿主已有连接和内部完成通知；元数据回复不经过界面 IPC，取消或导航后的迟到读取不会启动推理。

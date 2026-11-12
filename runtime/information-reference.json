@@ -1,0 +1,498 @@
+{
+  "claude-haiku-4.5": {
+    "efforts": [],
+    "sources": [
+      "openrouter/unknown"
+    ]
+  },
+  "claude-sonnet-4.6": {
+    "efforts": [],
+    "sources": [
+      "oaipro"
+    ]
+  },
+  "claude-sonnet-5": {
+    "efforts": [],
+    "sources": [
+      "oaipro"
+    ]
+  },
+  "claude-opus-4.6": {
+    "efforts": [],
+    "sources": [
+      "oaipro"
+    ]
+  },
+  "claude-opus-4.7": {
+    "efforts": [],
+    "sources": [
+      "oaipro"
+    ]
+  },
+  "claude-opus-4.8": {
+    "efforts": [],
+    "sources": [
+      "oaipro"
+    ]
+  },
+  "claude-opus-5": {
+    "efforts": [
+      "none"
+    ],
+    "sources": [
+      "mono",
+      "oaipro"
+    ]
+  },
+  "claude-fable-5.1": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "mono"
+    ]
+  },
+  "claude-fable-5": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "mono"
+    ]
+  },
+  "gemini-2.5-pro": {
+    "efforts": [],
+    "sources": [
+      "mono"
+    ]
+  },
+  "gemini-3.1-pro-preview": {
+    "efforts": [],
+    "sources": [
+      "mono"
+    ]
+  },
+  "gemini-3.5-flash": {
+    "efforts": [],
+    "sources": [
+      "mono"
+    ]
+  },
+  "gemini-3.6-flash": {
+    "efforts": [],
+    "sources": [
+      "mono"
+    ]
+  },
+  "gemini-3.7-flash": {
+    "efforts": [],
+    "sources": [
+      "mono"
+    ]
+  },
+  "gemini-3.8-flash": {
+    "efforts": [],
+    "sources": [
+      "mono"
+    ]
+  },
+  "grok-4.5": {
+    "efforts": [],
+    "sources": [
+      "mono"
+    ]
+  },
+  "grok-4.6": {
+    "efforts": [],
+    "sources": [
+      "mono"
+    ]
+  },
+  "gpt-4o": {
+    "efforts": [],
+    "sources": [
+      "openrouter/unknown"
+    ]
+  },
+  "glm-5.2": {
+    "efforts": [
+      "none"
+    ],
+    "sources": [
+      "openrouter/unknown"
+    ]
+  },
+  "glm-5.3": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openrouter/unknown"
+    ]
+  },
+  "qwen3.8-max-0902": {
+    "efforts": [
+      "minimal"
+    ],
+    "sources": [
+      "openrouter/unknown"
+    ]
+  },
+  "qwen3.8-27b": {
+    "efforts": [
+      "none"
+    ],
+    "sources": [
+      "openrouter/unknown"
+    ]
+  },
+  "kimi-k3": {
+    "efforts": [
+      "none"
+    ],
+    "sources": [
+      "openrouter/moonshotai"
+    ]
+  },
+  "hy4-preview": {
+    "efforts": [
+      "none"
+    ],
+    "sources": [
+      "openrouter/unknown"
+    ]
+  },
+  "muse-spark-1.2": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openrouter/unknown"
+    ]
+  },
+  "muse-spark-1.3": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openrouter/unknown"
+    ]
+  },
+  "kimi-k2.8-preview": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "kimi-code-subscription"
+    ]
+  },
+  "grok-4.7": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openrouter/xai"
+    ]
+  },
+  "mimo-v2.5": {
+    "efforts": [
+      "none"
+    ],
+    "sources": [
+      "openrouter/xiaomi/fp8"
+    ]
+  },
+  "mimo-v2.5-pro": {
+    "efforts": [
+      "none"
+    ],
+    "sources": [
+      "openrouter/xiaomi/fp8"
+    ]
+  },
+  "mimo-v2.6-flash": {
+    "efforts": [
+      "none"
+    ],
+    "sources": [
+      "openrouter/xiaomi/fp8"
+    ]
+  },
+  "mimo-v2.6-pro": {
+    "efforts": [
+      "none"
+    ],
+    "sources": [
+      "openrouter/xiaomi/fp8"
+    ]
+  },
+  "step-5-preview": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "stepfun-api"
+    ]
+  },
+  "claude-opus-5.5": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openrouter/anthropic"
+    ]
+  },
+  "gpt-6-luna": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openrouter/openai"
+    ]
+  },
+  "glm-5.3-flashx": {
+    "efforts": [],
+    "sources": [
+      "openrouter/z-ai/fp8"
+    ]
+  },
+  "glm-5.3-flash": {
+    "efforts": [],
+    "sources": [
+      "openrouter/z-ai/fp8"
+    ]
+  },
+  "deepseek-v4.1-flash": {
+    "efforts": [],
+    "sources": [
+      "openrouter/deepseek"
+    ]
+  },
+  "deepseek-v4-flash": {
+    "efforts": [],
+    "sources": [
+      "openrouter/novita"
+    ]
+  },
+  "deepseek-v4-pro-0813": {
+    "efforts": [],
+    "sources": [
+      "openrouter/deepseek"
+    ]
+  },
+  "deepseek-v4-pro": {
+    "efforts": [],
+    "sources": [
+      "openrouter/novita"
+    ]
+  },
+  "deepseek-v4-flash-0731": {
+    "efforts": [],
+    "sources": [
+      "openrouter/novita"
+    ]
+  },
+  "deepseek-v3.2": {
+    "efforts": [],
+    "sources": [
+      "openrouter/novita"
+    ]
+  },
+  "gpt-6-sol": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openai/direct"
+    ]
+  },
+  "claude-sonnet-5.5": {
+    "efforts": [],
+    "sources": [
+      "openrouter/anthropic"
+    ]
+  },
+  "gpt-6-astra": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openai/direct",
+      "openrouter/openai"
+    ]
+  },
+  "gpt-5.4": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openai/direct"
+    ]
+  },
+  "gpt-5.5": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openai/direct"
+    ]
+  },
+  "gpt-5.6-sol": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openai/direct"
+    ]
+  },
+  "gpt-5.6-terra": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openai/direct"
+    ]
+  },
+  "gpt-5.6-luna": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openai/direct"
+    ]
+  },
+  "seed-2.0-mini": {
+    "efforts": [],
+    "sources": [
+      "openrouter/seed/fp8"
+    ]
+  },
+  "seed-2.0-lite": {
+    "efforts": [],
+    "sources": [
+      "openrouter/seed/fp8"
+    ]
+  },
+  "qwen3.8-omni-flash": {
+    "efforts": [],
+    "sources": [
+      "openrouter/alibaba"
+    ]
+  },
+  "seed-2.1-turbo": {
+    "efforts": [],
+    "sources": [
+      "openrouter/seed/fp8"
+    ]
+  },
+  "qwen3.8-flash": {
+    "efforts": [],
+    "sources": [
+      "openrouter/alibaba"
+    ]
+  },
+  "claude-haiku-5.5": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openrouter/anthropic"
+    ]
+  },
+  "muse-wonder": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openrouter/meta"
+    ]
+  },
+  "deepseek-v4.1-flash-1017": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openrouter/deepseek"
+    ]
+  },
+  "kimi-k3.1-pro": {
+    "efforts": [
+      "none"
+    ],
+    "sources": [
+      "openrouter/moonshotai/mxfp4"
+    ]
+  },
+  "gemini-3.5-flash-lite": {
+    "efforts": [
+      "minimal"
+    ],
+    "sources": [
+      "openrouter/google-ai-studio"
+    ]
+  },
+  "minimax-m3.1-flash": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openrouter/minimax"
+    ]
+  },
+  "gpt-6.1-terra": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openrouter/openai"
+    ]
+  },
+  "openpangu-2.0-flash": {
+    "efforts": [
+      "none"
+    ],
+    "sources": [
+      "huaweicloud"
+    ]
+  },
+  "openpangu-2.0-pro": {
+    "efforts": [
+      "none"
+    ],
+    "sources": [
+      "huaweicloud"
+    ]
+  },
+  "muse-ember": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openrouter/meta"
+    ]
+  },
+  "claude-fable-5.2": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openrouter/anthropic"
+    ]
+  },
+  "gemini-4-carbon": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openrouter/google-vertex/us"
+    ]
+  },
+  "gemini-4-argon": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openrouter/google-vertex/us"
+    ]
+  }
+}
