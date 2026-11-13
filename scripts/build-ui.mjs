@@ -11,6 +11,7 @@ for (const name of fs.readdirSync(path.join(root, 'runtime'))) fs.copyFileSync(p
 fs.cpSync(path.join(root, 'plugins'), path.join(destination,'plugins'), {recursive:true});
 fs.copyFileSync(path.join(root,'assets','codex-forge.ico'),path.join(destination,'codex-forge.ico'));
 fs.copyFileSync(path.join(root,'forge.config.json'),path.join(destination,'forge.config.json'));
+fs.cpSync(path.join(root,'marketplace'),path.join(destination,'marketplace'),{recursive:true});
 fs.cpSync(path.join(root, 'vendor/7zip'), path.join(destination, 'vendor/7zip'), { recursive: true });
 fs.cpSync(path.join(root, 'bundled-skills'), path.join(destination, 'bundled-skills'), { recursive: true });
 const nexusResult = await build({ entryPoints: [path.join(root, 'runtime', 'nexus.cjs')], bundle: true, metafile: true, outfile: path.join(destination, 'nexus.cjs'), platform: 'node', format: 'cjs', target: ['node22'], legalComments: 'linked' });

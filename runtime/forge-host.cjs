@@ -7,7 +7,7 @@ const { DshCompatibilityLayer } = require('./dsh-compat.cjs');
 const { CAPABILITIES, METHOD_CAPABILITY, granted, negotiate } = require('./forge-capabilities.cjs');
 const { ForgeError, reply } = require('./forge-errors.cjs');
 const { SLOTS, slotEntries, slotConfig } = require('./forge-slots.cjs');
-function installForge({ ipcMain, dialog, host, threadContext, nativeCall, nativeMessage, open, notify, states, collaboration, nexus, predictions, onRegistryChange = () => {} }) {
+function installForge({ ipcMain, dialog, host, threadContext, nativeCall, nativeMessage, open, notify, states, collaboration, nexus, predictions, services = {}, nodePath, executable, safeStorage, onRegistryChange = () => {} }) {
   const config = json(fs.existsSync(path.join(__dirname,'forge.config.json'))?path.join(__dirname,'forge.config.json'):path.join(__dirname,'../forge.config.json'));
   const root = process.env.CODEX_FORGE_HOME || path.join(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'forge');
   const registry = new ForgeRegistry({ root, bundledRoot:fs.existsSync(path.join(__dirname,'plugins'))?path.join(__dirname,'plugins'):path.join(__dirname,'../plugins'), versions: { codex: config.codexVersion, forge: config.version, apiVersion: config.apiVersion } });
@@ -17,9 +17,9 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
   const updateResults = pluginUpdates.applyPending(registry);
   config.githubRepository = json(path.join(root,'updates.json'),{}).repository || config.githubRepository;
   const dynamic = new Map(), outputFile = path.join(root, 'output.json');
-  let output = json(outputFile, {}), currentUpdate = null;
+  let output = json(outputFile, {}), currentUpdate = null, api5;
   const updateConfig = () => ({ ...config, ...json(path.join(root, 'updates.json'), {}) });
-  const publicContext = (event, state) => ({ threadId: threadContext(event, state).threadId, codexVersion: config.codexVersion, forgeVersion: config.version, apiVersion: config.apiVersion });
+  const publicContext = (event, state) => ({ threadId: threadContext(event, state).threadId, generation:state.api5Generation||0,codexVersion: config.codexVersion, forgeVersion: config.version, apiVersion: config.apiVersion });
   // 提前算好未授予能力的方法，让 SDK 在插件侧就能拿到可读的拒绝原因；
   // 权威校验仍在 forge:api 派发前做，插件绕过 SDK 也拦得住。
   const enabledCapabilities = () => ({ nexus: !!nexus, 'prompt-prediction': !!predictions && registry.status('forge.prompt-prediction').enabled && registry.settings('forge.prompt-prediction').enabled });
@@ -27,7 +27,7 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
     const reason = granted(manifest, method);
     return reason ? [[method, reason]] : [];
   }));
-  function broadcast() { onRegistryChange(); for (const state of states.values()) notify(state, { type: 'forge-refresh' }); }
+  function broadcast() { onRegistryChange(); api5?.sync().catch(error=>api5.logHostError(error)); for (const state of states.values()) notify(state, { type: 'forge-refresh' }); }
   function broadcastPluginEvent(name, value, metadata = {}, threadId = null, sourceState = null) {
     for (const target of states.values()) {
       if (target.win.isDestroyed()) continue;
@@ -42,7 +42,7 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
   function snapshot(event, state) {
     const result = registry.list();
     const context = publicContext(event, state);
-    return { ...result, prediction: predictions?.snapshot(state), pluginUpdates:Object.fromEntries(pluginPlans), pendingUpdates:pluginUpdates.pendingUpdates(registry), pluginUpdateResults:updateResults, context, dynamic: [...dynamic.values()].filter(x => registry.status(x.pluginId).enabled), settingsPlugin: state.settingsPlugin || null, output: context.threadId ? (output[context.threadId] || []) : [], config: { githubRepository: config.githubRepository, channel: config.channel }, dsh: dsh.snapshot(), slots: { ...slotEntries(registry), config: slotConfig() }, update: currentUpdate };
+    return { ...result,contextPlugins:result.plugins.filter(require('./forge-api5-contract.cjs').canReadContext).map(plugin=>plugin.id),api5:api5?.uiSnapshot({...context,windowId:state.win.webContents?.id}),marketSources:api5?.market.sources(),backends:api5?[...api5.backends.workers.keys()]:[],prediction: predictions?.snapshot(state), pluginUpdates:Object.fromEntries(pluginPlans), pendingUpdates:pluginUpdates.pendingUpdates(registry), pluginUpdateResults:updateResults, context, dynamic: [...dynamic.values()].filter(x => registry.status(x.pluginId).enabled), settingsPlugin: state.settingsPlugin || null, output: context.threadId ? (output[context.threadId] || []) : [], config: { githubRepository: config.githubRepository, channel: config.channel }, dsh: dsh.snapshot(), slots: { ...slotEntries(registry), config: slotConfig() }, update: currentUpdate };
   }
   function panel(id, viewId) {
     const entry = registry.permission(id, 'panels'), view = entry.manifest.contributes?.panels?.find(v => v.id === viewId);
@@ -68,11 +68,14 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
     switch (method) {
       case 'returnToChat': state.win.webContents.send('codex_desktop:message-for-view',{type:'navigate-back'});return true;
       case 'snapshot': return snapshot(event, state);
+      case 'marketCatalog': return api5.market.catalog(args);
+      case 'marketSources': {const result=api5.market.setSources(args.sources);broadcast();return result;}
+      case 'marketInstall': {const result=await api5.market.install(args);broadcast();return result;}
       case 'openSettings': { registry.get(args.id, false); state.settingsPlugin = args.id; state.win.webContents.send('codex_desktop:message-for-view', {type:'navigate-to-route',path:'/settings/codex-forge?plugin='+encodeURIComponent(args.id)}); notify(state,{type:'forge-settings-focus',id:args.id}); return true; }
       case 'openPage': { check(['forge-updates','forge-features','forge-changelog','forge-plugins','forge-extension-info','forge-output'].includes(args.page),'未知页面'); open(state,{page:args.page}); return true; }
       case 'enable': {
         const result = registry.setEnabled(args.id, args.enabled);
-        if (args.enabled) dsh.reviewed(args.id);
+        if (args.enabled) {registry.recordReview(args.id);dsh.reviewed(args.id);}
         if (args.id === 'forge.collaboration' && !args.enabled) for (const thread of collaboration.store.threads()) for (const job of collaboration.store.jobs(thread.id)) if (['running','queued','awaiting_approval'].includes(job.status)) collaboration.store.cancel(job.id);
         for (const [key, value] of dynamic) if (!registry.status(value.pluginId).enabled) dynamic.delete(key);
         broadcast(); return result;
@@ -144,6 +147,8 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
       default: throw Error('未知 Forge 管理操作');
     }
   }
+  api5 = new (require('./forge-api5.cjs').ForgeAPI5)({registry,root,services:{...services,nexus},nativeCall,contextFor:threadContext,notify,changed:broadcast,states,dialog,open,nodePath,executable,safeStorage});
+  ipcMain.handle('forge:frame',(event,args={})=>{host(event);return args.dispose?api5.disposeFrame(event,args.frameToken):api5.registerFrame(event,args);});
   ipcMain.handle('forge:authorizeDevtools',(event,{id,fingerprint}={})=>{
     host(event);const entry=registry.permission(id,'devtools');
     check(entry.builtin && id==='forge.devtools' && fingerprint===entry.fingerprint,'宿主调试仅限当前已启用的内置 forge.devtools 插件');
@@ -162,13 +167,14 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
   });
   ipcMain.handle('forge:api', (event, request = {}) => reply(async () => {
     const state = host(event), { id, method, args = {} } = request, entry = registry.get(id);
+    if(Object.hasOwn(require('./forge-api5-contract.cjs').methods,method)||method?.startsWith('rpc.'))return api5.handle(event,state,request);
     const blocked = granted(entry.manifest, method, enabledCapabilities());
     if (blocked) throw new ForgeError('CAPABILITY_UNAVAILABLE', blocked);
     const permission = name => registry.permission(id, name);
     switch (method) {
-      case 'context.get': { const value={...publicContext(event,state), apiVersion:entry.manifest.apiVersion, hostApiVersion:config.apiVersion}; if(!entry.manifest.permissions.includes('conversation.read')) value.threadId=null; return value; }
+      case 'context.get': { const value={...publicContext(event,state), apiVersion:entry.manifest.apiVersion, hostApiVersion:config.apiVersion}; if(!require('./forge-api5-contract.cjs').canReadContext(entry.manifest)) value.threadId=null; return value; }
       case 'metadata.get': return entry.manifest;
-      case 'capabilities.get': return { apiVersion: entry.manifest.apiVersion, hostApiVersion: config.apiVersion, supportedApiVersions: [1,2,3,4], codexVersion: config.codexVersion, forgeVersion: config.version, permissions: [...entry.manifest.permissions], capabilities: entry.manifest.capabilities.map(item => ({ ...item })), available: Object.fromEntries(Object.entries(CAPABILITIES).map(([name, spec]) => [name, spec.version])), negotiated: negotiate(entry.manifest, enabledCapabilities()), denied: deniedMethods(entry.manifest), slots: Object.entries(SLOTS).map(([id, spec]) => ({ id, kind: spec.kind, scope: spec.scope, label: spec.label })), events: ['ready','context.changed','settings.changed','dispose','output.changed',...(entry.manifest.contributes?.events || []).map(item => item.name)], surfaces: ['panels','sidebar','toolbar','composer'] };
+      case 'capabilities.get': return { apiVersion: entry.manifest.apiVersion, hostApiVersion: config.apiVersion, supportedApiVersions: [1,2,3,4,5], codexVersion: config.codexVersion, forgeVersion: config.version, permissions: [...entry.manifest.permissions], capabilities: entry.manifest.capabilities.map(item => ({ ...item })), available: Object.fromEntries(Object.entries(CAPABILITIES).map(([name, spec]) => [name, spec.version])), negotiated: negotiate(entry.manifest, enabledCapabilities()), denied: deniedMethods(entry.manifest), slots: Object.entries(SLOTS).map(([id, spec]) => ({ id, kind: spec.kind, scope: spec.scope, label: spec.label })), events: ['ready','context.changed','settings.changed','dispose','output.changed',...(entry.manifest.apiVersion>=5?['theme.changed','slot.changed']:[]),...(entry.manifest.contributes?.events || []).map(item => item.name)], surfaces: ['panels','sidebar','toolbar','composer'] };
       case 'settings.get': permission('settings'); return registry.settings(id);
       case 'nexus.request': {
         permission('nexus.read'); check(nexus, '宿主不支持 Nexus', 'CAPABILITY_UNAVAILABLE');
@@ -238,6 +244,6 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
       default: throw new ForgeError('METHOD_NOT_FOUND', 'Forge API 不支持此操作');
     }
   }));
-  return { registry, management: manageWithFallback, snapshot, page: page => ['forge-settings','forge-updates','forge-features','forge-changelog','forge-plugins','forge-extension-info','forge-output'].includes(page) || [...registry.entries.values()].some(e => registry.status(e.manifest.id).enabled && e.manifest.contributes?.panels?.some(v => pageId(e.manifest.id,v.id) === page)), enabled: id => registry.status(id).enabled };
+  return { registry, api5,dispose:()=>api5.dispose(),management: manageWithFallback, snapshot, page: page => ['forge-settings','forge-updates','forge-features','forge-changelog','forge-plugins','forge-extension-info','forge-output'].includes(page) || [...registry.entries.values()].some(e => registry.status(e.manifest.id).enabled && e.manifest.contributes?.panels?.some(v => pageId(e.manifest.id,v.id) === page)), enabled: id => registry.status(id).enabled };
 }
 module.exports = { installForge };

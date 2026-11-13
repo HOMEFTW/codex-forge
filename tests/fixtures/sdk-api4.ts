@@ -1,5 +1,5 @@
 import type {ForgeAPI, NexusWriteResult, NexusDocument} from '../../sdk/index.js';
-declare const forge:ForgeAPI;
+declare const forge:ForgeAPI<4>;
 const api:4 = forge.apiVersion;
 forge.nexus.request('vaults').then(value => value.vaults[0]?.id);
 forge.nexus.connect().then(value => value?.vault.id);
@@ -30,5 +30,5 @@ forge.sidebar.register({id:'notes',title:'Notes',icon:{viewBox:'0 0 1 1',paths:[
 
 declare const legacy:ForgeAPI<1>;
 const legacyVersion:1 = legacy.apiVersion;
-const hostVersion:4 = legacy.hostApiVersion;
+const hostVersion:5 = legacy.hostApiVersion;
 legacy.context.get().then(context => { const api:1=context.apiVersion; });

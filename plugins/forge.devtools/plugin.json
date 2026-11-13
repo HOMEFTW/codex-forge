@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "apiVersion": 4,
-  "version": "0.6.3",
+  "apiVersion": 5,
+  "version": "0.7.0",
   "compatibility": {
     "codex": [
       "26.1106.6628.0",
@@ -15,7 +15,7 @@
       "26.1021.2667.0"
     ],
     "forge": [
-      ">=0.6.0 <0.7.0"
+      "0.7.0"
     ]
   },
   "permissions": [

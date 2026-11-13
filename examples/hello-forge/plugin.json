@@ -1,14 +1,14 @@
 {
   "$schema": "../../sdk/plugin.schema.json",
   "schemaVersion": 1,
-  "apiVersion": 4,
+  "apiVersion": 5,
   "id": "example.hello",
   "name": "Hello Forge",
-  "version": "0.6.3",
+  "version": "0.7.0",
   "description": "演示原生标签、输入框、独立存储、会话输出、浏览器和统一设置。",
   "compatibility": {
     "forge": [
-      ">=0.6.1 <0.7.0"
+      "0.7.0"
     ]
   },
   "permissions": [

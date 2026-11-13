@@ -4,7 +4,7 @@ const { installForge } = require('../runtime/forge-host.cjs');
 const { pluginBundle } = require('../runtime/forge-content.cjs');
 const { applyPending } = require('../runtime/forge-plugin-updates.cjs');
 
-for (const apiVersion of [1, 2, 3]) test(`historical API ${apiVersion} SDK uses the current host with unchanged RPC and permissions`, async t => {
+for (const apiVersion of [1, 2, 3, 4]) test(`historical API ${apiVersion} SDK uses the current host with unchanged RPC and permissions`, async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'forge-legacy-'));
   const previous = process.env.CODEX_FORGE_HOME, originalLoad = Module._load;
   process.env.CODEX_FORGE_HOME = root;
@@ -15,7 +15,7 @@ for (const apiVersion of [1, 2, 3]) test(`historical API ${apiVersion} SDK uses 
   try { forge = installForge({ ipcMain: { handle: (name, fn) => handlers.set(name, fn) }, host: () => state, threadContext: () => ({ threadId }), states: new Map([[1, state]]), notify: (_state, value) => events.push(value), open: (_state, value) => opened.push(value) }); }
   finally { Module._load = originalLoad; }
   const source = path.join(root, 'source'); fs.mkdirSync(source);
-  const manifest = { schemaVersion: 1, apiVersion, id: 'test.legacy', name: 'Legacy', version: '1.0.0', compatibility: { forge: ['>=0.6.1 <0.7.0'] },
+  const manifest = { schemaVersion: 1, apiVersion, id: 'test.legacy', name: 'Legacy', version: '1.0.0', compatibility: { forge: ['>=0.6.1 <0.8.0'] },
     permissions: ['storage', 'settings', 'events', 'composer', 'conversation.read', 'panels'], entry: 'main.js',
     contributes: { commands: [{ id: 'hello', title: 'Hello' }], panels: [{ id: 'main', title: 'Main', entry: 'ui.html' }], events: [{ name: 'plugin.test.legacy.changed' }], settings: { properties: { greeting: { title: 'Greeting', type: 'string', default: 'kept' } } } } };
   fs.writeFileSync(path.join(source, 'main.js'), 'void 0'); fs.writeFileSync(path.join(source, 'ui.html'), '<html><head></head><body>Legacy</body></html>');
@@ -35,8 +35,8 @@ for (const apiVersion of [1, 2, 3]) test(`historical API ${apiVersion} SDK uses 
     vm.runInNewContext(sdk, { window: page, parent, setTimeout, clearTimeout, console });
     const api = page.CodexForge;
     assert.equal(api.apiVersion, apiVersion);
-    const context = await api.context.get(); assert.equal(context.apiVersion, apiVersion); assert.equal(context.hostApiVersion, 4); assert.equal(context.threadId, threadId);
-    const caps = await api.capabilities.get(); assert.equal(caps.apiVersion, apiVersion); assert.equal(caps.hostApiVersion, 4);
+    const context = await api.context.get(); assert.equal(context.apiVersion, apiVersion); assert.equal(context.hostApiVersion, 5); assert.equal(context.threadId, threadId);
+    const caps = await api.capabilities.get(); assert.equal(caps.apiVersion, apiVersion); assert.equal(caps.hostApiVersion, 5);
     await api.storage.set('note', { keep: true }); assert.deepEqual(await api.storage.get('note'), { keep: true });
     assert.equal((await api.settings.get()).greeting, 'kept');
     assert.equal((await api.metadata.get()).apiVersion, apiVersion);

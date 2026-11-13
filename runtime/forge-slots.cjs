@@ -1,13 +1,11 @@
 'use strict';
 
-// Forge 的命名 UI 贡献点（slot）——DSH ui-slots 的裁剪版。
-// 宿主声明位置与基数，插件只能往已声明位置注册；single/keyed 的冲突在派发前
-// 就判定为冲突并跳过，不影响其他插件。渲染层按 anchor 选择器挂载，anchor 为
-// null 表示落点尚未实测，插件声明会被接受但不会渲染。
+// Anchors belong to the versioned host adapter. Missing or hidden native targets
+// are skipped; plugins never select arbitrary host DOM or read its message text.
 const SLOTS = Object.freeze({
   'conversation.header.action': {
     kind: 'list', scope: 'session', permission: 'ui', label: '会话头动作区',
-    anchor: null, verified: false,
+    anchor: '[data-app-shell-header-slot="end"] [data-app-shell-header-slot-content]', verified: true,
   },
   'sidebar.right.body': {
     kind: 'list', scope: 'session', permission: 'ui', label: '右侧标签 body',
@@ -15,13 +13,29 @@ const SLOTS = Object.freeze({
   },
   'tool.card.view': {
     kind: 'keyed', scope: 'session', permission: 'ui', label: '工具调用卡片',
-    anchor: null, verified: false,
+    anchor: '[data-local-conversation-item-target-ids]', verified: true,
+  },
+  'composer.leading': {
+    kind: 'list', scope: 'session', permission: 'ui', label: '输入框前置控件',
+    anchor: '[data-codex-composer-root] [data-composer-leading-controls]', verified: true,
+  },
+  'composer.trailing': {
+    kind: 'list', scope: 'session', permission: 'ui', label: '输入框后置控件',
+    anchor: '[data-codex-composer-root] [data-composer-trailing-controls]', verified: true,
+  },
+  'conversation.message.action': {
+    kind: 'list', scope: 'session', permission: 'ui', label: '消息动作区',
+    anchor: '[data-local-conversation-final-assistant] .turn-action-controls', verified: true,
+  },
+  'settings.section': {
+    kind: 'list', scope: 'global', permission: 'ui', label: 'Forge 设置扩展区',
+    anchor: '[data-forge-settings-mount]', verified: true,
   },
 });
 
 function slotNames() { return Object.keys(SLOTS); }
 
-// 配置视图供调试插件与宿主 UI 使用：anchor 为 null 表示落点还没实测。
+// Verified against the current 26.1106.6628.0 native UI; absent older anchors are skipped.
 function slotConfig() {
   return Object.entries(SLOTS).map(([id, spec]) => ({ id, kind: spec.kind, scope: spec.scope, label: spec.label, anchor: spec.anchor, verified: spec.verified !== false }));
 }

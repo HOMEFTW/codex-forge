@@ -12,8 +12,8 @@ const read = relative => JSON.parse(fs.readFileSync(path.join(root, relative), '
 const config = read('forge.config.json');
 const versions = { codex: config.codexVersion, forge: config.version, apiVersion: config.apiVersion };
 
-test('0.6.3 release metadata, API 4 SDK, adapters, bundle and builtins agree', t => {
-  assert.equal(config.version, '0.6.3'); assert.equal(config.apiVersion, 4);
+test('0.7.0 release metadata, API 5 SDK, adapters, bundle and builtins agree', t => {
+  assert.equal(config.version, '0.7.0'); assert.equal(config.apiVersion, 5);
   assert.equal(read('package.json').version, config.version);
   const lock = read('package-lock.json');
   assert.equal(lock.version, config.version); assert.equal(lock.packages[''].version, config.version);
@@ -21,7 +21,7 @@ test('0.6.3 release metadata, API 4 SDK, adapters, bundle and builtins agree', t
     const adapter = read('adapters/' + name);
     assert.equal(adapter.forgeVersion, config.version); assert.equal(adapter.apiVersion, config.apiVersion);
   }
-  assert.deepEqual(read('sdk/plugin.schema.json').properties.apiVersion.enum, [1,2,3,4]);
+  assert.deepEqual(read('sdk/plugin.schema.json').properties.apiVersion.enum, [1,2,3,4,5]);
   const window = { parent: { postMessage() {} }, addEventListener() {} };
   vm.runInNewContext(fs.readFileSync(path.join(root, 'runtime/forge-sdk.js'), 'utf8'), { window, parent: window.parent, setTimeout() {}, clearTimeout() {} });
   assert.equal(window.CodexForge.apiVersion, config.apiVersion);
@@ -36,7 +36,7 @@ test('0.6.3 release metadata, API 4 SDK, adapters, bundle and builtins agree', t
   }
   assert.equal(read('bundles/forge.builtin/bundle.json').version, config.version);
   assert.deepEqual(read('bundles/forge.builtin/bundle.patch.json').entries.map(item => item.id).sort(), state.plugins.map(item => item.id).sort());
-  assert.equal(read('examples/hello-forge/plugin.json').apiVersion, 4);
+  assert.equal(read('examples/hello-forge/plugin.json').apiVersion, 5);
 });
 
 for (const apiVersion of [1, 2, 3]) test(`API ${apiVersion} manifests preserve data and still require a compatible Forge range`, t => {
@@ -46,7 +46,7 @@ for (const apiVersion of [1, 2, 3]) test(`API ${apiVersion} manifests preserve d
   const manifest = { schemaVersion: 1, apiVersion, id: 'test.legacy', name: 'Legacy', version: '1.0.0', compatibility: { codex: [config.codexVersion], forge: ['>=0.1.0 <0.5.0'] }, permissions: ['storage'] };
   fs.writeFileSync(path.join(pluginRoot, 'plugin.json'), JSON.stringify(manifest));
   assert.equal(validate(manifest, pluginRoot).apiVersion, apiVersion);
-  assert.throws(() => validate({ ...manifest, apiVersion: 5 }, pluginRoot), /API/);
+  assert.throws(() => validate({ ...manifest, apiVersion: 6 }, pluginRoot), /API/);
   const registry = new ForgeRegistry({ root: home, bundledRoot: path.join(home, 'empty'), versions });
   const data = path.join(home, 'storage/test.legacy.json'); fs.writeFileSync(data, '{"user":"keep"}');
   assert.deepEqual(registry.list().errors, []);
@@ -62,7 +62,7 @@ test('API 4 runtime updater reads mixed API 1/2/3 history and checks target plug
   const release = { schemaVersion: 3, platform: 'win32-x64', apiVersion: 3, forgeVersion: '0.4.0', codexVersion: config.codexVersion, codexBuildVersion: config.codexBuildVersion, repository, distribution: 'msi-portable', containsOfficialClient: false, url: 'https://github.com/test/forge/releases/download/v0.4.0/Forge.msi', sha256: 'a'.repeat(64), bytes: 100, portableUrl: 'https://github.com/test/forge/releases/download/v0.4.0/Forge.zip', portableSha256: 'b'.repeat(64), portableBytes: 200 };
   const history = [release, { ...release, apiVersion: 2, forgeVersion: '0.3.4' }, { ...release, apiVersion: 1, forgeVersion: '0.2.0' }];
   for (const item of history) assert.equal(validateRelease(item, repository).apiVersion, item.apiVersion);
-  assert.throws(() => validateRelease({ ...release, apiVersion: 5 }, repository), /格式不兼容/);
+  assert.throws(() => validateRelease({ ...release, apiVersion: 6 }, repository), /格式不兼容/);
   const feed = history.map(item => ({ assets: [{ name: 'codex-forge-release.json', browser_download_url: 'https://github.com/test/forge/releases/download/v' + item.forgeVersion + '/codex-forge-release.json' }] }));
   const oldConfig = { ...config, version: '0.3.4', apiVersion: 2, githubRepository: repository };
   const result = await checkUpdates({ config: oldConfig, plugins: [], readJSON: async url => url.includes('windows-store-update') ? { schemaVersion: 1, packageIdentity: 'OpenAI.Codex', storeProductId: '9PLM9XGG6VKS', buildVersion: config.codexBuildVersion } : url.includes('api.github.com') ? feed : history.find(item => url.includes('/v' + item.forgeVersion + '/')) });
@@ -74,10 +74,10 @@ test('API 4 runtime updater reads mixed API 1/2/3 history and checks target plug
 });
 
 test('current update matcher accepts older installations with migrated independent API 4 plugins', () => {
-  const release = { schemaVersion: 3, platform: 'win32-x64', apiVersion: 4, forgeVersion: config.version, codexVersion: config.codexVersion, codexBuildVersion: config.codexBuildVersion, repository: config.githubRepository, distribution: 'msi-portable', containsOfficialClient: false, url: `https://github.com/${config.githubRepository}/releases/download/v${config.version}/Forge.msi`, sha256: 'a'.repeat(64), bytes: 100, portableUrl: `https://github.com/${config.githubRepository}/releases/download/v${config.version}/Forge.zip`, portableSha256: 'b'.repeat(64), portableBytes: 200 };
+  const release = { schemaVersion: 3, platform: 'win32-x64', apiVersion: 5, forgeVersion: config.version, codexVersion: config.codexVersion, codexBuildVersion: config.codexBuildVersion, repository: config.githubRepository, distribution: 'msi-portable', containsOfficialClient: false, url: `https://github.com/${config.githubRepository}/releases/download/v${config.version}/Forge.msi`, sha256: 'a'.repeat(64), bytes: 100, portableUrl: `https://github.com/${config.githubRepository}/releases/download/v${config.version}/Forge.zip`, portableSha256: 'b'.repeat(64), portableBytes: 200 };
   validateRelease(release, config.githubRepository);
   const previous = { ...config, version: '0.4.0' };
-  const plugin = { id: 'example.notes', name: 'Notes', apiVersion: 4, compatibility: { codex: [config.codexVersion], forge: ['>=0.6.0 <0.7.0'] } };
+  const plugin = { id: 'example.notes', name: 'Notes', apiVersion: 4, compatibility: { codex: [config.codexVersion], forge: ['>=0.6.0 <0.8.0'] } };
   assert.equal(matchUpdate({ config: previous, plugins: [plugin], releases: [release] }).plan.forgeVersion, config.version);
   const pinned = { ...plugin, compatibility: { ...plugin.compatibility, forge: ['0.4.0'] } };
   assert.equal(matchUpdate({ config: previous, plugins: [pinned], releases: [release] }).plan, null);

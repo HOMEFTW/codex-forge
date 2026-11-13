@@ -1,6 +1,6 @@
 # 从零开发一个 Codex Forge 插件
 
-本教程用 JavaScript 和 HTML 创建一个能在原生右侧标签中显示、读取统一设置、向当前会话输出、编辑输入草稿及打开内置浏览器的插件。目标环境：Windows x64，Codex Forge 0.6.1 本地构建 / API 4，客户端兼容由 Forge 的固定适配器负责。
+本教程用 JavaScript 和 HTML 创建一个能在原生右侧标签中显示、读取统一设置、向当前会话输出、编辑输入草稿及打开内置浏览器的插件。目标环境：Windows x64，Codex Forge 0.7.0 本地构建 / API 5，客户端兼容由 Forge 的固定适配器负责。
 
 ## 1. 获取源码与创建项目
 
@@ -28,13 +28,13 @@ node cli/forge.mjs create ./my-first-plugin
 ```json
 {
   "schemaVersion": 1,
-  "apiVersion": 4,
+  "apiVersion": 5,
   "id": "yourname.first-plugin",
   "name": "我的第一个插件",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "在当前会话插入问候，显示可折叠输出，并打开内置浏览器。",
   "compatibility": {
-    "forge": [">=0.6.1 <0.7.0"]
+    "forge": [">=0.7.0 <0.8.0"]
   },
   "permissions": ["panels", "sidebar", "toolbar", "composer", "conversation.read", "output", "browser", "storage", "settings", "events"],
   "capabilities": [
@@ -61,11 +61,11 @@ node cli/forge.mjs create ./my-first-plugin
       }
     }
   },
-  "changelog": [{"version": "0.6.1", "date": "2026-11-12", "items": ["适配 Codex Forge 0.6.1 / API 4。"]}]
+  "changelog": [{"version": "0.7.0", "date": "2026-11-12", "items": ["适配 Codex Forge 0.7.0 / API 5。"]}]
 }
 ```
 
-插件必须声明 API 和 Forge 兼容范围。普通公共 API 插件可省略 `compatibility.codex`；依赖官方内部实现的插件可显式限定，此时仍严格检查。API 1–3 也可在 0.6.1 加载，见 [兼容说明](API-4-MIGRATION.md)。
+插件必须声明 API 和 Forge 兼容范围。普通公共 API 插件可省略 `compatibility.codex`；依赖官方内部实现的插件可显式限定，此时仍严格检查。API 1–4 也可在 0.7.0 加载，插件声明的 Forge 范围必须包含宿主版本，见 [兼容说明](API-5-MIGRATION.md)。
 
 `panels` 没有指定 `placement` 时就是原生右侧标签页。只有功能确需全宽时才声明 `placement: "expanded"` 和至少 6 个字符的 `placementReason`，不要自己叠加侧栏。`description` 和 `changelog` 会自动显示在“扩展插件功能与升级日志”中。
 
@@ -205,7 +205,7 @@ if (capabilities.permissions.includes('events')) {
 
 ```powershell
 node cli/forge.mjs validate ./my-first-plugin
-node cli/forge.mjs pack ./my-first-plugin ./first-plugin-0.6.1.forge-plugin.json
+node cli/forge.mjs pack ./my-first-plugin ./first-plugin-0.7.0.forge-plugin.json
 ```
 
 输出包必须在源目录之外，目标文件不能已存在。打包器拒绝链接、`.git`、`node_modules`；插件最多 1,000 文件、20 MiB 解包内容。打包产生两个文件：包本身及其 `.release.json` 清单。

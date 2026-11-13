@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "forgeVersion": "0.6.3",
-  "apiVersion": 4,
+  "forgeVersion": "0.7.0",
+  "apiVersion": 5,
   "codexVersion": "26.1023.6123.0",
   "codexBuildVersion": "26.1023.6621.0",
   "architecture": "x64",

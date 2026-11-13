@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Codex Forge Plugin (API 1-4)",
+  "title": "Codex Forge Plugin (API 1-5)",
   "type": "object",
   "required": [
     "schemaVersion",
@@ -21,9 +21,10 @@
         1,
         2,
         3,
-        4
+        4,
+        5
       ],
-      "default": 4
+      "default": 5
     },
     "id": {
       "type": "string",
@@ -81,7 +82,47 @@
           "nexus.write",
           "dsh",
           "dsh.manage",
-          "nexus.script"
+          "nexus.script",
+          "canvas.read",
+          "canvas.write",
+          "todos.read",
+          "todos.write",
+          "skills.read",
+          "skills.manage",
+          "memory.read",
+          "memory.write",
+          "statistics.read",
+          "statistics.detect",
+          "collaboration.read",
+          "collaboration.run",
+          "conversation.history",
+          "conversation.manage",
+          "conversation.send",
+          "conversation.events",
+          "llm.call",
+          "llm.providers",
+          "tools.call",
+          "tools.register",
+          "services.call",
+          "services.provide",
+          "backend.node",
+          "hooks.register",
+          "files.read",
+          "files.write",
+          "shell.execute",
+          "credentials.manage",
+          "network.request",
+          "jobs.manage",
+          "schedules.manage",
+          "plugins.read",
+          "plugins.manage",
+          "logs.read",
+          "logs.write",
+          "theme.read",
+          "theme.write",
+          "theme.register",
+          "shortcuts",
+          "settings.write"
         ]
       }
     },
@@ -114,17 +155,43 @@
                 "name": {
                   "not": {
                     "enum": [
+                      "canvas",
+                      "todos",
+                      "skills",
+                      "memory",
+                      "statistics",
+                      "collaboration",
+                      "conversation-history",
+                      "conversation-management",
+                      "conversation-send",
+                      "conversation-events",
+                      "llm",
+                      "tools",
+                      "services",
+                      "backend",
+                      "hooks",
+                      "files",
+                      "shell",
+                      "credentials",
+                      "network-request",
+                      "jobs",
+                      "schedules",
+                      "plugins",
+                      "logs",
+                      "theme",
+                      "shortcuts",
+                      "prompt-prediction",
+                      "nexus",
                       "conversation",
                       "composer",
                       "output",
                       "browser",
+                      "dsh",
                       "storage",
                       "settings",
                       "events",
                       "panels",
-                      "ui",
-                      "nexus",
-                      "dsh"
+                      "ui"
                     ]
                   }
                 }
@@ -230,20 +297,45 @@
                 "enum": [
                   "conversation.header.action",
                   "sidebar.right.body",
-                  "tool.card.view"
+                  "tool.card.view",
+                  "composer.leading",
+                  "composer.trailing",
+                  "conversation.message.action",
+                  "settings.section"
                 ]
               },
               "id": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^[a-zA-Z][\\w-]{0,79}$"
               },
               "key": {
                 "type": "string",
+                "minLength": 1,
                 "maxLength": 80
               },
               "view": {
                 "type": "string"
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "slot": {
+                      "const": "tool.card.view"
+                    }
+                  }
+                },
+                "then": {
+                  "required": ["key"]
+                },
+                "else": {
+                  "not": {
+                    "required": ["key"]
+                  }
+                }
+              }
+            ]
           }
         },
         "panels": {
@@ -280,6 +372,179 @@
               }
             }
           }
+        },
+        "tools": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$"
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 2000
+              },
+              "inputSchema": {
+                "type": "object"
+              },
+              "outputSchema": {
+                "type": "object"
+              },
+              "scope": {
+                "enum": [
+                  "global",
+                  "session"
+                ]
+              }
+            }
+          }
+        },
+        "providers": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$"
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 2000
+              },
+              "models": {
+                "type": "array",
+                "maxItems": 1000,
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object"
+                    }
+                  ]
+                }
+              },
+              "scope": {
+                "enum": [
+                  "global",
+                  "session"
+                ]
+              }
+            }
+          }
+        },
+        "services": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$"
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 2000
+              },
+              "methods": {
+                "type": "array",
+                "uniqueItems": true,
+                "maxItems": 64,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z][\\w-]{0,79}$"
+                }
+              },
+              "scope": {
+                "enum": [
+                  "global",
+                  "session"
+                ]
+              }
+            }
+          }
+        },
+        "jobs": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-zA-Z][\\w-]{0,79}$"
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 2000
+              },
+              "method": {
+                "type": "string",
+                "pattern": "^[a-zA-Z][\\w-]{0,79}$"
+              },
+              "scope": {
+                "enum": [
+                  "global",
+                  "session"
+                ]
+              }
+            }
+          }
+        },
+        "hooks": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "enum": [
+                  "llm.before",
+                  "llm.after",
+                  "tools.before",
+                  "tools.after",
+                  "conversation.beforeSend",
+                  "conversation.afterSend"
+                ]
+              },
+              "method": {
+                "type": "string"
+              },
+              "order": {
+                "type": "integer",
+                "minimum": -1000,
+                "maximum": 1000
+              },
+              "scope": {
+                "enum": [
+                  "global",
+                  "session"
+                ]
+              }
+            }
+          }
         }
       }
     },
@@ -303,6 +568,49 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      }
+    },
+    "backend": {
+      "type": "object",
+      "required": [
+        "entry"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "entry": {
+          "type": "string",
+          "pattern": "^(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9_./-]+\\.(?:cjs|mjs|js)$"
+        },
+        "methods": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][\\w-]{0,79}$"
+          }
+        },
+        "scope": {
+          "enum": [
+            "global",
+            "session"
+          ]
+        }
+      }
+    },
+    "consumes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "services": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$"
           }
         }
       }
@@ -505,5 +813,88 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "permissions": {
+            "contains": {
+              "enum": [
+                "canvas.read",
+                "canvas.write",
+                "todos.read",
+                "todos.write",
+                "skills.read",
+                "skills.manage",
+                "memory.read",
+                "memory.write",
+                "statistics.read",
+                "statistics.detect",
+                "collaboration.read",
+                "collaboration.run",
+                "conversation.history",
+                "conversation.manage",
+                "conversation.send",
+                "conversation.events",
+                "llm.call",
+                "llm.providers",
+                "tools.call",
+                "tools.register",
+                "services.call",
+                "services.provide",
+                "backend.node",
+                "hooks.register",
+                "files.read",
+                "files.write",
+                "shell.execute",
+                "credentials.manage",
+                "network.request",
+                "jobs.manage",
+                "schedules.manage",
+                "plugins.read",
+                "plugins.manage",
+                "logs.read",
+                "logs.write",
+                "theme.read",
+                "theme.write",
+                "theme.register",
+                "shortcuts",
+                "settings.write"
+              ]
+            }
+          }
+        },
+        "required": [
+          "permissions"
+        ]
+      },
+      "then": {
+        "properties": {
+          "apiVersion": {
+            "const": 5
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "backend"
+        ]
+      },
+      "then": {
+        "properties": {
+          "apiVersion": {
+            "const": 5
+          },
+          "permissions": {
+            "contains": {
+              "const": "backend.node"
+            }
+          }
+        }
+      }
+    }
+  ]
 }

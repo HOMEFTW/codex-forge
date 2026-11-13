@@ -25,7 +25,7 @@ function satisfies(version, range) {
 function ranges(value) { if (!Array.isArray(value) || !value.length || value.length > 20) throw Error('兼容版本必须为非空数组'); for (const range of value) satisfies('0.0.0', range); return value; }
 // Backward support was introduced in Forge 0.6.1, not in every API 4 host.
 function supportsApi(api, versions) {
-  return [1, 2, 3, 4].includes(api) && (api === versions.apiVersion || versions.apiVersion === 4 && compare(versions.forge, '0.6.1') >= 0);
+  return [1, 2, 3, 4, 5].includes(api) && (api === versions.apiVersion || versions.apiVersion === 5 || versions.apiVersion === 4 && api < 4 && compare(versions.forge, '0.6.1') >= 0);
 }
 function compatibility(manifest, versions) {
   const reasons = [];

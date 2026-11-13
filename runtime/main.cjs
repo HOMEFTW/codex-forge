@@ -59,6 +59,7 @@ function install() {
   const nativePredictionPolicy = new NativePredictionPolicy(() => predictions.nativeChanged(), event => {
     predictions.observeNotification(event.method, event.params);
     statistics.observeNotification(event.method, event.params);
+    for(const state of states.values())if(state.threadId===event.params?.threadId)forge?.api5.observe(state,event.method,event.params);
   });
   activePredictionPolicy = nativePredictionPolicy;
   const predictions = new PromptPredictionHost({ states, settings: predictionSettings, call: nativeCall,
@@ -227,6 +228,10 @@ function install() {
       if (localRequest) {
         const state = host(event), method = message.request?.method, params = message.request?.params || {};
         state.bridge = { handler, event };
+        if(forge&&['turn/start','turn/steer','turn/addUserMessage'].includes(method)){
+          try{await forge.api5.prepareNativeSend(state,message.request,{...threadContext(event,state),cwd:params.cwd||contexts.binding(params.threadId).cwd});}
+          catch(error){event.sender.send('codex_desktop:message-for-view',{type:'mcp-response',hostId:'local',message:{id:message.request.id,error:{code:-32000,message:error.message}}});return;}
+        }
         if (method === 'thread/list') await directHistory.verify((name, args) => nativeCall(state, name, args));
         if (method === 'thread/items/list' && params.turnId?.startsWith('fast-') && directHistory.turns(params.threadId).some(turn => turn.id === params.turnId)) {
           const result = await directHistory.response(method, params, { data: [], nextCursor: null, backwardsCursor: null });
@@ -241,6 +246,7 @@ function install() {
         const nextThreadId = /^[A-Za-z0-9_-]{1,100}$/.test(message.conversationId || '') ? message.conversationId : null;
         if (state.threadId && state.threadId !== nextThreadId) statistics.cancelAutomatic(state.threadId);
         if (state.threadId && !nextThreadId) { state.draftTarget = defaultTarget(); for (const id of state.pendingDraftThreads) state.composerTargets.set(id, defaultTarget()); }
+        if(state.threadId!==nextThreadId){forge?.api5.invalidateWindow(state);state.api5Thread=nextThreadId;}
         state.threadId = nextThreadId;
         predictions.context(state);
         notify(state, { type: 'refresh' });
@@ -291,10 +297,11 @@ function install() {
           incoming.message.error ? internal.reject(Object.assign(Error(incoming.message.error.message || '原生操作失败'), { code: incoming.message.error.code })) : internal.resolve(incoming.message.result); return;
         }
         if (incoming?.type === 'mcp-response' && incoming.hostId === 'local' && sampleOwners.get(incoming.message?.id) === contents.id) return;
+        if(incoming?.type==='mcp-response'&&(!incoming.hostId||incoming.hostId==='local')){const state=[...states.values()].find(item=>item.win.webContents.id===contents.id);if(state)forge?.api5.completeNativeSend(state,incoming.message);}
         if (incoming?.type === 'mcp-notification' && incoming.hostId === 'local') {
           statistics.observeNotification(incoming.method, incoming.params);
           const state = [...states.values()].find(state => state.win.webContents.id === contents.id);
-          if (state) predictions.observe(state, incoming.method, incoming.params);
+          if (state) {predictions.observe(state, incoming.method, incoming.params);forge?.api5.observe(state,incoming.method,incoming.params);}
           const action = { 'thread/archived': 'thread/archive', 'thread/unarchived': 'thread/unarchive', 'thread/deleted': 'thread/delete' }[incoming.method];
           if (action) directHistory.mutation(action, incoming.params);
         }
@@ -330,7 +337,7 @@ function install() {
     if (!win) throw new Error('Host window not found');
     if (!states.has(win.id)) {
       states.set(win.id, { win, visible: false, mode: 'right', page: 'canvas', canvasId: null, composerTargets: new Map(), draftTarget: defaultTarget(), pendingDraftThreads: new Set() });
-      win.once('closed', () => { const state = states.get(win.id); if (state) predictions.close(state); states.delete(win.id); });
+      win.once('closed', () => { const state = states.get(win.id); if (state) {predictions.close(state);forge?.api5.invalidateWindow(state);} states.delete(win.id); });
     }
     return states.get(win.id);
   }
@@ -476,7 +483,16 @@ function install() {
   if (process.env.CODEX_FAST_EXTENSION_TEST === '1') setTimeout(() => {
     fs.writeFileSync(path.join(store.root, '.diagnostics.json'), JSON.stringify({ menu: Menu.getApplicationMenu()?.items.map(item => ({ label: item.label, id: item.id })) }, null, 2));
   }, 10000);
-  forge = require('./forge-host.cjs').installForge({ipcMain,dialog,host,threadContext,nativeCall,nativeMessage:(state,message)=>{if(!state.bridge) throw Error('原生连接尚未就绪'); return state.bridge.handler(state.bridge.event,message);},open,notify,states,collaboration,nexus,predictions,onRegistryChange:() => { refreshPredictionSettings(); statistics.settingsChanged(); }});
+  forge = require('./forge-host.cjs').installForge({ipcMain,dialog,host,threadContext,nativeCall,nativeMessage:(state,message)=>{if(!state.bridge) throw Error('原生连接尚未就绪'); return state.bridge.handler(state.bridge.event,message);},open,notify,states,collaboration,nexus,predictions,
+    nodePath:path.join(process.resourcesPath||__dirname,'cua_node/bin/node.exe'),executable:path.join(process.resourcesPath||__dirname,'codex.exe'),safeStorage:require('./forge-secrets.cjs').systemCredentials(()=>require('electron').safeStorage),
+    services:{canvas:store,todos,skills,memory:codexMemory,statistics,collaboration,
+      toolContext:value=>{if(!value.threadId)throw Error('插件工具缺少原生对话绑定');const binding=contexts.binding(value.threadId);if(!binding.cwd)throw Error('插件工具对话未绑定工作目录');const state=[...states.values()].find(item=>item.threadId===value.threadId);return {threadId:value.threadId,cwd:binding.cwd,...(state?{windowId:state.win.webContents.id,generation:state.api5Generation||0}:{})};},
+      statisticsContext:context=>informationContext({sender:context.state.win.webContents},context.state),
+      modelContext:async context=>{const value=await informationContext({sender:context.state.win.webContents},context.state);return {...context,model:value.model,provider:value.provider,effort:value.effort};}},
+    onRegistryChange:() => { refreshPredictionSettings(); statistics.settingsChanged(); }});
+  let forgeQuitReady=false,forgeQuitting=false;
+  app.on('before-quit',event=>{if(forgeQuitReady)return;event.preventDefault();if(forgeQuitting)return;forgeQuitting=true;forge.dispose().catch(report).finally(()=>{forgeQuitReady=true;app.quit();});});
+  app.on('will-quit',()=>{forge.dispose().catch(report);});
   refreshPredictionSettings();
   if (process.versions.electron) {
     try { require('./native-features.cjs').applyNativeFeatures(forge.registry); }

@@ -7,7 +7,7 @@ function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'forge-package-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const registry = new ForgeRegistry({ root: path.join(root, 'data'), bundledRoot: path.join(root, 'empty'), versions: { forge: config.version, codex: config.codexVersion, apiVersion: config.apiVersion } });
-  const manifest = { schemaVersion: 1, apiVersion: 4, id: 'homeftw.nexus', name: 'Nexus fixture', version: '0.1.0', compatibility: { forge: ['>=0.6.0 <0.7.0'], codex: [config.codexVersion] }, permissions: ['panels', 'nexus.read', 'nexus.write'], contributes: { panels: [{ id: 'main', title: 'Notes', entry: 'panel.html' }] } };
+  const manifest = { schemaVersion: 1, apiVersion: 4, id: 'homeftw.nexus', name: 'Nexus fixture', version: '0.1.0', compatibility: { forge: ['>=0.6.0 <0.8.0'], codex: [config.codexVersion] }, permissions: ['panels', 'nexus.read', 'nexus.write'], contributes: { panels: [{ id: 'main', title: 'Notes', entry: 'panel.html' }] } };
   const file = (name, data) => ({ path: name, encoding: 'base64', content: Buffer.from(data).toString('base64') });
   let count = 0;
   const pack = (extras = [], override = {}) => { const target = path.join(root, 'plugin-' + (++count) + '.forge-plugin.json'); fs.writeFileSync(target, JSON.stringify({ schemaVersion: 1, files: [file('plugin.json', JSON.stringify({ ...manifest, ...override })), file('panel.html', '<html><head></head><body>Standalone</body></html>'), ...extras] })); return target; };
@@ -32,7 +32,7 @@ test('package traversal, Windows aliases, duplicate paths and malformed base64 c
   for (const name of ['../escape', '/escape', 'C:/escape', 'a\\escape', 'nul.txt', 'x./file', 'a:stream', 'node_modules/x', '.git/config']) assert.throws(() => f.registry.install(f.pack([f.file(name, 'bad')])));
   assert.throws(() => f.registry.install(f.pack([f.file('A.txt', 'one'), f.file('a.txt', 'two')])));
   assert.throws(() => f.registry.install(f.pack([{ path: 'bad.txt', encoding: 'base64', content: '%%%%' }])));
-  assert.throws(() => f.registry.install(f.pack([], { apiVersion: 5 })));
+  assert.throws(() => f.registry.install(f.pack([], { apiVersion: 6 })), /不支持的清单或 API/);
   assert.equal(f.registry.list().plugins.length, 0);
   assert(!fs.readdirSync(f.registry.root).some(name => name.startsWith('.import-')));
   assert(!fs.existsSync(path.join(f.root, 'escape')));

@@ -5,7 +5,7 @@ internal static class BootstrapTests {
  static void Package(string file,Dictionary<string,object> adapter,string extra,string version){using(var zip=ZipFile.Open(file,ZipArchiveMode.Create)){Put(zip,"AppxManifest.xml","<Package><Identity Name=\"OpenAI.Codex\" Version=\""+version+"\" ProcessorArchitecture=\"x64\" Publisher=\""+adapter["publisher"]+"\" /></Package>");Put(zip,"app/ChatGPT.exe","fixture");Put(zip,extra,"fixture component");}}
  static int Main(string[] args){try{
   string root=args[0];var token=CancellationToken.None;var adapter=BootstrapCore.Read(args[1]);BootstrapCore.ValidateAdapter(adapter);
-  foreach(int unsupported in new[]{1,2,3,5}){adapter["apiVersion"]=unsupported;Reject(()=>BootstrapCore.ValidateAdapter(adapter));}adapter["apiVersion"]=4;BootstrapCore.ValidateAdapter(adapter);
+  foreach(int unsupported in new[]{1,2,3,4,6}){adapter["apiVersion"]=unsupported;Reject(()=>BootstrapCore.ValidateAdapter(adapter));}adapter["apiVersion"]=5;BootstrapCore.ValidateAdapter(adapter);
   string longRoot=Path.Combine(root,new String('a',120),new String('b',120));Directory.CreateDirectory(longRoot);File.WriteAllText(Path.Combine(longRoot,"long-path.txt"),"ok");
   foreach(string relative in new[]{"../escape","/absolute","C:/absolute","a\\b","a/../b","a./b","a /b","a//b","a:stream"})Reject(()=>BootstrapCore.SafePath(root,relative));
   string good=Path.Combine(root,"good.msix"),output=Path.Combine(root,"decoded");Package(good,adapter,"app/resources/node_modules/%40oai/browser-desktop/index.js",Convert.ToString(adapter["codexVersion"]));BootstrapCore.ExtractApp(good,output,adapter,token);

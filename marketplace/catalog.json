@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "plugins": [
+    {
+      "id": "homeftw.nexus",
+      "name": "星枢 Nexus",
+      "description": "Obsidian 笔记阅读与编辑、双链、搜索、图谱与数据库。安装前按最新正式发行清单检查 Forge 与 API 兼容性。",
+      "tags": ["知识库", "Obsidian", "笔记"],
+      "update": {"provider": "github", "repository": "HOMEFTW/codex-forge-nexus"}
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "apiVersion": 5,
+  "id": "example.api-five",
+  "name": "API 5 后端示例",
+  "version": "1.0.0",
+  "description": "展示受审阅的 Node 后端、工具、服务、模型适配器和后台任务。",
+  "compatibility": { "forge": [">=0.7.0 <0.8.0"] },
+  "permissions": ["backend.node", "services.provide", "services.call", "tools.register", "llm.providers", "hooks.register", "jobs.manage", "schedules.manage", "llm.call"],
+  "backend": { "entry": "backend.cjs", "methods": ["echo", "scheduled"], "scope": "session" },
+  "consumes": { "services": ["example.api-five.counter"] },
+  "contributes": {
+    "services": [{ "name": "example.api-five.counter", "methods": ["read"] }],
+    "tools": [{
+      "name": "example.api-five.add",
+      "inputSchema": { "type": "object", "properties": { "left": { "type": "number" }, "right": { "type": "number" } }, "required": ["left", "right"], "additionalProperties": false },
+      "outputSchema": { "type": "object", "properties": { "sum": { "type": "number" } }, "required": ["sum"], "additionalProperties": false }
+    }],
+    "providers": [{ "name": "example.api-five.local" }],
+    "hooks": [{ "name": "conversation.beforeSend" }],
+    "jobs": [{ "name": "scheduled" }]
+  }
+}

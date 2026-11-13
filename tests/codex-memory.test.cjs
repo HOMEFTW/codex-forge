@@ -83,8 +83,9 @@ test('does not follow symbolic links in the memory tree', t => {
 
 test('registers the built-in memory manager by default with its right-sidebar page', t => {
   const { root } = fixture(t);
+  const config = require('../forge.config.json');
   const registry = new ForgeRegistry({ root: path.join(root, 'forge'), bundledRoot: path.join(__dirname, '../plugins'),
-    versions: { forge: '0.6.0', codex: '26.1103.7773.0', apiVersion: 4 } });
+    versions: { forge: config.version, codex: config.codexVersion, apiVersion: config.apiVersion } });
   const plugin = registry.list().plugins.find(item => item.id === 'forge.codex-memory');
   assert.equal(registry.errors.some(item => item.directory === 'forge.codex-memory'), false);
   assert.equal(plugin.builtin, true);

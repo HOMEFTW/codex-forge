@@ -18,12 +18,12 @@ function fakeRegistry(plugins) {
 }
 
 test('slot names are a stable, documented set', () => {
-  assert.deepEqual(slotNames(), ['conversation.header.action', 'sidebar.right.body', 'tool.card.view']);
+  assert.deepEqual(slotNames(), ['conversation.header.action', 'sidebar.right.body', 'tool.card.view','composer.leading','composer.trailing','conversation.message.action','settings.section']);
   for (const name of slotNames()) assert.equal(SLOTS[name].permission, 'ui');
   assert.equal(SLOTS['tool.card.view'].kind, 'keyed');
   assert.equal(SLOTS['sidebar.right.body'].kind, 'list');
   assert.equal(SLOTS['sidebar.right.body'].verified, true, 'right sidebar body uses a verified ARIA anchor');
-  assert.equal(SLOTS['conversation.header.action'].anchor, null, 'unverified slots render nothing until an anchor is measured');
+  assert.match(SLOTS['conversation.header.action'].anchor, /data-app-shell-header-slot/);
 });
 
 test('list slots allow many plugins while keyed slots report the first conflict', () => {
@@ -41,11 +41,11 @@ test('list slots allow many plugins while keyed slots report the first conflict'
 
 test('slot config exposes anchors and verification state for the inspector', () => {
   const config = slotConfig();
-  assert.deepEqual(config.map(item => item.id), ['conversation.header.action', 'sidebar.right.body', 'tool.card.view']);
+  assert.deepEqual(config.map(item => item.id), slotNames());
   assert.equal(config.find(item => item.id === 'sidebar.right.body').anchor, '[role="tabpanel"]');
   assert.equal(config.find(item => item.id === 'sidebar.right.body').verified, true);
-  assert.equal(config.find(item => item.id === 'tool.card.view').anchor, null);
-  assert.equal(config.find(item => item.id === 'tool.card.view').verified, false);
+  assert.equal(config.find(item => item.id === 'tool.card.view').anchor, '[data-local-conversation-item-target-ids]');
+  assert.equal(config.find(item => item.id === 'tool.card.view').verified, true);
 });
 
 test('disabled plugins contribute no slots', () => {

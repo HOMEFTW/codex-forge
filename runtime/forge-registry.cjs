@@ -71,6 +71,11 @@ class ForgeRegistry {
     state.plugins[id] = { ...state.plugins[id], enabled, fingerprint: entry.fingerprint }; atomic(this.stateFile, state);
     return this.list();
   }
+  recordReview(id) {
+    const entry=this.get(id,false),file=path.join(this.root,'plugin-reviews.json'),reviews=json(file,{});
+    reviews[id]={fingerprint:entry.fingerprint,at:new Date().toISOString()};atomic(file,reviews);return true;
+  }
+  reviewed(id) {const entry=this.get(id,false);return entry.builtin||json(path.join(this.root,'plugin-reviews.json'),{})[id]?.fingerprint===entry.fingerprint;}
   settings(id, value) {
     const entry = this.get(id, false), file = path.join(this.root, 'storage', id + '.settings.json');
     if (value !== undefined) {

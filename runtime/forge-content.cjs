@@ -21,7 +21,7 @@ function pluginBundle(registry,id,{viewId,slotEntry,assetsRoot=path.join(__dirna
     html=inHead(html,'<style>'+css.join('\n').replace(/<\/style/gi,'<\\/style')+'</style>');
     script=[fs.readFileSync(path.join(assetsRoot,'dsh-client.js'),'utf8'),registry.source(id,d.entry),'window.ForgeDshClient.start('+JSON.stringify({packageName:d.packageName,version:m.version})+');'].join('\n;\n');
   }
-  return {html,sdk:fs.readFileSync(path.join(__dirname,'forge-sdk.js'),'utf8').replace('apiVersion: 4,', 'apiVersion: '+m.apiVersion+','),script,networkOrigins:m.networkOrigins||[],localMedia:m.permissions.includes('nexus.read'),scriptWorker:m.permissions.includes('nexus.script')};
+  return {html,sdk:fs.readFileSync(path.join(__dirname,'forge-sdk.js'),'utf8').replace(/apiVersion: [45],/, 'apiVersion: '+m.apiVersion+','),script,networkOrigins:m.networkOrigins||[],localMedia:m.permissions.includes('nexus.read'),scriptWorker:m.permissions.includes('nexus.script')};
 }
 function pluginResponse(registry,requestURL,options={}) {
   try {
@@ -30,7 +30,7 @@ function pluginResponse(registry,requestURL,options={}) {
     const [id,kind,slotEntry]=parts;
     if(parts.length===3&&kind!=='slot')throw Error('Invalid plugin resource');
     const bundle=pluginBundle(registry,id,{...options,...(slotEntry?{slotEntry}:kind!=='runtime'?{viewId:kind}:{})});
-    let html=inHead(bundle.html,'<meta charset="utf-8">'+inlineScript(bundle.sdk));
+    let html=inHead(bundle.html,'<meta charset="utf-8"><style>:root{color-scheme:light dark}body{margin:0;background:var(--forge-background,transparent);color:var(--forge-foreground,inherit);font:13px system-ui,sans-serif}button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}</style>'+inlineScript(bundle.sdk));
     html+=inlineScript(bundle.script);
     const origins=bundle.networkOrigins.join(' ');
     const csp="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: "+origins+"; connect-src "+(origins||"'none'")+"; font-src data:; media-src "+(bundle.localMedia?"data:":"'none'")+"; worker-src "+(bundle.scriptWorker?"blob:":"'none'")+"; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors app://-";

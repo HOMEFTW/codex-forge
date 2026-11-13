@@ -19,7 +19,7 @@ try {
     case 'list':result=registry().list();break;
     case 'install':if(!id)throw Error('需要插件目录或 ZIP/7z/JSON 插件包');result=registry().install(path.resolve(id));break;
     case 'uninstall':result=registry().uninstall(id);break;
-    case 'enable':case 'disable':result=registry().setEnabled(id,command==='enable');break;
+    case 'enable':case 'disable':{const target=registry();result=target.setEnabled(id,command==='enable');if(command==='enable')target.recordReview(id);break;}
     case 'settings':result=registry().settings(id,value?JSON.parse(fs.readFileSync(value,'utf8')):undefined);break;
     case 'pack': {
       if(!id||!value)throw Error('pack <插件目录> <输出文件>');

@@ -4,7 +4,8 @@ const { parts, ranges, compatibility } = require('./forge-versions.cjs');
 const { CAPABILITIES, normalize: normalizeCapabilities } = require('./forge-capabilities.cjs');
 const { SLOTS } = require('./forge-slots.cjs');
 const { ForgeError } = require('./forge-errors.cjs');
-const permissions = new Set(['panels', 'sidebar', 'toolbar', 'composer', 'ui', 'devtools', 'conversation.read', 'conversation.title', 'conversation.predict', 'output', 'browser', 'storage', 'settings', 'network', 'events', 'dsh', 'dsh.manage', 'nexus.read', 'nexus.write', 'nexus.script']);
+const api5 = require('./forge-api5-contract.cjs');
+const permissions = new Set([...api5.permissions, 'panels', 'sidebar', 'toolbar', 'composer', 'ui', 'devtools', 'conversation.read', 'conversation.title', 'conversation.predict', 'output', 'browser', 'storage', 'settings', 'network', 'events', 'dsh', 'dsh.manage', 'nexus.read', 'nexus.write', 'nexus.script']);
 const surfaces = ['sidebar', 'toolbar', 'composer'];
 const idPattern = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/;
 const localId = /^[a-zA-Z][\w-]{0,79}$/;
@@ -24,17 +25,27 @@ function safeFile(root, relative) {
 function validate(input, root, { builtin = false } = {}) {
   check(input && typeof input === 'object' && !Array.isArray(input), '插件清单必须为对象');
   const m = JSON.parse(JSON.stringify(input));
-  check(m.schemaVersion === 1 && [1, 2, 3, 4].includes(m.apiVersion), '不支持的清单或 API 版本');
+  check(m.schemaVersion === 1 && [1, 2, 3, 4, 5].includes(m.apiVersion), '不支持的清单或 API 版本');
   check(idPattern.test(m.id) && m.id.length <= 100, '插件 ID 使用 publisher.name 格式');
   check(builtin || !m.id.startsWith('forge.'), 'forge.* 是内置插件保留命名空间');
   check(typeof m.name === 'string' && m.name.trim() && m.name.length <= 100, '插件名称无效');
   parts(m.version); ranges(m.compatibility?.forge);
   if (Object.hasOwn(m.compatibility, 'codex')) ranges(m.compatibility.codex);
   check(Array.isArray(m.permissions) && m.permissions.every(p => permissions.has(p)) && new Set(m.permissions).size === m.permissions.length, '插件声明了未知或重复权限');
+  check(m.apiVersion===5 || !m.permissions.some(p=>api5.permissions.includes(p)), '新增宿主权限需要 API 5');
+  for(const [write,read] of [['canvas.write','canvas.read'],['todos.write','todos.read'],['skills.manage','skills.read'],['memory.write','memory.read'],['statistics.detect','statistics.read'],['collaboration.run','collaboration.read'],['files.write','files.read'],['plugins.manage','plugins.read'],['network.request','network'],['settings.write','settings'],['theme.write','theme.read'],['theme.register','theme.read']]) check(!m.permissions.includes(write)||m.permissions.includes(read),`${write} 同时需要 ${read}`);
   check(!m.permissions.includes('nexus.write') || m.permissions.includes('nexus.read'), 'nexus.write 同时需要 nexus.read 权限');
   check(!m.permissions.includes('nexus.script') || m.permissions.includes('nexus.read') && !m.permissions.includes('network'), 'nexus.script 需要 nexus.read，且不能同时使用 network 权限');
   check(!m.permissions.includes('devtools') || (builtin && m.id === 'forge.devtools'), 'devtools 仅限内置 forge.devtools 插件');
-  check(!m.permissions.includes('conversation.predict') || (builtin && m.apiVersion === 4 && m.id === 'forge.prompt-prediction' && m.permissions.includes('conversation.read') && m.permissions.includes('composer')), 'conversation.predict 仅限内置 forge.prompt-prediction，且需要 conversation.read 和 composer 权限');
+  check(!m.permissions.includes('conversation.predict') || (builtin && m.apiVersion >= 4 && m.id === 'forge.prompt-prediction' && m.permissions.includes('conversation.read') && m.permissions.includes('composer')), 'conversation.predict 仅限内置 forge.prompt-prediction，且需要 conversation.read 和 composer 权限');
+  if(m.backend){
+    check(m.apiVersion===5&&m.permissions.includes('backend.node'),'插件后端需要 API 5 和 backend.node');
+    check(m.backend&&typeof m.backend==='object'&&!Array.isArray(m.backend)&&Object.keys(m.backend).every(key=>['entry','methods','scope'].includes(key)),'后端声明无效');
+    check(typeof m.backend.entry==='string'&&/\.(?:cjs|mjs|js)$/.test(m.backend.entry),'后端入口必须为 JavaScript');safeFile(root,m.backend.entry);
+    check(m.backend.methods===undefined||Array.isArray(m.backend.methods)&&m.backend.methods.length<=64&&new Set(m.backend.methods).size===m.backend.methods.length&&m.backend.methods.every(name=>localId.test(name)),'后端方法声明无效');
+    check(m.backend.scope===undefined||['global','session'].includes(m.backend.scope),'后端作用域无效');
+  }
+  if(m.consumes){check(m.apiVersion===5&&m.permissions.includes('services.call'),'消费服务需要 API 5 和 services.call');check(Array.isArray(m.consumes.services)&&m.consumes.services.length<=64&&m.consumes.services.every(name=>typeof name==='string'&&idPattern.test(name)),'消费服务列表无效');}
   if (m.capabilities !== undefined) {
     check(Array.isArray(m.capabilities) && m.capabilities.length <= 32, 'capabilities 必须为数组');
     const declared = new Set();
@@ -68,6 +79,20 @@ function validate(input, root, { builtin = false } = {}) {
   if (m.entry) { check(m.entry.endsWith('.js'), '入口必须为浏览器 JavaScript'); safeFile(root, m.entry); }
   for (const [id, version] of Object.entries(m.dependencies || {})) { check(idPattern.test(id) && id !== m.id, '依赖 ID 无效'); ranges([version]); }
   const c = m.contributes ||= {}, commands = new Set(), views = new Set(), events = new Set();
+  for(const [kind,permission]of Object.entries({tools:'tools.register',providers:'llm.providers',services:'services.provide',hooks:'hooks.register',jobs:'jobs.manage'}))if(c[kind]!==undefined){
+    check(m.apiVersion===5&&m.backend&&m.permissions.includes(permission),'后端贡献需要 API 5、backend 和 '+permission);
+    check(Array.isArray(c[kind])&&c[kind].length<=64,'后端贡献列表无效');const names=new Set();
+    for(const item of c[kind]){
+      check(item&&typeof item.name==='string'&&!names.has(item.name),'后端贡献名称无效或重复');names.add(item.name);
+      if(kind==='hooks')check(api5.hookNames.includes(item.name),'未知执行钩子');
+      else if(kind==='jobs')check(localId.test(item.name)&&(!item.method||localId.test(item.method)),'任务名称或方法无效');
+      else check(item.name.startsWith(m.id+'.')&&idPattern.test(item.name),'后端贡献必须使用本插件命名空间');
+      check(item.scope===undefined||['global','session'].includes(item.scope),'贡献作用域无效');
+      check(item.order===undefined||Number.isSafeInteger(item.order)&&Math.abs(item.order)<=1000,'钩子顺序无效');
+      if(kind==='services'&&item.methods)check(Array.isArray(item.methods)&&item.methods.length<=64&&item.methods.every(name=>localId.test(name)),'服务方法无效');
+      if(kind==='tools'){const {schemaDefinition}=require('./forge-backend-values.cjs');if(item.inputSchema)schemaDefinition(item.inputSchema);if(item.outputSchema)schemaDefinition(item.outputSchema);}
+    }
+  }
   if (c.slots !== undefined) {
     check(Array.isArray(c.slots) && c.slots.length <= 32, 'contributes.slots 必须为数组');
     const slotKeys = new Set();

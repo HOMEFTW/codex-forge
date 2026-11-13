@@ -1,5 +1,22 @@
 # Forge 验证记录
 
+## 0.7.0 正式发布准备（2026-11-13）
+
+- 用户已授权提交、推送和发布。README 下载入口更新为 v0.7.0 的 MSI、便携 ZIP、独立更新器和校验文件；明确旧更新器首次迁移 API 5 的方式，以及独立插件仍需声明覆盖 0.7.0 的兼容范围。
+- 产品代码沿用下方已通过的 572 项全量回归、16 项定向检查、45 项更新器断言和 14+5 项隔离界面验收。发布阶段只调整 README、更新日志和验证记录，不重复未受影响的测试。
+- 文档更新后重新构建发行五件套，重新核对 MSI/ZIP 载荷、版本、升级标识、大小、SHA-256 和源码一致性。发布准备审计为 `output/api5-release-package-audit.json`；远端发布及附件回下载核验以 `output/api5-github-verification.json` 为准。
+- MSI 真实安装/卸载、真实远端模型和账号计费行为仍未测试；发布过程不替换或重启正式客户端。
+
+## 0.7.0 / API 5 本地验收（2026-11-12）
+
+- 40 项新增权限、37 项能力、6 类钩子和 7 个命名插槽；API 1–4 真实历史 SDK、显式兼容范围、TypeScript 消费和公共 wire 方法与 Schema 对照通过。业务服务复用原实现，新增权限不自动授予旧插件。
+- 最终完整 Node 回归 **572 项通过、0 失败、0 跳过**：`node scripts/run-tests.mjs`，证据 `output/forge-tests.tap`、`output/forge-tests-result.json` 与 `output/api5-final-full-run.log`。覆盖真实子进程、取消/背压、工具/模型/服务、后台与时区计划、市场安装和拒绝路径、权限审阅/扩权、文件身份/修订、网络来源、DPAPI、原生发送接缝和退出等待。随后插槽的已验收标记和界面配色样式只做对应定向检查。
+- C# 更新器 **45 项断言通过**：`pwsh -File scripts/test-updater.ps1`，证据 `output/api5-updater-tests.log`。启动器、准备程序、独立更新器及 UI 构建成功。Windows PowerShell 5 按本机旧编码解析该测试脚本时失败，使用 PowerShell 7 执行原测试脚本后通过；未修改断言或跳过测试。
+- 真实 Codex CLI `26.1106.6628.0` 连接 localhost Responses 模拟服务，3 次请求验证流式正文、usage、无工具声明、工具尝试终止、取消后 HTTP 连接关闭和无持久会话；不含凭据或远端模型调用。命令 `node scripts/check-api5-native.mjs <verified-codex.exe>`，证据 `output/api5-native-cli.json`。
+- 真实隔离客户端的 **14 项交互检查通过、渲染错误 0**。包括市场搜索/空结果、可信管理启用、首页全局后端/服务、快捷键、7 类插槽、原生发送钩子改写真实请求、Code Mode → MCP → 后端工具执行及匹配卡片、历史/提供方/双向通道/文件/配置重载/日志、原生主题应用与恢复、对话切换投影刷新和停用清理。证据 `output/playwright/api5/verification-1794487884545.json` 与同目录截图；复用同一源码下已通过的前段检查，后段记录由 `continue.mjs` 完成。模型服务为 localhost 夹具。
+- 隔离冷启动发现该官方构建未链接 `electron_browser_safe_storage`；改为可选获取原生加密，Windows 缺少该模块时使用当前用户 DPAPI。中文凭据加密/解密的真实 Windows 往返通过。未使用明文存储回退。
+- 本次仅本地实现、验证和打包；没有提交、推送、发布或替换正式客户端。旧 0.6.3 五件套按字节保存到 `release/archive/v0.6.3`。MSI 实际安装/卸载、真实远端提供商及账号计费行为未验证。DSH 服务端二进制/闭源原生 agent loop 不属于 Forge 公共扩展契约。
+
 ## 0.6.3 整合发行验证（2026-11-12）
 
 - Forge 统一为 0.6.3，API 保持 4，官方客户端基线保持 `26.1106.6628.0`；整合下方信息统计更新和预测输入框伸缩修复。保留 API 1–3 兼容与独立插件可省略 Codex 版本限制。
