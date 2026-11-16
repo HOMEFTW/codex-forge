@@ -19,9 +19,9 @@ const target = path.resolve(process.argv[3] || path.join(root, 'release', 'packa
 // 该字段时才回退到符号判断。members 必须由适配器提供：静默回退到 legacy 文件名
 // 会把旧补丁套到新客户端上。
 const nativeVersion = adapter.patchSet || (adapter.nativeSymbols?.registryMap === 'QL' ? 'legacy' : 'current');
-assert(['legacy', 'current', 'oct23', 'oct27', 'oct27b', 'oct29', 'nov09', 'nov12'].includes(nativeVersion), `适配器 patchSet 无效：${nativeVersion}`);
-const modernMain = ['nov09', 'nov12'].includes(nativeVersion);
-const rspackAdapter = ['oct29', 'nov09', 'nov12'].includes(nativeVersion);
+assert(['legacy', 'current', 'oct23', 'oct27', 'oct27b', 'oct29', 'nov09', 'nov12', 'nov16'].includes(nativeVersion), `适配器 patchSet 无效：${nativeVersion}`);
+const modernMain = ['nov09', 'nov12', 'nov16'].includes(nativeVersion);
+const rspackAdapter = ['oct29', 'nov09', 'nov12', 'nov16'].includes(nativeVersion);
 const currentAdapter = nativeVersion !== 'legacy';
 const members = adapter.members;
 if (modernMain) assert(members?.metadataGeneration, '适配器必须声明标题生成模块');
@@ -79,7 +79,7 @@ for (const { member, entry, offset } of all) {
     changed=Buffer.from(patchSettingsPage(original.toString(),{version:nativeVersion}));
   } else if(!process.env.FAST_NO_PATCH && member===members.visibleSettings) {
     changed=Buffer.from(patchSettingsVisibility(original.toString(),{version:nativeVersion}));
-  } else if (!process.env.FAST_NO_PATCH && member === members.network && ['oct27', 'oct27b', 'oct29', 'nov09', 'nov12'].includes(nativeVersion)) {
+  } else if (!process.env.FAST_NO_PATCH && member === members.network && ['oct27', 'oct27b', 'oct29', 'nov09', 'nov12', 'nov16'].includes(nativeVersion)) {
     changed = Buffer.from(patchOct27Network(original.toString(), { version: modernMain ? 'nov09' : nativeVersion }));
   } else if (!process.env.FAST_NO_PATCH && modernMain && member === 'package.json') {
     const metadata = JSON.parse(original);

@@ -1,0 +1,9 @@
+{
+  "member": ".vite/build/early-bootstrap-331-29198f5b57adf59a.js",
+  "moduleSHA256": "36450d9e7dea1346ba07a11f66f2683126deef87ba710c58c5cc229bf1f536f4",
+  "settingSource": "q9={enabled:(0,q3.at)({agentAccess:\"hidden\",default:!0,description:\"Whether the composer predicts the user's next message\",key:\"composer-predictions-enabled\",schema:q2.uf})}.enabled;",
+  "controllerGuard": "this.settings.getEffective(q9.key)",
+  "hostSymbol": "a$",
+  "settingSymbol": "q9",
+  "attachSource": "atch-interrupt-on-cancel\")===!0,void 0),this.disposables.add(this.cumberbatchController),this.disposables.add(function({connections:e,evaluations:t,refreshDaybr"
+}

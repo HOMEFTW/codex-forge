@@ -4,11 +4,11 @@
   "apiVersion": 5,
   "id": "example.hello",
   "name": "Hello Forge",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "演示原生标签、输入框、独立存储、会话输出、浏览器和统一设置。",
   "compatibility": {
     "forge": [
-      "0.7.0"
+      "0.7.1"
     ]
   },
   "permissions": [
