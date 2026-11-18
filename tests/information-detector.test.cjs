@@ -64,6 +64,16 @@ test('different or unknown reasoning effort hides probabilities and cannot raise
   assert.equal(assess('gpt-6.1-terra', comparable).verdict, 'MISMATCH');
 });
 
+test('6.2 models are unlisted until reference samples exist and cannot reuse an older GPT identity', () => {
+  const analysis = analyze(outputs);
+  for (const model of ['gpt-6.2-sol', 'gpt-6.2-astra']) {
+    assert.equal(modelClass(model), undefined);
+    const conditioned = samplingContext(analysis, model, 'low', true);
+    assert.equal(conditioned.probability, null);
+    assert.deepEqual(assess(model, conditioned), { verdict: 'UNLISTED', warning: false });
+  }
+});
+
 test('partial answers retain ranking but never manufacture a calibrated probability', () => {
   const result = analyze(outputs.slice(0, 1));
   assert.equal(result.decision, 'partial');

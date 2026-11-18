@@ -8,6 +8,31 @@ const CONTEXT_WINDOW = 500_000;
 const TERRA_MODEL = 'gpt-6.1-terra';
 const FAST_TIER = { id: 'priority', name: 'Fast', description: '使用优先处理档位；可用性与计费以模型服务为准。' };
 const ULTRA_TIER = { id: 'ultrafast', name: 'Ultrafast', description: '超高速档位；需要模型服务支持，额度与计费以服务方为准。' };
+const GPT62_MODELS = [
+  { slug: 'gpt-6.2-sol', name: 'GPT-6.2-Sol', description: '面向日常工作、编码与智能体任务。', templates: [MODEL, 'gpt-6-sol', 'gpt-6-astra'] },
+  { slug: 'gpt-6.2-astra', name: 'GPT-6.2-Astra', description: '面向高难度项目的推理、编码与电脑操作。', templates: ['gpt-6-astra', MODEL, 'gpt-6-sol'] },
+];
+
+function gpt62Descriptors(models) {
+  return GPT62_MODELS.flatMap(({ slug, name, description, templates }) => {
+    // Native/provider descriptors are authoritative, including hidden entries
+    // and restricted tiers. Only fill missing models from compatible GPT peers.
+    if (models.some(model => model.slug === slug)) return [];
+    const template = templates.map(id => models.find(model => model.slug === id)).find(Boolean);
+    if (!template) return [];
+    const levels = (template.supported_reasoning_levels || []).filter(level => !['none', 'minimal'].includes(level.effort));
+    if (!levels.length) levels.push({ effort: 'medium', description: 'medium' });
+    // API total window 1,050,000 = 922,000 input + 128,000 output. Keep
+    // Codex's default input window; never inherit Forge's later 6.1-Sol override.
+    // https://developers.openai.com/api/docs/models/gpt-6.2-sol
+    // https://developers.openai.com/api/docs/models/gpt-6.2-astra
+    return [{ ...template, slug, display_name: name, description, visibility: 'list', supported_in_api: true,
+      context_window: Math.min(Number(template.context_window) || 272_000, 922_000), max_context_window: 922_000,
+      default_reasoning_level: levels.some(level => level.effort === 'medium') ? 'medium' : levels[0].effort,
+      supported_reasoning_levels: levels, service_tiers: [{ ...FAST_TIER }, { ...ULTRA_TIER }],
+      upgrade: null, availability_nux: null }];
+  });
+}
 
 function terraDescriptor(models) {
   const existing = models.find(model => model.slug === TERRA_MODEL);
@@ -40,10 +65,11 @@ function readModelCatalog({ codexHome = process.env.CODEX_HOME || path.join(os.h
   return { source, catalog };
 }
 
-function configuredModels(catalog, { enableTerra = true, ultrafastModels = [] } = {}) {
+function configuredModels(catalog, { enableTerra = true, enable62Models = true, ultrafastModels = [] } = {}) {
   const models = catalog.models.map(model => ({ ...model }));
   // Derive Terra before applying Sol's per-model context override.
   const terra = enableTerra ? terraDescriptor(models) : null;
+  const gpt62 = enable62Models ? gpt62Descriptors(models) : [];
   let target = models.find(model => model.slug === MODEL);
   let derived = false;
   if (!target) {
@@ -65,6 +91,7 @@ function configuredModels(catalog, { enableTerra = true, ultrafastModels = [] } 
     terra.supported_in_api = true;
     if (!terra.service_tiers?.some(tier => tier.id === 'priority')) terra.service_tiers = [...(terra.service_tiers || []), { ...FAST_TIER }];
   }
+  models.push(...gpt62);
   for (const model of models) if (ultrafastModels.includes(model.slug) && !model.service_tiers?.some(tier => tier.id === 'ultrafast')) {
     model.service_tiers = [...(model.service_tiers || []), { ...ULTRA_TIER }];
   }
@@ -114,7 +141,7 @@ function applyFastModelSettings({ registry, codexHome, env = process.env }) {
   env.CODEX_FORGE_SPEED = 'native';
   try {
     const enabled = registry.status('forge.fast').enabled;
-    const settings = enabled ? registry.settings('forge.fast') : { defaultSpeed: 'native', enableTerra: false, hiddenModels: [] };
+    const settings = enabled ? registry.settings('forge.fast') : { defaultSpeed: 'native', enableTerra: false, enable62Models: false, hiddenModels: [] };
     env.CODEX_FORGE_FAST = enabled ? '1' : '0';
     env.CODEX_FORGE_SPEED = settings.defaultSpeed;
     const result = prepareModelCatalog({ codexHome, root: registry.root, settings });

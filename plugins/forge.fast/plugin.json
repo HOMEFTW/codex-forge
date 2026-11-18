@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "apiVersion": 5,
-  "version": "0.7.1",
+  "version": "0.7.2",
   "compatibility": {
     "codex": [
       "26.1106.6628.0",
@@ -16,7 +16,7 @@
       "26.1111.2228.0"
     ],
     "forge": [
-      "0.7.1"
+      "0.7.2"
     ]
   },
   "permissions": [
@@ -165,7 +165,7 @@
   ],
   "id": "forge.fast",
   "name": "Fast 与模型配置",
-  "description": "模型显示控制、GPT-6.1-Terra、Fast 与 Ultrafast；保存后重启生效。",
+  "description": "模型显示控制、GPT-6.2-Sol / Astra、GPT-6.1-Terra、Fast 与 Ultrafast；保存后重启生效。",
   "contributes": {
     "settings": {
       "properties": {

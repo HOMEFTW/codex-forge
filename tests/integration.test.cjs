@@ -34,7 +34,7 @@ test('native menu opens package notes and IPC rejects other origins and subframe
   const api = async (...args) => { const reply = await handlers.get('forge:api')(...args); if (!reply.ok) throw Object.assign(Error(reply.error.message), { code: reply.error.code }); return reply.result; };
   const manage = (method, args = {}) => handlers.get('forge:manage')(event, { method, args });
   const models = await manage('fastModels', { enableTerra: true });
-  assert.deepEqual(models.map(model => model.id), ['gpt-6-sol', 'gpt-6.1-sol', 'gpt-6.1-terra']);
+  assert.deepEqual(models.map(model => model.id), ['gpt-6-sol', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6.2-sol', 'gpt-6.2-astra']);
   assert(models.every(model => Object.keys(model).sort().join(',') === 'fast,id,name,ultrafast'));
   assert(!(await manage('fastModels', { enableTerra: false })).some(model => model.id === 'gpt-6.1-terra'));
   await assert.rejects(manage('fastModels', { enableTerra: 'false' }), /Terra 开关无效/);

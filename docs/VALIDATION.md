@@ -1,5 +1,22 @@
 # Forge 验证记录
 
+## 0.7.2 发布准备（2026-11-18）
+
+- 将下方已验证的 GPT-6.2-Sol / Astra 模型支持纳入 0.7.2；API 保持 5，官方客户端基线保持 `26.1111.2228.0`。同步配置、适配器、内置插件、启动器与版本标识，更新 README 下载入口和版本索引。
+- 复用模型功能阶段 588 项全量回归、8 项隔离界面检查及 6 次本机模拟请求；升版后执行 `node output/run-release-072-tests.mjs`，**207 项通过、0 失败、0 跳过**。更新器测试 **45 项断言通过**；UI、启动器、准备程序和独立更新器编译成功。沙箱曾拒绝覆盖旧更新器并阻止测试程序启动，正常用户环境编译及执行相同测试后通过。
+- 旧 0.7.1 五件套按字节保存至 `release/archive/v0.7.1`。本次重建 MSI、便携 ZIP、独立更新器、发行清单与校验文件；包内容及源码摘要、客户端完整性、GitHub 附件回下载核验分别记录于 `output/release-072-package-audit.json`、`output/release-072-client-integrity.json`、`output/release-072-github-verification.json`。
+- 真实服务商速度、计费、长上下文请求及 MSI 安装/卸载未实测；发布不替换或重启正式客户端。新官方构建 `26.1111.9265.0` 尚未取得安装包，不列为已适配版本。
+
+## GPT-6.2 模型支持（2026-11-18，本地改动）
+
+- Forge 保持 0.7.1 / API 5，客户端基线仍为 `26.1111.2228.0`。新增 Sol / Astra 模型条目、Fast / Ultrafast 和模型显示控制，保留已有服务商描述及 6.1-Sol 独立 500K 设置；使用与限制见[模型说明](MODELS-6.2.md)。尚未提交、发布或替换正式客户端。
+- `node output/run-nov18-model-tests.mjs`：**588 项通过、0 失败、0 跳过**；报告为 `output/nov18-model-full-tests-result.json` 与 `output/nov18-model-full-tests.tap`，收尾核对 176 个源码摘要均与测试记录一致。沙箱首次执行时有 8 项因 7-Zip / WinForms 子进程环境失败、1 项跳过；同一完整测试集在正常用户环境复核全部通过，未放宽断言。`npm run build` 成功。
+- 真实 Codex CLI 连接 localhost Responses 模拟服务，两个模型各验证 Standard、Fast、Ultrafast，共 **6 次本机请求**；模型 ID、`priority` / `ultrafast` 参数、medium 推理档位和默认可用窗口 258,400 均符合预期。请求不含 Authorization，不调用远端模型。证据为 `output/nov18-native-gpt-6.2-sol.json`、`output/nov18-native-gpt-6.2-astra.json`。
+- 真实隔离客户端 **8 项界面检查通过，观察期间渲染错误 0**：Astra Ultrafast、Sol 选择及三档速度、设置页模型与档位标签、隐藏设置重开后保留，以及完整重启后 Astra 从原生菜单消失且 Sol 仍可选。证据为 `output/nov18-model-ui.json` 与 `output/playwright/nov18/` 截图；使用合成配置与本地模拟服务。
+- 本轮源码构建的隔离客户端通过 **4,107 个文件、20,057 个 ASAR 成员、20,095 个完整性块**及 EXE 内嵌摘要检查，未关闭完整性保护。证据为 `output/nov18-model-client-integrity.json`。该目录用于验证，没有生成新的正式安装包。
+- 验收后正常退出隔离客户端，停止本轮模拟服务，检查进程与目录链接后清理合成配置，释放 323,541,918 字节（约 309 MiB）；报告、截图及验证构建保留。证据为 `output/nov18-model-cleanup.json`。
+- 官方清单的新构建 `26.1111.9265.0` 暂未取得安装包，按用户确认先完成模型支持，未声称新版客户端已适配。真实服务商速度、计费、账号权限及长上下文请求未测试；当前指纹库未收录两个新模型，不复用旧模型身份。
+
 ## 0.7.1 发布准备（2026-11-16）
 
 - 将已验证的 `26.1111.2228.0` 适配纳入 0.7.1，API 保持 5；同步配置、适配器、内置插件、启动器和客户端版本标识，README 更新下载入口，历史日志及第三方插件范围不改写。

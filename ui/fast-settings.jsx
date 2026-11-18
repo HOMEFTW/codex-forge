@@ -27,6 +27,7 @@ export default function FastModelSettings({plugin,call}) {
       <label>额外启用 Ultrafast 的模型（每行一个模型 ID）<textarea value={(value.ultrafastModels||[]).join('\n')} disabled={saving} onChange={e=>change({ultrafastModels:e.target.value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean)})}/></label>
       <p className="forge-muted">模型目录自带的 Ultrafast 会自动显示。若自定义服务支持该档位，可在此补充模型 ID；发送独立的 ultrafast 参数，服务不支持时可能拒绝请求。</p>
       <div className="forge-model-heading"><h3>对话中可选择的模型</h3><span>{models?`${visible} / ${models.length} 个显示`:''}</span></div>
+      <p className="forge-muted">自动补齐 GPT-6.2-Sol / Astra 及 Fast、Ultrafast 档位；已有模型目录中的能力和限制优先保留。实际可用性与计费以模型服务为准。</p>
       <p className="forge-muted">取消勾选后，模型将从切换菜单隐藏；已有对话的模型保持不变。原生默认隐藏的模型不在此列表中。</p>
       <div className="forge-actions"><button type="button" disabled={saving||!hidden.length} onClick={()=>change({hiddenModels:[]})}>恢复默认显示</button><button type="button" disabled={saving} onClick={()=>setRevision(revision+1)}>重新读取模型</button></div>
       {listError&&<p className="forge-error" role="alert">{listError}</p>}
@@ -35,7 +36,7 @@ export default function FastModelSettings({plugin,call}) {
       {empty&&<p className="forge-error" role="alert">请至少保留一个可选择的模型。</p>}
       {models&&<div className="forge-model-list">{models.map(model=>{
         const checked=!hidden.includes(model.id);
-        return <label className="forge-model-item" key={model.id}><input type="checkbox" aria-label={'显示 '+model.id} checked={checked} disabled={saving||checked&&visible===1} onChange={e=>change({hiddenModels:e.target.checked?hidden.filter(id=>id!==model.id):[...hidden,model.id]})}/><span><strong>{model.name}</strong><code>{model.id}</code></span>{model.fast&&<small>Fast</small>}</label>;
+        return <label className="forge-model-item" key={model.id}><input type="checkbox" aria-label={'显示 '+model.id} checked={checked} disabled={saving||checked&&visible===1} onChange={e=>change({hiddenModels:e.target.checked?hidden.filter(id=>id!==model.id):[...hidden,model.id]})}/><span><strong>{model.name}</strong><code>{model.id}</code></span>{model.fast&&<small>Fast</small>}{model.ultrafast&&<small>Ultrafast</small>}</label>;
       })}</div>}
       <button disabled={saving||empty||!models&&!listError} onClick={save}>{saving?'正在保存…':'保存设置'}</button>
       {notice&&<p role="status">{notice}</p>}

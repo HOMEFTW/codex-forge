@@ -111,11 +111,11 @@ test('visibility hides picker entries without removing their descriptors or expo
   const settings = { enableTerra: true, hiddenModels: ['gpt-6-sol', 'gpt-6.1-terra'] };
   const result = prepareModelCatalog({ codexHome: home, settings });
   const models = JSON.parse(fs.readFileSync(result.path)).models;
-  assert.equal(models.length, 4);
+  assert.equal(models.length, 6);
   assert.equal(models.find(m => m.slug === 'gpt-6-sol').visibility, 'hide');
   assert.equal(models.find(m => m.slug === 'gpt-6.1-terra').visibility, 'hide');
   assert.deepEqual(models.find(m => m.slug === 'internal'), source.models[1]);
-  assert.deepEqual(modelOptions({ codexHome: home, settings }).map(m => m.id), ['gpt-6-sol', 'gpt-6.1-sol', 'gpt-6.1-terra']);
+  assert.deepEqual(modelOptions({ codexHome: home, settings }).map(m => m.id), ['gpt-6-sol', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6.2-sol', 'gpt-6.2-astra']);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(home, 'models_cache.json'))), source);
   const reset = prepareModelCatalog({ codexHome: home, settings: { ...settings, hiddenModels: [] } });
   assert.equal(JSON.parse(fs.readFileSync(reset.path)).models.find(m => m.slug === 'gpt-6-sol').visibility, 'list');
@@ -148,6 +148,8 @@ test('the Fast plugin owns Terra, visibility and speed settings across disable a
   let models = JSON.parse(fs.readFileSync(result.path)).models;
   assert.equal(models.find(m => m.slug === 'gpt-6-sol').visibility, 'hide');
   assert(models.some(m => m.slug === 'gpt-6.1-terra'));
+  assert(models.some(m => m.slug === 'gpt-6.2-sol'));
+  assert(models.some(m => m.slug === 'gpt-6.2-astra'));
   assert.equal(env.CODEX_FORGE_FAST, '1'); assert.equal(env.CODEX_FORGE_SPEED, 'native');
   assert.equal(env.CODEX_FORGE_MODEL_CATALOG, result.path);
   assert.throws(() => registry.settings('forge.fast', { hiddenModels: models.map(m => m.slug) }), /至少保留/);
@@ -156,6 +158,7 @@ test('the Fast plugin owns Terra, visibility and speed settings across disable a
   result = applyFastModelSettings({ registry, codexHome: home, env });
   models = JSON.parse(fs.readFileSync(result.path)).models;
   assert(!models.some(m => m.slug === 'gpt-6.1-terra'));
+  assert(!models.some(m => m.slug.startsWith('gpt-6.2-')));
   assert.equal(models.find(m => m.slug === 'gpt-6-sol').visibility, 'list');
   assert.equal(models.find(m => m.slug === 'gpt-6.1-sol').context_window, 500000);
   assert.equal(env.CODEX_FORGE_FAST, '0');
@@ -169,6 +172,46 @@ test('the Fast plugin owns Terra, visibility and speed settings across disable a
   fs.rmSync(path.join(home, 'models_cache.json'));
   assert.throws(() => applyFastModelSettings({ registry: reloaded, codexHome: home, env }), /未找到模型目录/);
   assert.equal(env.CODEX_FORGE_MODEL_CATALOG, undefined);
+});
+
+test('6.2 models use the original family capabilities, supported reasoning and speed tiers without inheriting 500K', t => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'forge-gpt62-'));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const levels = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'].map(effort => ({ effort, description: effort }));
+  const source = { models: [
+    { slug: 'gpt-6.1-sol', context_window: 272000, max_context_window: 872000, base_instructions: 'Sol', supported_reasoning_levels: levels, default_reasoning_level: 'none' },
+    { slug: 'gpt-6-astra', context_window: 272000, base_instructions: 'Astra', supported_reasoning_levels: levels, upgrade: { model: 'old' }, availability_nux: { message: 'old' } },
+  ] };
+  const file = path.join(home, 'models_cache.json'); fs.writeFileSync(file, JSON.stringify(source));
+  const result = prepareModelCatalog({ codexHome: home, settings: { hiddenModels: ['gpt-6.2-astra'] } });
+  const models = JSON.parse(fs.readFileSync(result.path)).models;
+  for (const [slug, instructions] of [['gpt-6.2-sol', 'Sol'], ['gpt-6.2-astra', 'Astra']]) {
+    const model = models.find(m => m.slug === slug);
+    assert.equal(model.base_instructions, instructions);
+    assert.equal(model.context_window, 272000);
+    assert.equal(model.max_context_window, 922000);
+    assert.equal(model.default_reasoning_level, 'medium');
+    assert.deepEqual(model.supported_reasoning_levels.map(l => l.effort), ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']);
+    assert.deepEqual(model.service_tiers.map(tier => tier.id), ['priority', 'ultrafast']);
+    assert.equal(model.upgrade, null); assert.equal(model.availability_nux, null);
+    assert.equal(model.visibility, slug.endsWith('astra') ? 'hide' : 'list');
+  }
+  assert.equal(models.find(m => m.slug === 'gpt-6.1-sol').context_window, 500000);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file)), source);
+  const repeated = prepareModelCatalog({ codexHome: home, catalogPath: result.path });
+  assert.deepEqual(JSON.parse(fs.readFileSync(repeated.path)).models, models, 'Repeated overlays must not duplicate or alter native descriptors');
+});
+
+test('existing 6.2 descriptors retain provider windows, hidden status, instructions and restricted tiers', t => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'forge-gpt62-native-'));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const source = { models: ['gpt-6.2-sol', 'gpt-6.2-astra'].map(slug => ({ slug, display_name: 'Provider '+slug,
+    visibility: 'hide', supported_in_api: false, context_window: 64000, max_context_window: 128000,
+    base_instructions: 'Provider', default_reasoning_level: 'high', supported_reasoning_levels: [{ effort: 'high' }],
+    service_tiers: [{ id: 'flex', name: 'Provider tier', description: 'Provider limits' }] })) };
+  fs.writeFileSync(path.join(home, 'models_cache.json'), JSON.stringify(source));
+  const result = prepareModelCatalog({ codexHome: home });
+  assert.deepEqual(JSON.parse(fs.readFileSync(result.path)), source);
 });
 
 test('both native network adapters forward the generated catalog as a model catalog override', async () => {
