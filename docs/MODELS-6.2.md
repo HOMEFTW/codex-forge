@@ -1,6 +1,6 @@
 # GPT-6.2 Sol / Astra 支持
 
-2026-11-18，Forge 0.7.2 在“Fast 与模型配置”中补齐 `gpt-6.2-sol` 和 `gpt-6.2-astra`。API 保持 5；请升级到 [v0.7.2 安装包](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.7.2)，既有 v0.7.1 安装包不包含这些修改。
+Forge 0.7.2 开始支持选择 `gpt-6.2-sol` 和 `gpt-6.2-astra`。[0.7.3 安装包](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.7.3) 增加 Sol 的可选 500K 上下文，以及两个模型各自的指纹参考类别。Forge API 保持 5。
 
 ## 使用方式
 
@@ -17,10 +17,10 @@
 
 Fast 请求使用 `service_tier: priority`，Ultrafast 使用 `service_tier: ultrafast`。真实可用性、账号权限、速度和计费仍由模型服务决定。
 
-当前指纹库没有这两个模型的参考样本，因此显示未收录；不会套用旧 Astra / Sol 指纹，也不会因此误报红字。
+从 0.7.3 起，“Fast 与模型配置”提供“启用 GPT-6.2-Sol 的 500K 上下文”选项，默认关闭。勾选、保存并完整重启后，Forge 对此模型设置 500,000 tokens 的输入窗口；如果模型目录声明了更低的最大窗口，则以该上限为准。客户端还会扣除预留比例（95% 时可用 475,000）。取消并重启后恢复原目录窗口，不影响 6.2-Astra 或 6.1-Sol。
+
+0.7.3 指纹库为两个模型分别收录了 36 条 `low` 档参考回答，其他思考强度下仅供参考。见[指纹说明](INFORMATION-STATS.md)。
 
 ## 客户端适配状态
 
-官方更新清单已公布构建 `26.1111.9265.0`、内部发行版 `26.1111.71025`，但固定 MSIX 下载地址返回 404。对通用下载包执行带 ETag 的范围读取，核实其 `AppxManifest.xml` 仍为 `26.1111.2228.0`；Microsoft Store 下载接口也未能返回新版包。按用户确认，本次先完成模型支持，客户端基线保持已验证的 `26.1111.2228.0`，不把 Feed 构建号冒充已适配版本。
-
-下载可用性证据位于 `output/nov18-official-availability.json`。模型功能、客户端构建和界面验收范围见[验证记录](VALIDATION.md)。
+截至 2026-11-19，微软商店美区与港区的 Windows x64 客户端均为 `26.1111.2228.0`。官方更新清单虽已列出 `26.1111.9664.0`，其固定包下载地址仍返回 404。Forge 0.7.3 保持已验证的商店客户端基线；详见[验证记录](VALIDATION.md)。

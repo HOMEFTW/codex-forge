@@ -65,7 +65,7 @@ function readModelCatalog({ codexHome = process.env.CODEX_HOME || path.join(os.h
   return { source, catalog };
 }
 
-function configuredModels(catalog, { enableTerra = true, enable62Models = true, ultrafastModels = [] } = {}) {
+function configuredModels(catalog, { enableTerra = true, enable62Models = true, sol62Context500k = false, ultrafastModels = [] } = {}) {
   const models = catalog.models.map(model => ({ ...model }));
   // Derive Terra before applying Sol's per-model context override.
   const terra = enableTerra ? terraDescriptor(models) : null;
@@ -92,6 +92,13 @@ function configuredModels(catalog, { enableTerra = true, enable62Models = true, 
     if (!terra.service_tiers?.some(tier => tier.id === 'priority')) terra.service_tiers = [...(terra.service_tiers || []), { ...FAST_TIER }];
   }
   models.push(...gpt62);
+  if (sol62Context500k) {
+    const sol = models.find(model => model.slug === 'gpt-6.2-sol');
+    if (sol) {
+      const limit = sol.max_context_window;
+      sol.context_window = Number.isSafeInteger(limit) && limit > 0 ? Math.min(CONTEXT_WINDOW, limit) : CONTEXT_WINDOW;
+    }
+  }
   for (const model of models) if (ultrafastModels.includes(model.slug) && !model.service_tiers?.some(tier => tier.id === 'ultrafast')) {
     model.service_tiers = [...(model.service_tiers || []), { ...ULTRA_TIER }];
   }

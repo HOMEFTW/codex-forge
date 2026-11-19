@@ -1,9 +1,9 @@
 # 信息统计源码依据
 
-## lm-detector 更新（2026-11-12，本地源码）
+## lm-detector 更新（2026-11-19，本地源码）
 
-- 数字评分与参考数据使用 https://github.com/Ikaleio/lm-detector ，固定提交 `a7e9d3056e019827904dd50722c20b4a0c896738`，MIT。
-- `data/unified_bank.json`：69 个指纹类别，15 个家族，2,560 条参考回答；数据日期 2026-11-11。
+- 数字评分与参考数据使用 https://github.com/Ikaleio/lm-detector ，固定提交 `33fb43f26670be0ed7817ab13e5c4c4731ccb76a`，MIT。
+- `data/unified_bank.json`：72 个指纹类别，15 个家族，2,668 条参考回答。GPT-6.2-Sol / Astra 各有独立类别及 36 条 OpenRouter → OpenAI 的 low 档样本；评分器包含上游 #40 修复。
 - 配套 `data/shared_detector.bin` 和 `shared` 目录的评分、位置/顺序特征、二进制解码源码提供本机离线评分，未使用网页代理或在线评分服务。
 - 上游源码及逐文件摘要在 `vendor/lm-detector`；`scripts/build-information-detector.mjs` 生成运行时 CommonJS 文件，UI 构建同时执行。
 - 数据、评分器、标准挑战和推理档位元数据的摘要见 `runtime/information-provenance.json`；运行时核验配对关系。

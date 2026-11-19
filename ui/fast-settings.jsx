@@ -24,6 +24,7 @@ export default function FastModelSettings({plugin,call}) {
       <label>默认速度<select value={value.defaultSpeed} disabled={saving} onChange={e=>change({defaultSpeed:e.target.value})}><option value="fast">Fast（默认）</option><option value="ultrafast">Ultrafast</option><option value="native">跟随客户端选择</option></select></label>
       <label className="forge-fast-toggle"><input type="checkbox" checked={value.enableTerra} disabled={saving} onChange={e=>change({enableTerra:e.target.checked})}/><span>启用 GPT-6.1-Terra 模型与 Fast 支持</span></label>
       <p className="forge-muted">补齐 Terra 模型和 Fast 档位。Fast 的实际可用性与计费由模型服务决定。</p>
+      <label className="forge-fast-toggle"><input type="checkbox" checked={value.sol62Context500k} disabled={saving} onChange={e=>change({sol62Context500k:e.target.checked})}/><span>启用 GPT-6.2-Sol 的 500K 上下文</span></label>
       <label>额外启用 Ultrafast 的模型（每行一个模型 ID）<textarea value={(value.ultrafastModels||[]).join('\n')} disabled={saving} onChange={e=>change({ultrafastModels:e.target.value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean)})}/></label>
       <p className="forge-muted">模型目录自带的 Ultrafast 会自动显示。若自定义服务支持该档位，可在此补充模型 ID；发送独立的 ultrafast 参数，服务不支持时可能拒绝请求。</p>
       <div className="forge-model-heading"><h3>对话中可选择的模型</h3><span>{models?`${visible} / ${models.length} 个显示`:''}</span></div>

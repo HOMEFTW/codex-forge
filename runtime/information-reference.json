@@ -26,13 +26,13 @@
   "claude-opus-4.7": {
     "efforts": [],
     "sources": [
-      "oaipro"
+      "openrouter/anthropic"
     ]
   },
   "claude-opus-4.8": {
     "efforts": [],
     "sources": [
-      "oaipro"
+      "openrouter/anthropic"
     ]
   },
   "claude-opus-5": {
@@ -493,6 +493,30 @@
     ],
     "sources": [
       "openrouter/google-vertex/us"
+    ]
+  },
+  "gemini-4-hydrogen": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openrouter/google-vertex/global"
+    ]
+  },
+  "gpt-6.2-sol": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openrouter/openai"
+    ]
+  },
+  "gpt-6.2-astra": {
+    "efforts": [
+      "low"
+    ],
+    "sources": [
+      "openrouter/openai"
     ]
   }
 }

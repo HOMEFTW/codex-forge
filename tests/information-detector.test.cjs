@@ -27,15 +27,15 @@ function harness(t, runner = async () => outputs) {
     async finish(threadId = context.threadId) { await service.jobs.get(threadId)?.work; } };
 }
 
-test('the pinned 69-class offline ranker scores complete reference fixtures', () => {
-  assert.equal(bank.models.length, 69);
-  assert.equal(bank.models.reduce((sum, model) => sum + model.response_count, 0), 2560);
+test('the pinned 72-class offline ranker scores complete reference fixtures', () => {
+  assert.equal(bank.models.length, 72);
+  assert.equal(bank.models.reduce((sum, model) => sum + model.response_count, 0), 2668);
   for (const item of fixtures) {
     const result = analyze(item.outputs);
     assert.equal(result.prediction, item.model);
     assert.equal(result.method, 'shared-detector-v2');
     assert.equal(result.used_outputs, 3);
-    assert.equal(result.results.length, 69);
+    assert.equal(result.results.length, bank.models.length);
     assert(result.probability > 0.9);
     assert(Math.abs(result.results.reduce((sum, row) => sum + row.probability, 0) - 1) < 1e-9);
   }
@@ -64,21 +64,35 @@ test('different or unknown reasoning effort hides probabilities and cannot raise
   assert.equal(assess('gpt-6.1-terra', comparable).verdict, 'MISMATCH');
 });
 
-test('6.2 models are unlisted until reference samples exist and cannot reuse an older GPT identity', () => {
-  const analysis = analyze(outputs);
-  for (const model of ['gpt-6.2-sol', 'gpt-6.2-astra']) {
-    assert.equal(modelClass(model), undefined);
-    const conditioned = samplingContext(analysis, model, 'low', true);
-    assert.equal(conditioned.probability, null);
-    assert.deepEqual(assess(model, conditioned), { verdict: 'UNLISTED', warning: false });
+test('6.2 Sol and Astra have separate low-effort references and stale results cannot trigger warnings', () => {
+  for (const [model, other] of [['gpt-6.2-sol', 'gpt-6.2-astra'], ['gpt-6.2-astra', 'gpt-6.2-sol']]) {
+    assert.equal(modelClass(model).id, model);
+    const analysis = analyze(fixtures.find(item => item.model === model).outputs);
+    const low = samplingContext(analysis, model, 'low', true);
+    assert.deepEqual(low.sampling.referenceEfforts, ['low']);
+    assert.equal(assess(model, low).verdict, 'MATCH');
+    assert.equal(assess(other, samplingContext(analysis, other, 'low', true)).verdict, 'MISMATCH');
+    const high = samplingContext(analysis, model, 'high', true);
+    assert.equal(high.probability, null);
+    assert.deepEqual(assess(model, high), { verdict: 'REFERENCE_ONLY', warning: false });
+    assert.deepEqual(assess(other, { ...low, engineVersion: 'lm-detector:a7e9d305' }), { verdict: 'LEGACY', warning: false });
   }
+});
+
+test('upstream issue 40: weak adjacent-pair signals can be ranked as a partial sample', () => {
+  const fixture = require('./fixtures/information-lm-detector-issue40.json');
+  const result = analyze(fixture.outputs);
+  assert.equal(result.used_outputs, 1);
+  assert.equal(result.decision, fixture.decision);
+  assert.equal(result.prediction, fixture.prediction);
+  assert.equal(result.probability, null);
 });
 
 test('partial answers retain ranking but never manufacture a calibrated probability', () => {
   const result = analyze(outputs.slice(0, 1));
   assert.equal(result.decision, 'partial');
   assert.equal(result.probability, null);
-  assert.equal(result.results.length, 69);
+  assert.equal(result.results.length, bank.models.length);
   assert(result.results.every(item => item.probability === null));
 });
 

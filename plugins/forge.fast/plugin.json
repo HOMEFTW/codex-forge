@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "apiVersion": 5,
-  "version": "0.7.2",
+  "version": "0.7.3",
   "compatibility": {
     "codex": [
       "26.1106.6628.0",
@@ -16,7 +16,7 @@
       "26.1111.2228.0"
     ],
     "forge": [
-      "0.7.2"
+      "0.7.3"
     ]
   },
   "permissions": [
@@ -183,6 +183,11 @@
           "type": "boolean",
           "title": "启用 GPT-6.1-Terra 模型与 Fast 支持",
           "default": true
+        },
+        "sol62Context500k": {
+          "type": "boolean",
+          "title": "启用 GPT-6.2-Sol 的 500K 上下文",
+          "default": false
         },
         "hiddenModels": {
           "type": "array",

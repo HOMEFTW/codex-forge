@@ -1,4 +1,4 @@
-// Generated from Ikaleio/lm-detector a7e9d305 (MIT). See vendor/lm-detector/SOURCES.json.
+// Generated from Ikaleio/lm-detector 33fb43f26670be0ed7817ab13e5c4c4731ccb76a (MIT). See vendor/lm-detector/SOURCES.json.
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
@@ -238,7 +238,17 @@ function rankSharedNumbers(numbers, artifact) {
   if (!ranking.every(Number.isFinite)) throw new Error("\u6392\u540D\u8BA1\u7B97\u4EA7\u751F\u65E0\u6548\u6570\u503C\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5");
   return ranking;
 }
-var SEQUENCE_LIMITS = { autocorrelation: -0.23, small_step_share: 0.05 };
+var SEQUENCE_LIMITS = { autocorrelation: -0.23, small_step_share: 0.05, nearby_pair_share: 0.07 };
+function nearbyPairShare(numbers) {
+  let close = 0, pairs = 0;
+  for (let lag = 1; lag <= 3; lag++) {
+    for (let i = lag; i < numbers.length; i++) {
+      if (Math.abs(numbers[i] - numbers[i - lag]) <= 20) close++;
+      pairs++;
+    }
+  }
+  return close / pairs;
+}
 function sequenceShape(numbers) {
   const shapes = numbers.map((n) => {
     const m = mean2(n), variance = mean2(n.map((x) => (x - m) ** 2)), steps = n.slice(1).map((x, i) => x - n[i]);
@@ -251,7 +261,7 @@ function sequenceShape(numbers) {
   return {
     autocorrelation,
     small_step_share,
-    model_like: autocorrelation <= SEQUENCE_LIMITS.autocorrelation || small_step_share <= SEQUENCE_LIMITS.small_step_share
+    model_like: autocorrelation <= SEQUENCE_LIMITS.autocorrelation || small_step_share <= SEQUENCE_LIMITS.small_step_share || median(numbers.map(nearbyPairShare)) <= SEQUENCE_LIMITS.nearby_pair_share
   };
 }
 function analyzeSharedOutputs(outputs, bank, artifact, options = {}) {

@@ -142,7 +142,7 @@ test('the Fast plugin owns Terra, visibility and speed settings across disable a
   const config = require('../forge.config.json');
   const options = { root: path.join(home, 'forge'), codexHome: home, bundledRoot: path.join(__dirname, '../plugins'), versions: { codex: config.codexVersion, forge: config.version, apiVersion: config.apiVersion } };
   const registry = new ForgeRegistry(options), env = {};
-  assert.deepEqual(registry.settings('forge.fast'), { defaultSpeed: 'fast', enableTerra: true, hiddenModels: [], ultrafastModels: [] });
+  assert.deepEqual(registry.settings('forge.fast'), { defaultSpeed: 'fast', enableTerra: true, sol62Context500k: false, hiddenModels: [], ultrafastModels: [] });
   registry.settings('forge.fast', { defaultSpeed: 'native', enableTerra: true, hiddenModels: ['gpt-6-sol'] });
   let result = applyFastModelSettings({ registry, codexHome: home, env });
   let models = JSON.parse(fs.readFileSync(result.path)).models;
@@ -200,6 +200,34 @@ test('6.2 models use the original family capabilities, supported reasoning and s
   assert.deepEqual(JSON.parse(fs.readFileSync(file)), source);
   const repeated = prepareModelCatalog({ codexHome: home, catalogPath: result.path });
   assert.deepEqual(JSON.parse(fs.readFileSync(repeated.path)).models, models, 'Repeated overlays must not duplicate or alter native descriptors');
+});
+
+test('the persisted 6.2-Sol window toggle respects provider limits and restores native settings', t => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'forge-sol62-window-'));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const { ForgeRegistry } = require('../runtime/forge-registry.cjs');
+  const { applyFastModelSettings } = require('../runtime/model-catalog.cjs');
+  const config = require('../forge.config.json');
+  const options = { root: path.join(home, 'forge'), codexHome: home, bundledRoot: path.join(__dirname, '../plugins'), versions: { codex: config.codexVersion, forge: config.version, apiVersion: config.apiVersion } };
+  const registry = new ForgeRegistry(options), file = path.join(home, 'models_cache.json');
+  const sol = { slug: 'gpt-6.2-sol', context_window: 272000, max_context_window: 922000, effective_context_window_percent: 90 };
+  const catalog = { models: [sol, { slug: 'gpt-6.2-astra', context_window: 192000 }, { slug: 'gpt-6.1-sol', context_window: 272000 }] };
+  fs.writeFileSync(file, JSON.stringify(catalog));
+  const overlay = () => JSON.parse(fs.readFileSync(applyFastModelSettings({ registry: new ForgeRegistry(options), codexHome: home, env: {} }).path)).models;
+  const original = overlay();
+  assert.deepEqual(original[0], sol);
+  registry.settings('forge.fast', { sol62Context500k: true });
+  const on = overlay();
+  assert.deepEqual(on, [{ ...sol, context_window: 500000 }, ...original.slice(1)]);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file)), catalog);
+  registry.setEnabled('forge.fast', false);
+  assert.deepEqual(overlay()[0], sol);
+  registry.setEnabled('forge.fast', true);
+  sol.max_context_window = 320000;
+  fs.writeFileSync(file, JSON.stringify(catalog));
+  assert.deepEqual(overlay()[0], { ...sol, context_window: 320000 });
+  registry.settings('forge.fast', { sol62Context500k: false });
+  assert.deepEqual(overlay()[0], sol);
 });
 
 test('existing 6.2 descriptors retain provider windows, hidden status, instructions and restricted tiers', t => {

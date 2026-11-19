@@ -1,9 +1,9 @@
 {
   "repository": "https://github.com/Ikaleio/lm-detector",
-  "commit": "a7e9d3056e019827904dd50722c20b4a0c896738",
-  "bankSHA256": "a6e8d6291b50e7cf25744b5fbad46460ed4cc0b94e156bb2719a9d714684b635",
-  "detectorSHA256": "8c7d48ea242026d123baa7cfbbe377701ac8d6899e6796f319ce555d3ae06b6c",
-  "referenceSHA256": "1d4c696dd83b53253b288cc9345de9069a33c80c2f33afba867eb7486f27d508",
+  "commit": "33fb43f26670be0ed7817ab13e5c4c4731ccb76a",
+  "bankSHA256": "8e7a0083dc66d941229c49e195c503a4362d1b33edd2aa6318877849eef7b691",
+  "detectorSHA256": "f6cf5bb49f621690da7eba3173b34ea978af19b51987a65e0b37c424d5904343",
+  "referenceSHA256": "606f097afcfd87785959fe4b542ad9c95fd45aa8df2ffcc73cac30cbbd8b873b",
   "challengeSHA256": "a3af3207b46ff76bfd54df8a39fab988a219371ca61507c0e218d93f19bfbe74",
-  "referenceProfileSHA256": "acbb6012bf5bc5b8ed4d5b3b4527bf3189bf86540663bfc789dd8da71e5c0955"
+  "referenceProfileSHA256": "0447ec1e6955a6e003a032fafe0c3641991b6b4087f9cb457234227c3d21fe31"
 }

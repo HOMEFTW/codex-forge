@@ -2,6 +2,15 @@
 
 [返回程序介绍](../README.md) · [GitHub Releases](https://github.com/HOMEFTW/codex-forge/releases)
 
+## 0.7.3
+
+（2026-11-19，API 5），官方客户端基线保持 `26.1111.2228.0`。
+
+- “Fast 与模型配置”新增 GPT-6.2-Sol 独立 500K 上下文开关，默认关闭。保存并完整重启生效。
+- 同步 lm-detector 指纹库与离线评分器至 `33fb43f`，新增 GPT-6.2-Sol / Astra 独立参考类别，修复部分弱信号样本被提前排除的问题。更新后旧结果需重测。[检测说明](INFORMATION-STATS.md)。
+
+[模型设置](MODELS-6.2.md) · [验证记录](VALIDATION.md) · [下载 0.7.3](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.7.3)。
+
 ## 0.7.2
 
 （2026-11-18，API 5），官方客户端基线保持 `26.1111.2228.0`。
@@ -71,6 +80,7 @@
 
 ## 版本索引
 
+- [0.7.3](#073) （2026-11-19，API 5）
 - [0.7.2](#072) （2026-11-18，API 5）
 - [0.7.1](#071) （2026-11-16，API 5）
 - [0.7.0](#070) （2026-11-13，API 5）
