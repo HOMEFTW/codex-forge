@@ -7,6 +7,7 @@ import { patchSettingsPage, patchSettingsVisibility } from './native-settings-pa
 import { patchNativeTabs, patchNativeWorkspace } from './native-tabs-patch.mjs';
 import { patchFastAccess, patchModelCatalogArgs, patchOct27Network } from './native-fast-patch.mjs';
 import { patchNov09Main, patchNov09Metadata, patchNativePredictionPolicy } from './native-nov09-main.mjs';
+import { patchNov23Network, patchNov23Metadata } from './native-nov23-main.mjs';
 import { patchRspackMember, patchRspackIndex } from './native-rspack-patch.mjs';
 const root = path.resolve(import.meta.dirname, '..');
 const config=JSON.parse(fs.readFileSync(path.join(root,'forge.config.json'),'utf8'));
@@ -19,9 +20,9 @@ const target = path.resolve(process.argv[3] || path.join(root, 'release', 'packa
 // 该字段时才回退到符号判断。members 必须由适配器提供：静默回退到 legacy 文件名
 // 会把旧补丁套到新客户端上。
 const nativeVersion = adapter.patchSet || (adapter.nativeSymbols?.registryMap === 'QL' ? 'legacy' : 'current');
-assert(['legacy', 'current', 'oct23', 'oct27', 'oct27b', 'oct29', 'nov09', 'nov12', 'nov16'].includes(nativeVersion), `适配器 patchSet 无效：${nativeVersion}`);
-const modernMain = ['nov09', 'nov12', 'nov16'].includes(nativeVersion);
-const rspackAdapter = ['oct29', 'nov09', 'nov12', 'nov16'].includes(nativeVersion);
+assert(['legacy', 'current', 'oct23', 'oct27', 'oct27b', 'oct29', 'nov09', 'nov12', 'nov16', 'nov23'].includes(nativeVersion), `适配器 patchSet 无效：${nativeVersion}`);
+const modernMain = ['nov09', 'nov12', 'nov16', 'nov23'].includes(nativeVersion);
+const rspackAdapter = ['oct29', 'nov09', 'nov12', 'nov16', 'nov23'].includes(nativeVersion);
 const currentAdapter = nativeVersion !== 'legacy';
 const members = adapter.members;
 if (modernMain) assert(members?.metadataGeneration, '适配器必须声明标题生成模块');
@@ -79,6 +80,8 @@ for (const { member, entry, offset } of all) {
     changed=Buffer.from(patchSettingsPage(original.toString(),{version:nativeVersion}));
   } else if(!process.env.FAST_NO_PATCH && member===members.visibleSettings) {
     changed=Buffer.from(patchSettingsVisibility(original.toString(),{version:nativeVersion}));
+  } else if (!process.env.FAST_NO_PATCH && nativeVersion === 'nov23' && [members.network, members.networkHost].includes(member)) {
+    changed = Buffer.from(patchNov23Network(original.toString(), member === members.networkHost));
   } else if (!process.env.FAST_NO_PATCH && member === members.network && ['oct27', 'oct27b', 'oct29', 'nov09', 'nov12', 'nov16'].includes(nativeVersion)) {
     changed = Buffer.from(patchOct27Network(original.toString(), { version: modernMain ? 'nov09' : nativeVersion }));
   } else if (!process.env.FAST_NO_PATCH && modernMain && member === 'package.json') {
@@ -96,7 +99,7 @@ for (const { member, entry, offset } of all) {
     changed = Buffer.from(sourceText.slice(0, start) + withCatalog + sourceText.slice(end));
   }
   if (!process.env.FAST_NO_PATCH && member === adapter.members.desktopFeatures) changed = Buffer.from(patchNov09Main(original.toString(), member));
-  if (!process.env.FAST_NO_PATCH && member === members.metadataGeneration) changed = Buffer.from(patchNov09Metadata(original.toString()));
+  if (!process.env.FAST_NO_PATCH && member === members.metadataGeneration) changed = Buffer.from((nativeVersion === 'nov23' ? patchNov23Metadata : patchNov09Metadata)(original.toString()));
   if (!process.env.FAST_NO_PATCH && member === adapter.nativePredictionPolicy?.member) changed = Buffer.from(patchNativePredictionPolicy(original.toString(), changed.toString(), adapter.nativePredictionPolicy));
   if (!changed.equals(original)) {
     assert(entry.integrity?.algorithm === 'SHA256');
@@ -111,6 +114,7 @@ const expectedMembers = process.env.FAST_NO_PATCH ? [] : [
   'webview/index.html', '.vite/build/early-bootstrap.js', '.vite/build/preload.js',
   ...(rspackAdapter ? rspackMembers : [members.renderer, members.settingsPage, members.visibleSettings]), members.network,
   ...(modernMain ? ['package.json', members.desktopFeatures, members.metadataGeneration] : []),
+  ...(nativeVersion === 'nov23' ? [members.networkHost] : []),
   ...(members.workspaceRenderer ? [members.workspaceRenderer] : []),
 ];
 assert.deepEqual(modifications.map(item => item.member).sort(), expectedMembers.sort(), 'Native patch member set changed');

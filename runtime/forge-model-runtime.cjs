@@ -44,7 +44,7 @@ class ForgeNativeModels {
         notification(message);
       });
       const call=(method,params)=>new Promise((resolve,reject)=>{if(error||controller.signal.aborted)return reject(error||controller.signal.reason);const id=++sequence,deadline=setTimeout(()=>fail(new ForgeError('TIMEOUT','模型协议调用超时')),15000);pending.set(id,{resolve,reject,timer:deadline});child.stdin.write(JSON.stringify({id,method,params})+'\n');});
-      await call('initialize',{clientInfo:{name:'codex_forge_api5',version:'0.7.3'},capabilities:{experimentalApi:true}});child.stdin.write('{"method":"initialized"}\n');
+      await call('initialize',{clientInfo:{name:'codex_forge_api5',version:'0.7.4'},capabilities:{experimentalApi:true}});child.stdin.write('{"method":"initialized"}\n');
       const original=await call('config/read',{includeLayers:false}),config={model_reasoning_effort:effort,web_search:'disabled'};
       for(const name of ['shell_tool','unified_exec','multi_agent','apps','code_mode','code_mode_host','plugins','hooks','computer_use','browser_use','browser_use_external','skill_search','sleep_tool','goals','workspace_dependencies','view_image'])config['features.'+name]=false;
       config['features.skip_host_skill_discovery']=true;

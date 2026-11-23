@@ -1,0 +1,12 @@
+{
+  "member": ".vite/build/early-bootstrap-7-a5d632ed685e6979.js",
+  "memberSHA256": "0b8d5055f63f62191e36a9ef13fb72a2a23d6ad02b8270ad311c260039eac6ba",
+  "functionName": "lu",
+  "source": "async function lu({appServerClient:e,model:t,readOnlyAppToolAllowlist:r=[],cwd:n,fallbackToFreshThread:i,experimentalPredictionMode:a,feature:o,outputSchema:s,prompt:l,responseSchema:c,serviceTier:u,serviceName:d,signal:p,sourceThreadId:h,timeoutMs:f}){let m=null,g=null,A=a?null:\"low\";try{var y;let _=await iT({prompt:l,cwd:n,model:t,effort:A,serviceTier:u,serviceName:d,threadSource:o,schema:s,config:{mcp_servers:await async function(e,t,r,n){if(n?.throwIfAborted(),null!=e.getUserSavedConfiguration)try{let i=e.getUserSavedConfiguration(t??void 0),a=null==n?await i:await (0,C._qC)(i,n),o=la.safeParse(a.mcp_servers);if(!o.success)return;return Object.fromEntries(Object.keys(o.data).filter(e=>!r||\"codex_apps\"!==e).map(e=>[e,{enabled:!1}]))}catch{n?.throwIfAborted();return}}(e,n,r.length>0,p),\"features.enable_fanout\":!1,\"features.hooks\":!1,\"features.multi_agent\":!1,\"features.multi_agent_v2\":!1,\"features.plugins\":!1,\"features.shell_snapshot\":!1,\"features.tool_suggest\":!1,...{\"features.apps\":(y=r).length>0,apps:{...Object.fromEntries(y.map(({appId:e,toolNames:t})=>[e,{enabled:!0,destructive_enabled:!1,open_world_enabled:!1,default_tools_enabled:!1,tools:Object.fromEntries(t.map(e=>[e,{enabled:!0}]))}])),_default:{enabled:!1,destructive_enabled:!1,open_world_enabled:!1}}},web_search:\"disabled\"},timeoutMs:f,client:e,responseSchema:c,sourceThreadId:h,fallbackToFreshThread:i,experimentalPredictionMode:a,signal:p,onTokenUsage:e=>{m=m??e,g=e}});return ei({feature:o,firstTokenUsage:m,model:t,reasoningEffort:A,serviceTier:u??null,status:null==_?\"empty\":\"success\",tokenUsage:g}),_}catch(e){throw ei({feature:o,firstTokenUsage:m,model:t,reasoningEffort:A,serviceTier:u??null,status:e instanceof Error&&\"AbortError\"===e.name?\"canceled\":\"error\",tokenUsage:g}),e}}",
+  "bindings": {
+    "parse": "la",
+    "generate": "iT",
+    "log": "ei",
+    "abort": "C"
+  }
+}

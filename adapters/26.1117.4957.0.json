@@ -1,0 +1,290 @@
+{
+  "schemaVersion": 1,
+  "forgeVersion": "0.7.4",
+  "apiVersion": 5,
+  "codexVersion": "26.1117.4957.0",
+  "codexBuildVersion": "26.1117.4957.0",
+  "architecture": "x64",
+  "packageIdentity": "OpenAI.Codex",
+  "publisher": "CN=50BDFD77-8903-4850-9FFE-6E8522F64D5B",
+  "downloadUrl": "https://persistent.oaistatic.com/codex-app-prod/releases/26.1117.4957.0/ChatGPT-x64.msix",
+  "packageBytes": 796523063,
+  "packageSHA256": "561f0b0c6edc4dbf5f00f33b86e0786ea59a0ff926759813b26770a0e8c4d963",
+  "baseASARSHA256": "8a437aad94098770c1bf5fd5385c204e162b62c6d7917f688741d74e05babe90",
+  "baseExecutableSHA256": "21c2eac7703b43611392234738f669a8af23907585b231ebde54ca3cb104cc82",
+  "members": {
+    "desktopFeatures": ".vite/build/early-bootstrap-916-2fd4cc5178eaa3b5.js",
+    "metadataGeneration": ".vite/build/early-bootstrap-7-a5d632ed685e6979.js",
+    "network": ".vite/build/early-bootstrap-824-de8313738dd96f7c.js",
+    "networkHost": ".vite/build/app-server-host.js"
+  },
+  "patchSet": "nov23",
+  "rspackModules": [
+    {
+      "id": "UTF2",
+      "member": "webview/assets/async/109399.513cd51f8a.js",
+      "start": 699,
+      "end": 3595,
+      "sha256": "f98ab88c37de8de9f2a426bc6268ec3bf5c3e8d9b3c2886ce164da294246eb8e"
+    },
+    {
+      "id": "PAzX",
+      "member": "webview/assets/async/181583.01f4bab9b2.js",
+      "start": 4798,
+      "end": 6013,
+      "sha256": "f504fbe905138f82939a6409e0af2cc6b56bae9f83639d375153a47e0c6fbeda"
+    },
+    {
+      "id": "mjpt",
+      "member": "webview/assets/async/191628.7c4ce6e8ec.js",
+      "start": 13608,
+      "end": 398795,
+      "sha256": "d17d6a6d5dc5b90ea9b9df2ab4655633523a7353ccafb989e86157bbe04e5eb5"
+    },
+    {
+      "id": "PAzX",
+      "member": "webview/assets/async/202338.33802c2827.js",
+      "start": 34120,
+      "end": 35335,
+      "sha256": "d1222fe35a382d6b2f09ffd4aadcf8f4ec63de44e4beb48ada083c62618f25e8"
+    },
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/209295.c7c1c53f8a.js",
+      "start": 49482,
+      "end": 50130,
+      "sha256": "baf23d1a1a4fa8cc62a7d5d9ef4cdbe5b5df1c7891df23f0a272bd2543171e4e"
+    },
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/25051.f5d7b08f7d.js",
+      "start": 33034,
+      "end": 33682,
+      "sha256": "49d398ce65b58cb7be6a51197b1b7bb3e33f9ac1ba7f22ee35226c84a594a308"
+    },
+    {
+      "id": "XADK",
+      "member": "webview/assets/async/25051.f5d7b08f7d.js",
+      "start": 62106,
+      "end": 67737,
+      "sha256": "846e818076f573d00e8b07e2f5cdedbd40320aaa5be09929e39fa4ada0de52c9"
+    },
+    {
+      "id": "jNL7",
+      "member": "webview/assets/async/273709.5529b38cc2.js",
+      "start": 41797,
+      "end": 166839,
+      "sha256": "44ab480976c6af9455e93a8aa8f50e50d9ae9d9fbccf0f1cf71c739713659d6c"
+    },
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/29761.32b25894b1.js",
+      "start": 152127,
+      "end": 152775,
+      "sha256": "f73379f692dfc6db70fce64dd1fda515b942fc3b28b044e4c4fae49e1ed4ed14"
+    },
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/300239.0dc1893389.js",
+      "start": 77122,
+      "end": 77770,
+      "sha256": "81b49f0b8ffedc10618e97bec65835ffb0429bf7d412dabc2860d594162c9ddc"
+    },
+    {
+      "id": "PAzX",
+      "member": "webview/assets/async/325898.a571199956.js",
+      "start": 73,
+      "end": 1288,
+      "sha256": "497d136467bb0311b48d47d312fd84d257e718dfbb41c44cb2b34a879d88bfce"
+    },
+    {
+      "id": "PAzX",
+      "member": "webview/assets/async/339953.68a1570c54.js",
+      "start": 8579,
+      "end": 9794,
+      "sha256": "4f8b047b2ad5df0ac947a56dccb2794528e68bd6549becc1a499e3bb1fe7253a"
+    },
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/35015.1e5f235976.js",
+      "start": 39861,
+      "end": 40509,
+      "sha256": "bb2c11b9dea97e2c81972eab72793482e365f6e50f6e96cf542cf90b830e0cda"
+    },
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/355340.de1f371a7a.js",
+      "start": 317395,
+      "end": 318043,
+      "sha256": "6f1f0b593065fe6b2513d2ec5b9955a1356022a392136b0f4a2734de2abc2c23"
+    },
+    {
+      "id": "PAzX",
+      "member": "webview/assets/async/393731.d7ede2bd99.js",
+      "start": 4788,
+      "end": 6003,
+      "sha256": "4cd9cafcce56d0ec1d869d69cc57c3f6229ec90e04490818cbac438b3b02b568"
+    },
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/449710.f80badaa52.js",
+      "start": 22038,
+      "end": 22686,
+      "sha256": "8ca2d4c561c442ee1383fd2eabd3030a5d0a547470df8cf9df8431ac138afa58"
+    },
+    {
+      "id": "a4Ud",
+      "member": "webview/assets/async/468418.d29c9693b2.js",
+      "start": 20306,
+      "end": 67094,
+      "sha256": "0d4dabc8d495f2460ba49f3eeb36a575dd259e7326cf88f8da760f4933eed005"
+    },
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/49195.439fd43503.js",
+      "start": 39239,
+      "end": 39887,
+      "sha256": "2ff3e4d7e889fcb9030f5380edf9c430382dcd916697588034251dd394f379bd"
+    },
+    {
+      "id": "PAzX",
+      "member": "webview/assets/async/499154.5c53c1b4c6.js",
+      "start": 10269,
+      "end": 11484,
+      "sha256": "f174d1ff02ce7c7c91f82a26aa522bd287fe569630a0f733ea3736d96eec850d"
+    },
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/542321.95810c4fe3.js",
+      "start": 68526,
+      "end": 69174,
+      "sha256": "d8e787f252456c8a39cbaf66cc5ba1088a971fd60e52cbebdc68bc2086e47f8a"
+    },
+    {
+      "id": "FRRX",
+      "member": "webview/assets/async/559869.1b50ec65da.js",
+      "start": 81691,
+      "end": 96853,
+      "sha256": "0def2004cf0c4a9432fa52dbd06f8214ebf4113e84dae4f39d70a0c9ca0ecd5b"
+    },
+    {
+      "id": "PAzX",
+      "member": "webview/assets/async/592263.4b0591d77a.js",
+      "start": 6666,
+      "end": 7881,
+      "sha256": "2bf510bc964db3a80785e5ec5e5790668b5219fa32eac20b2881050335451385"
+    },
+    {
+      "id": "PAzX",
+      "member": "webview/assets/async/649429.3c8f12a6f7.js",
+      "start": 1666,
+      "end": 2881,
+      "sha256": "a8311dd8088a58613068d341ca8d4dddf7e5a1eaa4f65fbdc9343856b6f19a92"
+    },
+    {
+      "id": "PAzX",
+      "member": "webview/assets/async/656164.66317ee1cd.js",
+      "start": 5501,
+      "end": 6716,
+      "sha256": "5c9314c878541732b117dedadf2e74fe91260c81b1e602d5dac099b716166e45"
+    },
+    {
+      "id": "PAzX",
+      "member": "webview/assets/async/769550.c57ec748e4.js",
+      "start": 5606,
+      "end": 6821,
+      "sha256": "b4d5744916b718acf95468f07b9f38f6cf6176ab3b606ee9d6665f9a851700ca"
+    },
+    {
+      "id": "PAzX",
+      "member": "webview/assets/async/790065.f2deb90102.js",
+      "start": 4397,
+      "end": 5612,
+      "sha256": "f153e44b8e724e4dbbc81b3c7d4ddb774c736654c6b1d9ee7851c07025d81cc2"
+    },
+    {
+      "id": "PAzX",
+      "member": "webview/assets/async/817302.c84bd089f1.js",
+      "start": 19358,
+      "end": 20573,
+      "sha256": "3c419e374c6b70fa1651bf9edba344a36db6bdae0e2ca869d04d2b49560ece3d"
+    },
+    {
+      "id": "PAzX",
+      "member": "webview/assets/async/817750.a6219adac0.js",
+      "start": 10872,
+      "end": 12087,
+      "sha256": "ce4726b0c1ebb5a5d89f13db33be81dfa816095f42f1ec401e690a784e6344ea"
+    },
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/881554.636a177f87.js",
+      "start": 32776,
+      "end": 33424,
+      "sha256": "f65c6b478897e6af8d39a2cb144d1e7fc8c90edb468b853ae1ca2b922091b11e"
+    },
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/887074.f612b45a0f.js",
+      "start": 15466,
+      "end": 16114,
+      "sha256": "d9fb5c950b8f21515f9885c52dd9df21967cac0406210aa61276e4e4d32402f0"
+    },
+    {
+      "id": "XADK",
+      "member": "webview/assets/async/905476.b0a1ebce43.js",
+      "start": 270425,
+      "end": 276056,
+      "sha256": "cd1f82aecb0980f8310ffcf79cadd3f4b31e535751655e95b0a45bad5dae7e78"
+    },
+    {
+      "id": "EpL9",
+      "member": "webview/assets/async/911644.eaf037cac0.js",
+      "start": 2709851,
+      "end": 2711827,
+      "sha256": "b0d4e1b7dd879cdb7319637c14fb07917d8061bf628f8fae32500a9e895594b9"
+    },
+    {
+      "id": "IIEq",
+      "member": "webview/assets/async/911644.eaf037cac0.js",
+      "start": 5130964,
+      "end": 5134033,
+      "sha256": "e62cdb1fd6407a3cc6cb589369898959229f0300f9a09d762fa1a4240254274d"
+    },
+    {
+      "id": "jWaO",
+      "member": "webview/assets/async/911644.eaf037cac0.js",
+      "start": 5134034,
+      "end": 5135778,
+      "sha256": "634cedeaf590edfc9cd4513576bf1d933048c066039bf36c19908d6fbc5bf4a8"
+    },
+    {
+      "id": "yrds",
+      "member": "webview/assets/async/911644.eaf037cac0.js",
+      "start": 5135881,
+      "end": 5137682,
+      "sha256": "4be05c7adc2f2c1d4f9a4201cc43788ca633ab7e4186adb40e78f555fca5b25e"
+    },
+    {
+      "id": "HHvo",
+      "member": "webview/assets/async/911644.eaf037cac0.js",
+      "start": 5181738,
+      "end": 5184203,
+      "sha256": "46f9050e51d8276c9223f4d791df259979afd01f3136b34da68f43faaa7333d1"
+    },
+    {
+      "id": "ipV4",
+      "member": "webview/assets/async/920827.4a604b4469.js",
+      "start": 29645,
+      "end": 30293,
+      "sha256": "e5cf647782022c91d1fe4e11f8c07fd3b44c7bca9f2cd80796ede12eaec78af1"
+    }
+  ],
+  "cuaGlobalsSHA256": "18b8039f846a6e00206128530c5f59ff05bd361c655a858a4a27059ec0f63d23",
+  "nativePredictionPolicy": {
+    "member": ".vite/build/early-bootstrap-916-2fd4cc5178eaa3b5.js",
+    "sha256": "c1e3b6391ba975e558b8dd524bf54c7587dd25e5b8e022a58624cbabcee6c736",
+    "settingSymbol": "eai",
+    "hostSymbol": "ox"
+  }
+}

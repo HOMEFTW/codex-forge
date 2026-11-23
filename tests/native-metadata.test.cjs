@@ -15,13 +15,13 @@ async function requestConfig(source,{servers={},allowlist=[],failure=false,signa
  return normalize(request.config);
 }
 
-for(const [version,fixture] of [['26.1103.4239.0',require('./fixtures/native-metadata-nov09.json')],['26.1103.7773.0',require('./fixtures/native-metadata-nov10.json')],['26.1106.6628.0',require('./fixtures/native-metadata-nov12.json')],['26.1111.2228.0',require('./fixtures/native-metadata-nov16.json')]]) {
+for(const [version,fixture] of [['26.1103.4239.0',require('./fixtures/native-metadata-nov09.json')],['26.1103.7773.0',require('./fixtures/native-metadata-nov10.json')],['26.1106.6628.0',require('./fixtures/native-metadata-nov12.json')],['26.1111.2228.0',require('./fixtures/native-metadata-nov16.json')],['26.1117.4957.0',require('./fixtures/native-metadata-nov23.json')]]) {
 
 const request=(source,options={})=>requestConfig(source,{...options,bindings:fixture.bindings});
 
 test(version+': native title config disables MCP servers without replacing their transport definitions',async()=>{
  assert.equal(require('../adapters/'+version+'.json').members.metadataGeneration,fixture.member);
- const {patchNov09Metadata}=await import('../scripts/native-nov09-main.mjs');
+ const patchNov09Metadata=version==='26.1117.4957.0'?(await import('../scripts/native-nov23-main.mjs')).patchNov23Metadata:(await import('../scripts/native-nov09-main.mjs')).patchNov09Metadata;
  const servers={fast_canvas:{command:'node',args:['mcp.cjs'],env:{PRIVATE_VALUE:'must-not-copy'}},remote:{url:'https://fixture.invalid/mcp'},'custom-name':{command:'other'}};
  const original=await request(fixture.source,{servers});
  assert.deepEqual(original.mcp_servers,{fast_canvas:{enabled:false},remote:{enabled:false},'custom-name':{enabled:false}});
@@ -32,7 +32,7 @@ test(version+': native title config disables MCP servers without replacing their
 });
 
 test(version+': metadata patch preserves allowed apps, disabled tools and unavailable config handling',async()=>{
- const {patchNov09Metadata}=await import('../scripts/native-nov09-main.mjs');
+ const patchNov09Metadata=version==='26.1117.4957.0'?(await import('../scripts/native-nov23-main.mjs')).patchNov23Metadata:(await import('../scripts/native-nov09-main.mjs')).patchNov09Metadata;
  const source=patchNov09Metadata(fixture.source);
  const actual=await request(source,{servers:{codex_apps:{command:'apps'},fast_canvas:{command:'node'}},allowlist:[{appId:'read-only-app',toolNames:['read']} ]});
  assert.equal(actual['mcp_servers.fast_canvas.enabled'],false);
@@ -51,7 +51,7 @@ test(version+': metadata patch preserves allowed apps, disabled tools and unavai
 });
 
 test(version+': metadata patch rejects missing, changed and duplicate upstream anchors',async()=>{
- const {patchNov09Metadata}=await import('../scripts/native-nov09-main.mjs');
+ const patchNov09Metadata=version==='26.1117.4957.0'?(await import('../scripts/native-nov23-main.mjs')).patchNov23Metadata:(await import('../scripts/native-nov09-main.mjs')).patchNov09Metadata;
  assert.throws(()=>patchNov09Metadata('unrelated code'),/metadata anchor changed/);
  assert.throws(()=>patchNov09Metadata(fixture.source+fixture.source),/metadata anchor changed/);
  assert.throws(()=>patchNov09Metadata(fixture.source.replace('e,{enabled:!1}','e,{enabled:false}')),/metadata anchor changed/);

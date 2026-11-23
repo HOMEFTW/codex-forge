@@ -1,0 +1,4 @@
+{
+  "network": "function er(){let e=j.flatMap(({configKey:e,envVar:t})=>{let r=process.env[t]?.trim();return null==r||\"\"===r?[]:[\"-c\",`${e}=${JSON.stringify(r)}`]});return 0===e.length?[...D,\"app-server\",\"--analytics-default-enabled\"]:[\"app-server\",...D,...e,\"--analytics-default-enabled\"]}",
+  "networkHost": "function X(){let e=U.flatMap(({configKey:e,envVar:t})=>{let r=process.env[t]?.trim();return null==r||\"\"===r?[]:[\"-c\",`${e}=${JSON.stringify(r)}`]});return 0===e.length?[...B,\"app-server\",\"--analytics-default-enabled\"]:[\"app-server\",...B,...e,\"--analytics-default-enabled\"]}"
+}

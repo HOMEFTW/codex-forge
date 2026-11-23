@@ -1,5 +1,13 @@
 # Forge 验证记录
 
+## 0.7.4 / Codex 26.1117.4957.0（2026-11-23）
+
+- 官方包摘要、ASAR 与 EXE 摘要复核一致，Authenticode 签名有效。独立 `nov23` 适配器及所有新增补丁的原始字节和语法检查通过。
+- `node output/run-nov23-tests.mjs`：601 项全量回归通过，无失败或跳过。沙箱下曾出现 7-Zip 子进程启动失败；相同测试集在正常用户环境全部通过，没有降低断言。
+- 隔离 UI 共覆盖 21 项不同交互。完整入口和设置验收：`output/playwright/nov23/run-XKLGKo/result.json`；模型与速度：`output/playwright/nov23/run-zabYA7/result.json`。其中重复检查的侧栏入口只计一次。修复并回归了新版详细设置搜索不认识 Forge 栏目而触发的错误页。
+- 复用当天对同一官方包的 6 次 localhost 请求及 MCP 工具发现结果：`output/nov23-client-compatibility.json`。实际服务商长输入、速度与计费，真实 Pro 预测和电脑/浏览器操作，以及正式安装/卸载未实测。本机正式客户端保持不变。
+- 升为 0.7.4 后，UI、启动器、准备程序和更新器编译通过；220 项定向回归和 45 项更新器断言通过。0.7.3 的五个附件按 SHA-256 比对后保留在 `release/archive/v0.7.3`。发行包与客户端完整性核验报告为 `output/release-074-package-audit.json`、`output/release-074-client-integrity.json`；GitHub 回下载校验报告为 `output/release-074-github-verification.json`。
+
 ## 0.7.3 指纹库与 6.2-Sol 可选 500K（2026-11-19）
 
 - 升版后 UI、启动器、准备程序和独立更新器编译成功。21 个测试文件共 209 项定向回归全部通过，无失败或跳过；独立更新器另通过 45 项断言。0.7.2 的五个发布附件均已归档并比对 SHA-256。

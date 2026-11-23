@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { rewriteExtension } from './native-tabs-patch.mjs';
 import { patchNov12Factory } from './native-nov12-patch.mjs';
 import { patchNov16Factory } from './native-nov16-patch.mjs';
+import { patchNov23Factory } from './native-nov23-patch.mjs';
 import { patchNov09Factory } from './native-nov09-patch.mjs';
 
 // These module IDs and source ranges belong to the pinned Oct 29 MSIX only.
@@ -91,8 +92,8 @@ export function patchRspackMember(source, member, modules, extension, version = 
     assert(Number.isInteger(start) && Number.isInteger(end) && start >= 0 && start < end && end <= limit, 'Invalid Rspack module range');
     const original = source.slice(start, end);
     assert.equal(crypto.createHash('sha256').update(original).digest('hex'), sha256, 'Rspack module digest changed: ' + member + ':' + id);
-    assert(original.startsWith(id + '('), 'Rspack module ID changed');
-    result = result.slice(0, start) + (version === 'nov16' ? patchNov16Factory(original, id, extension) : version === 'nov12' ? patchNov12Factory(original, id, extension) : version === 'nov09' ? patchNov09Factory(original, id, extension) : patchRspackFactory(original, id, extension)) + result.slice(end);
+    assert(original.startsWith(id + '(') || version === 'nov23' && original.startsWith(id + ':(function('), 'Rspack module ID changed');
+    result = result.slice(0, start) + (version === 'nov23' ? patchNov23Factory(original, id, extension) : version === 'nov16' ? patchNov16Factory(original, id, extension) : version === 'nov12' ? patchNov12Factory(original, id, extension) : version === 'nov09' ? patchNov09Factory(original, id, extension) : patchRspackFactory(original, id, extension)) + result.slice(end);
     limit = start;
   }
   return result;
