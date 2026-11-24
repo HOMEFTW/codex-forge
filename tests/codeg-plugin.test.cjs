@@ -1,0 +1,100 @@
+'use strict';
+const { test, before } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
+const { spawn, execFileSync } = require('node:child_process');
+const readline = require('node:readline');
+const { ForgeRegistry } = require('../runtime/forge-registry.cjs');
+const { SkillsStore, InstalledSkills, PLUGIN_ID } = require('../runtime/skills.cjs');
+const config = require('../forge.config.json');
+const root = path.resolve(__dirname, '..'), bundleRoot = path.join(root, 'extensions/codeg-skills/bundled-skills');
+const version = require('../extensions/codeg-skills/plugin.json').version;
+const artifact = suffix => path.join(root, 'dist/codeg-skills', `Codeg-Skills-${version}.${suffix}`);
+before(() => execFileSync(process.execPath, ['scripts/build-codeg-skills.mjs'], { cwd: root, windowsHide: true, stdio: 'pipe' }));
+function fixture(t) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'forge-codeg-plugin-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const registry = new ForgeRegistry({ root: path.join(directory, 'forge'), bundledRoot: path.join(root, 'plugins'), versions: { forge: config.version, apiVersion: config.apiVersion, codex: config.codexVersion } });
+  const preferences = path.join(directory, 'canvas/skills');
+  const skills = new InstalledSkills({ root: preferences, registry: () => registry });
+  return { directory, registry, preferences, skills };
+}
+
+test('host starts without Codeg resources, panel or preference directory', t => {
+  const { registry, skills, preferences } = fixture(t);
+  assert.equal(registry.list().errors.length, 0);
+  assert.equal(registry.entries.has('forge.skills'), false);
+  assert.equal(registry.entries.has(PLUGIN_ID), false);
+  assert.equal(skills.available(), false);
+  assert.equal(skills.promptCatalog('codex'), '');
+  assert.equal(skills.loaded, undefined);
+  assert.equal(fs.existsSync(preferences), false);
+  assert.throws(() => skills.list(), /插件/);
+});
+
+test('real ZIP and JSON install disabled, keep legacy agent choices, and revoke access on disable/uninstall', async t => {
+  const { registry, skills, preferences } = fixture(t);
+  const legacy = new SkillsStore({ root: preferences, bundleRoot });
+  const id = legacy.list().skills[0].id;
+  await legacy.setEnabled(id, true, 'claude');
+  const installed = registry.install(artifact('zip'));
+  assert.equal(installed.id, PLUGIN_ID);
+  assert.equal(installed.enabled, false);
+  assert.equal(skills.promptCatalog('claude'), '');
+  registry.setEnabled(PLUGIN_ID, true);
+  assert.equal(registry.get(PLUGIN_ID).builtin, false);
+  assert.equal(skills.list().inventory.skills, 37);
+  assert.equal(skills.list({ agent: 'claude', enabledOnly: true }).skills[0].id, id);
+  assert.equal(skills.list({ agent: 'codex', enabledOnly: true }).skills.length, 0);
+  assert.match(skills.promptCatalog('claude'), new RegExp(id));
+  assert.equal(skills.store().verify().files, 283);
+  assert.match(require('../runtime/forge-content.cjs').pluginBundle(registry, PLUGIN_ID, { viewId: 'main' }).html, /Codeg 技能包/);
+  registry.setEnabled(PLUGIN_ID, false);
+  assert.throws(() => skills.read(id), /未启用/);
+  assert.equal(skills.promptCatalog('claude'), '');
+  registry.uninstall(PLUGIN_ID);
+  assert.equal(fs.existsSync(path.join(preferences, 'enabled.json')), true);
+  assert.equal(skills.available(), false);
+  registry.install(artifact('forge-plugin.json'));
+  registry.setEnabled(PLUGIN_ID, true);
+  assert.equal(skills.list({ agent: 'claude', enabledOnly: true }).skills[0].id, id);
+  const resource = path.join(registry.get(PLUGIN_ID).root, 'bundled-skills', legacy.find(id).directory, 'SKILL.md');
+  fs.appendFileSync(resource, '\nchanged');
+  assert.throws(() => skills.read(id, { agent: 'claude' }), /integrity/i);
+  registry.reload();
+  assert.equal(skills.available(), false, 'modified package loses reviewed fingerprint');
+});
+
+test('running MCP exposes Codeg only after install and enable, then hides it again', async t => {
+  const { directory, registry, preferences } = fixture(t);
+  const child = spawn(process.execPath, [path.join(root, 'runtime/mcp.cjs')], { env: { ...process.env, CODEX_HOME: path.join(directory, 'codex'), CODEX_FORGE_HOME: registry.root, CODEX_FAST_CANVAS_DIR: path.dirname(preferences) }, windowsHide: true });
+  const exited = new Promise(resolve => child.once('exit', resolve));
+  t.after(async () => { child.kill(); await exited; });
+  const pending = new Map(); let serial = 0, stderr = '';
+  child.stderr.on('data', data => { stderr += data; });
+  readline.createInterface({ input: child.stdout }).on('line', line => { const reply = JSON.parse(line); pending.get(reply.id)?.(reply); pending.delete(reply.id); });
+  const request = (method, params) => new Promise((resolve, reject) => {
+    const id = ++serial, timer = setTimeout(() => reject(Error('MCP timeout: ' + stderr)), 10000);
+    pending.set(id, reply => { clearTimeout(timer); resolve(reply.result); });
+    child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
+  });
+  const listed = async () => (await request('tools/list')).tools.filter(tool => tool.name.startsWith('skill_')).map(tool => tool.name);
+  const call = (name, args = {}) => request('tools/call', { name, arguments: args });
+  await request('initialize', { protocolVersion: '2025-03-26' });
+  assert.deepEqual(await listed(), []);
+  assert.equal((await call('skill_list')).isError, true);
+  assert.equal(JSON.parse((await call('workspace_context')).content[0].text).skills, '');
+  registry.install(artifact('forge-plugin.json'));
+  assert.deepEqual(await listed(), []);
+  registry.setEnabled(PLUGIN_ID, true);
+  assert.deepEqual(await listed(), ['skill_list', 'skill_read', 'skill_files']);
+  assert.equal(JSON.parse((await call('skill_list')).content[0].text).skills.length, 0);
+  const store = new SkillsStore({ root: preferences, bundleRoot }), id = store.list().skills[0].id;
+  await store.setEnabled(id, true, 'codex');
+  assert.equal(JSON.parse((await call('skill_read', { id })).content[0].text).id, id);
+  registry.setEnabled(PLUGIN_ID, false);
+  assert.deepEqual(await listed(), []);
+  assert.equal((await call('skill_read', { id })).isError, true);
+  assert.equal(JSON.parse((await call('workspace_context')).content[0].text).skills, '');
+  child.stdin.end(); await exited;
+});

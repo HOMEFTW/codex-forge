@@ -292,7 +292,9 @@ class CodexMemory {
       for (const child of children) {
         scanned += 1;
         if (visited >= MAX_LIST_ITEMS || scanned >= MAX_LIST_ITEMS * 2) { this.truncated = true; break; }
-        if (child.name.startsWith('.')) continue;
+        // Dot-prefixed note names are accepted by create/rename. Include these
+        // files (and existing notes), while keeping hidden directories excluded.
+        if (child.name.startsWith('.') && !(categoryName === 'notes' && child.isFile())) continue;
         const childRelative = `${relative}/${child.name}`;
         const childPath = path.join(directory, child.name);
         if (child.isSymbolicLink()) continue;

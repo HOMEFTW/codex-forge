@@ -56,10 +56,10 @@ export default function SkillsPanel({ api, mode, onMode, onClose }) {
   const totalEnabled = data?.packs.reduce((sum, item) => sum + item.enabledCount, 0) || 0;
   return <main className="fast-skills" aria-label="技能包配置">
     <header className="fast-skills-header">
-      <div><span className="fast-skills-eyebrow">CODEX FAST · r4</span><h1>技能包</h1></div>
+      <div><span className="fast-skills-eyebrow">CODEG SKILLS</span><h1>技能包</h1></div>
       <div className="fast-skills-actions"><button onClick={refresh} aria-label="刷新技能包">↻</button>{onMode && <button onClick={() => onMode(mode === 'expanded' ? 'right' : 'expanded')}>{mode === 'expanded' ? '并排' : '展开'}</button>}{onClose && <button onClick={onClose} aria-label="关闭技能包">×</button>}</div>
     </header>
-    <p className="fast-skills-intro">{data ? `${data.inventory.packs} 组 · ${data.inventory.skills} 项技能 · ${data.inventory.resourceFiles} 个参考资源` : '正在读取内置技能…'}。按智能体启用，模型可在任务需要时读取原文与资源。</p>
+    <p className="fast-skills-intro">{data ? `${data.inventory.packs} 组 · ${data.inventory.skills} 项技能 · ${data.inventory.resourceFiles} 个参考资源` : '正在读取技能包…'}。按智能体启用，模型可在任务需要时读取原文与资源。</p>
     <div className="fast-skills-controls">
       <label>用于<select aria-label="技能目标智能体" value={agent} disabled={busy} onChange={event => setAgent(event.target.value)}>{Object.entries(agents).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
       <label className="fast-skills-only"><input type="checkbox" checked={enabledOnly} onChange={event => setEnabledOnly(event.target.checked)} />仅看已启用（{totalEnabled}）</label>
@@ -86,6 +86,6 @@ export default function SkillsPanel({ api, mode, onMode, onClose }) {
         </> : <p className="fast-skills-empty">选择一项技能查看正文、依赖和参考文件。</p>}
       </section>
     </div>
-    <footer className="fast-skills-footer">保持现有用户技能不变；本面板仅管理随包技能。协作仍需用户在提示词中要求。</footer>
+    <footer className="fast-skills-footer">保持现有用户技能不变；本面板仅管理此插件的技能。协作仍需用户在提示词中要求。</footer>
   </main>;
 }

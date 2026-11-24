@@ -33,8 +33,9 @@ function nextCron(expression, after, timeZone = 'UTC') {
   try { if (!utc) format = new Intl.DateTimeFormat('en-US', { timeZone, minute: 'numeric', hour: 'numeric', day: 'numeric', month: 'numeric', weekday: 'short', hourCycle: 'h23' }); }
   catch { fail('cron 时区无效'); }
   const weekdays = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-  // Search is bounded; malformed or impossible calendars cannot block the host indefinitely.
-  for (let at = Math.floor(after / 60000) * 60000 + 60000, end = at + 366 * 86400000; at < end; at += 60000) {
+  // Leap days can be eight years apart across a non-leap century (e.g. 2100).
+  // Keep the search bounded and skip entire nonmatching UTC calendar days.
+  for (let at = Math.floor(after / 60000) * 60000 + 60000, end = at + 8 * 366 * 86400000; at < end; at += 60000) {
     const date = new Date(at);
     let values;
     if (utc) values = [date.getUTCMinutes(), date.getUTCHours(), date.getUTCDate(), date.getUTCMonth() + 1, date.getUTCDay()];
@@ -44,9 +45,13 @@ function nextCron(expression, after, timeZone = 'UTC') {
     }
     const day = sets[2].has(values[2]), week = sets[4].has(values[4]) || values[4] === 0 && sets[4].has(7);
     const calendar = fields[2] === '*' ? week : fields[4] === '*' ? day : day || week;
+    if (utc && (!sets[3].has(values[3]) || !calendar)) {
+      at = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1) - 60000;
+      continue;
+    }
     if (sets[0].has(values[0]) && sets[1].has(values[1]) && sets[3].has(values[3]) && calendar) return at;
   }
-  fail('cron 在未来 366 天内没有运行时间');
+  fail('cron 在未来 8 年内没有运行时间');
 }
 function timing(value, now) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail('计划 timing 无效');

@@ -12,6 +12,12 @@ const need=(value,message,code='INVALID_ARGUMENT')=>{if(!value)throw new ForgeEr
 const hash=value=>crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
 function object(value){need(value&&typeof value==='object'&&!Array.isArray(value),'参数必须为对象');return value;}
 const copy=value=>JSON.parse(JSON.stringify(value));
+function shortcutKey(value){
+  need(typeof value==='string'&&/^(?:(?:Ctrl|Alt|Shift|Meta)\+){1,3}[A-Za-z0-9]$/.test(value),'快捷键无效');
+  const parts=value.split('+'),key=parts.pop().toUpperCase(),modifiers=new Set(parts);
+  need(modifiers.size===parts.length,'快捷键修饰键重复');
+  return [...['Ctrl','Alt','Shift','Meta'].filter(name=>modifiers.has(name)),key].join('+');
+}
 const currentMethods=new Set(['conversation.read','conversation.fork','conversation.send','conversation.cancel','conversation.events','conversation.create','llm.sample','llm.stream','todos.request','statistics.request','collaboration.request','tools.call','shell.execute','jobs.request','schedules.request','backend.call','backend.channel','services.request','services.channel','files.watch']);
 class ForgeAPI5 {
   constructor({registry,services={},root=registry.root,nativeCall,contextFor,notify=()=>{},changed=()=>{},states=new Map(),dialog,open,executable,nodePath,safeStorage,fetchImpl,backendManager,taskRuntime}={}){
@@ -101,10 +107,14 @@ class ForgeAPI5 {
     if(method==='llm.stream')return this.modelStream(id,args,context,{signal});
     throw new ForgeError('METHOD_NOT_FOUND','未知流式接口');
   }
-  channel(context,method,args,options={}){
+  async channel(context,method,args,options={}){
     const queue=[];let wake,ended=false;const channelId=crypto.randomUUID();let lifetime;
     const invoke=async value=>{need(!ended,'通道输入已关闭','STREAM_CLOSED');need(queue.length<64,'通道队列已满','RESOURCE_EXHAUSTED');const trusted=this.backendContext({...context,channelId});const result=method==='services.channel'?await this.backends.requestService(context.pluginId,args.name,args.method,value,trusted,{signal:lifetime}):await this.backends.call(context.pluginId,args.method,value,trusted,{signal:lifetime});queue.push(result);wake?.();};
-    return this.rpc.open(context.owner,signal=>{lifetime=signal;signal.addEventListener('abort',()=>{ended=true;wake?.();},{once:true});return {async *[Symbol.asyncIterator](){try{while(!ended||queue.length){if(queue.length)yield queue.shift();else await new Promise(resolve=>{wake=resolve;});}}finally{ended=true;wake?.();}}};},{...options,onInput:invoke,onEnd:()=>{ended=true;wake?.();}});
+    const opened=this.rpc.open(context.owner,signal=>{lifetime=signal;signal.addEventListener('abort',()=>{ended=true;wake?.();},{once:true});return {async *[Symbol.asyncIterator](){try{while(!ended||queue.length){if(queue.length)yield queue.shift();else await new Promise(resolve=>{wake=resolve;});}}finally{ended=true;wake?.();}}};},{...options,onInput:invoke,onEnd:()=>{ended=true;wake?.();}});
+    // Initial args are the first input frame, processed before the caller can
+    // send subsequent frames. Use the same bounds, cancellation and ordering.
+    try{if(Object.hasOwn(args,'args'))await this.rpc.send(context.owner,opened.streamId,args.args);return opened;}
+    catch(error){await this.rpc.close(context.owner,opened.streamId,error);throw error;}
   }
   subscribe(id,context,signal){
     const queue=[];let wake,ended=false,failure;const subscription={windowId:context.windowId,threadId:context.threadId,id,queue,push:value=>{if(queue.length>=64){failure=new ForgeError('RESOURCE_EXHAUSTED','会话事件积压，请重新订阅');subscription.close();}else{queue.push(value);wake?.();}},close:()=>{ended=true;this.events.delete(subscription);wake?.();}};this.events.add(subscription);signal.addEventListener('abort',subscription.close,{once:true});const events=this.events;
@@ -175,10 +185,19 @@ class ForgeAPI5 {
     need(reads[service].includes(method)||writes[service].includes(method),'不支持的公共服务方法','METHOD_NOT_FOUND');
     const writePermission={canvas:'canvas.write',todos:'todos.write',skills:'skills.manage',memory:'memory.write',statistics:'statistics.detect',collaboration:'collaboration.run'}[service];this.permission(id,service+'.read',...(writes[service].includes(method)?[writePermission]:[]));
     if(service==='canvas'){
-      if(method==='list')return api.list();if(method==='read')return api.read(args.canvasId);if(method==='asset')return api.imageData(args.asset);if(method==='create')return api.create(args.title,undefined,'user',args.metadata||{});if(method==='apply')return api.apply(args.canvasId,args.expectedRevision,args.operations,'user',args.message);if(method==='delete')return api.delete(args.canvasId,args.expectedRevision);if(method==='restore')return api.restore(args.restoreToken);
+      if(method==='create'||method==='apply'){const doc=method==='create'?await api.create(args.title,undefined,'user',args.metadata||{}):await api.apply(args.canvasId,args.expectedRevision,args.operations,'user',args.message);if(context.threadId)api.bindThread(context.threadId,doc.id);return doc;}
+      if(method==='list')return api.list();if(method==='read')return api.read(args.canvasId);if(method==='asset')return api.imageData(args.asset);if(method==='delete')return api.delete(args.canvasId,args.expectedRevision);if(method==='restore')return api.restore(args.restoreToken);
     }
     if(service==='todos'){need(context.threadId,'当前对话未就绪');need(!args.threadId||args.threadId===context.threadId,'待办不属于当前对话','PERMISSION_DENIED');return method==='read'?api.read(context.threadId):api.apply(context.threadId,args.expectedRevision,args.operations,'user');}
-    if(service==='skills'){if(method==='list')return api.list(args);if(method==='read')return api.read(args.id,{...args,requireEnabled:true});if(method==='files')return api.files(args.id,{...args,requireEnabled:true});return api.setEnabled(args.id,args.enabled,args.agent||'codex');}
+    if(service==='skills'){
+      if(method==='list')return api.list(args);
+      if(method==='read'||method==='files'){
+        const preview=args.requireEnabled===false;
+        if(preview)this.permission(id,'skills.manage');
+        return api[method](args.id,{...args,requireEnabled:!preview});
+      }
+      return api.setEnabled(args.id,args.enabled,args.agent||'codex');
+    }
     if(service==='memory')return api.dispatch(method,args);
     if(service==='statistics'){const trusted=this.services.statisticsContext?await this.services.statisticsContext(context):context;return api.dispatch(method,{outputs:args.outputs,threadId:trusted.threadId},trusted);}
     if(service==='collaboration'){need(!args.threadId||args.threadId===context.threadId,'不能访问其他对话','PERMISSION_DENIED');return api.dispatch(method,args,{...context,source:'plugin',trusted:false});}
@@ -219,7 +238,10 @@ class ForgeAPI5 {
     }else if(method==='theme.set'){
       this.permission(id,'theme.write');const theme=args.id===null?null:this.ui.themes.has(args.id)?args.id:id+':'+args.id;need(theme===null||this.ui.themes.has(theme),'主题未注册');const saved=json(path.join(this.root,'api5-ui.json'),{});saved.theme=theme;atomic(path.join(this.root,'api5-ui.json'),saved);
     }else if(method==='shortcuts.register'){
-      this.permission(id,'shortcuts');need(typeof args.id==='string'&&/^[\w.-]{1,80}$/.test(args.id)&&typeof args.key==='string'&&/^(?:(?:Ctrl|Alt|Shift|Meta)\+){1,3}[A-Za-z0-9]$/.test(args.key),'快捷键无效');need(this.registry.get(id).manifest.contributes?.commands?.some(command=>command.id===args.command),'快捷键命令未声明');need(![...this.ui.shortcuts.values()].some(shortcut=>shortcut.key===args.key&&shortcut.pluginId!==id),'快捷键已被其他插件占用');this.ui.shortcuts.set(id+':'+args.id,{pluginId:id,id:args.id,key:args.key,command:args.command});
+      this.permission(id,'shortcuts');need(typeof args.id==='string'&&/^[\w.-]{1,80}$/.test(args.id),'快捷键无效');const key=shortcutKey(args.key);
+      need(this.registry.get(id).manifest.contributes?.commands?.some(command=>command.id===args.command),'快捷键命令未声明');
+      need(![...this.ui.shortcuts.values()].some(shortcut=>shortcut.key===key&&(shortcut.pluginId!==id||shortcut.id!==args.id)),'快捷键已被占用');
+      this.ui.shortcuts.set(id+':'+args.id,{pluginId:id,id:args.id,key,command:args.command});
     }else if(method==='shortcuts.unregister'){this.permission(id,'shortcuts');this.ui.shortcuts.delete(id+':'+args.id);}else throw new ForgeError('METHOD_NOT_FOUND','未知界面方法');
     this.changed();return this.uiSnapshot();
   }

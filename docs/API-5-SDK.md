@@ -37,6 +37,8 @@ try {
 
 `services.channel(name, method, args, options)` 和 `backend.channel(method, args, options)` 支持客户端输入：`send(value)` 等待宿主处理这一帧，`end()` 关闭输入但继续读取输出，`dispose()` 同时关闭两侧。提前结束 `for await` 会自动调用迭代器 `return()` 并关闭宿主流。同一流只允许一个待处理读取和一个待处理输入；这提供背压，不在浏览器积累无界输出。
 
+打开时的 `args` 是第一帧输入（SDK 默认 `{}`），恰好调用一次对应后端方法，其返回值是第一帧输出。宿主处理完这一帧后才接受后续 `send(value)`；每个 `value` 单独传给同一方法，不与初始参数合并。所有帧共享宿主生成的 `context.channelId`，后端可据此保留项目等会话状态。`end()` 后可继续读完已产生的结果，随后读到 `done: true`；`dispose()` 或上下文失效会中止通道。初始调用失败时，打开请求报错并清理通道。
+
 流的协议为 `rpc.stream.open/next/send/end/cancel`。结果项和输入项必须是有界 JSON 数据。宿主默认每身份 16 个流、64 个请求；全局最多 256 个流、1024 个请求。`ForgeRPC` 类的缺省单项上限为 1 MiB、期限为 120 秒；API 5 宿主配置为 16 MiB 和最长 600 秒，以覆盖 8 MiB 文件的 Base64 返回。流选项 `lifetimeMs` 可缩短整条流的存活时间，`timeoutMs` 控制每次请求的等待时间。
 
 宿主创建流时优先使用 `rpc.open(owner, signal => producer(signal), options)`，把流的取消信号交给真正的生产者。直接传入迭代器适用于无外部工作或已经绑定取消的来源。关闭会中止信号并调用迭代器 `return()`；不合作的生产者不会阻塞宿主清理。
@@ -82,3 +84,5 @@ API 5 的七项命名贡献点为 `conversation.header.action`、`sidebar.right.
 使用 `events.on('slot.changed', callback)` 接收 JSON 投影 `{slot,id,key,threadId?,item?:{id,type,toolName},messageId?}`。宿主只发给自己创建的相应 iframe，投影不包含消息正文，不授予历史读取或会话发送权限。TypeScript 将该事件值约束为 `JsonObject`；`context.get()` 仍返回受权会话上下文。
 
 凭据优先使用可用的 Electron 系统加密服务；未链接该模块的 Windows Codex 构建使用当前用户 DPAPI。加密和解密通过进程标准输入传递字节，不把明文写入命令参数或临时文件；复制到其他 Windows 用户后不能解密。
+
+技能服务由已安装并启用的独立 Codeg 技能包提供资源。`skills.request("read"/"files", {id, requireEnabled:false})` 用于管理面板预览，需额外声明 `skills.manage`；默认调用和模型工具仍仅允许已启用技能。

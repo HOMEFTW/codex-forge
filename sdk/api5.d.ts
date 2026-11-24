@@ -77,7 +77,9 @@ export interface API5SettingsMethods {
 export interface API5Extensions {
   rpc:{stream<Out=JsonValue,In=JsonValue>(method:string,args?:JsonObject,options?:StreamOptions):ForgeStream<Out,In>};
   llm:{providers(options?:RequestOptions):Promise<{providers:ModelProvider[]}>;sample(args:LlmRequest,options?:RequestOptions):Promise<LlmResult>;stream(args:LlmRequest,options?:StreamOptions):ForgeStream<LlmChunk>};
+  /** channel args (default {}) are the first input; sends follow in order without merging. */
   services:{request<R=JsonValue>(name:string,method:string,args?:JsonObject,options?:RequestOptions):Promise<R>;channel<Out=JsonValue,In=JsonValue>(name:string,method:string,args?:JsonObject,options?:StreamOptions):ForgeStream<Out,In>};
+  /** channel args (default {}) are delivered once before later sends, sharing context.channelId. */
   backend:{call<R=JsonValue>(method:string,args?:JsonObject,options?:RequestOptions):Promise<R>;channel<Out=JsonValue,In=JsonValue>(method:string,args?:JsonObject,options?:StreamOptions):ForgeStream<Out,In>};
   tools:{list(options?:RequestOptions):Promise<JsonValue>;call<R=JsonValue>(name:string,args?:JsonObject,options?:RequestOptions):Promise<R>};
   plugins:{list(args?:JsonObject,options?:RequestOptions):Promise<JsonValue>;catalog(args?:JsonObject,options?:RequestOptions):Promise<JsonValue>;install(entry:string|{source?:string;id:string},options?:RequestOptions):Promise<JsonValue>;checkUpdate(id:string,options?:RequestOptions):Promise<JsonValue>;update(id:string,options?:RequestOptions):Promise<JsonValue>;enable(id:string,enabled:boolean,options?:RequestOptions):Promise<JsonValue>;uninstall(id:string,options?:RequestOptions):Promise<JsonValue>};

@@ -71,15 +71,15 @@ test('registers once and opens each fixed page as a native tab without replacing
   scope.tabs.set('ordinary', { tabId: 'ordinary', tabType: { kind: 'browser' } });
   f.context.fastWorkspaceRegisterTabs();
   assert.equal(f.sandbox.QL.size, 1);
-  for (const page of ['canvas', 'todos', 'collaboration', 'skills', 'updates', 'information-stats', 'codex-memory']) {
+  for (const page of ['canvas', 'todos', 'collaboration', 'updates', 'information-stats', 'codex-memory']) {
     const reply = f.request({ action: 'open', page, mode: 'right', threadId: 'a' });
     assert.equal(reply.error, undefined);
     assert.equal(reply.result.tabId, 'fast-workspace:' + page);
     assert.equal(reply.result.mode, 'right');
   }
-  assert.equal(scope.tabs.size, 8);
+  assert.equal(scope.tabs.size, 7);
   f.request({ action: 'open', page: 'canvas', mode: 'right', threadId: 'a' });
-  assert.equal(scope.tabs.size, 8, 'reopening a page uses its existing stable native tab');
+  assert.equal(scope.tabs.size, 7, 'reopening a page uses its existing stable native tab');
   const opens = f.calls.filter(item => item.method === 'openTab');
   assert(opens.every(item => item.options.replaceTabId === undefined && item.options.isPreview === false));
   assert(opens.every(item => item.options.requiresWorkspaceReady === false && item.options.allowDuringThreadCreation === true));
@@ -96,7 +96,7 @@ test('chooses the active native memory route and real thread instead of app URL 
   const reply = f.request({ action: 'open', page: 'collaboration', mode: 'right', threadId: 'real-created-thread' });
   assert.equal(reply.error, undefined);
   assert(draft.tabs.has('fast-workspace:collaboration'));
-  assert.match(f.request({ action: 'open', page: 'skills', threadId: 'missing-thread' }).error, /对话/);
+  assert.match(f.request({ action: 'open', page: 'todos', threadId: 'missing-thread' }).error, /对话/);
 });
 
 test('mode and close target one native mount scope while preserving other tabs and scopes', () => {
@@ -146,16 +146,19 @@ test('per-hook facades of one native scope route mount actions to the owning lay
 
 test('durable routes restore only fixed page IDs and leave native topology and ordinary tabs intact', () => {
   const f = fixture(), scope = f.remember(f.scope('a')), durable = f.descriptor.durableRoute;
-  const saved = durable.serialize(scope, { page: 'skills' });
-  assert.equal(saved.kind, 'fast-workspace'); assert.equal(saved.payloadVersion, 1); assert.equal(saved.params.page, 'skills');
-  const descriptor = { ...saved, tabId: 'fast-workspace:skills' };
+  const saved = durable.serialize(scope, { page: 'todos' });
+  assert.equal(saved.kind, 'fast-workspace'); assert.equal(saved.payloadVersion, 1); assert.equal(saved.params.page, 'todos');
+  const descriptor = { ...saved, tabId: 'fast-workspace:todos' };
   assert.equal(durable.restore({ scope, descriptor, target: 'right', revealAndFocus: false, insertPosition: { type: 'start' }, isDisconnected: () => false }), true);
-  assert(scope.tabs.has('fast-workspace:skills')); assert.equal(f.calls.filter(item => item.method === 'layout').length, 0);
+  assert(scope.tabs.has('fast-workspace:todos')); assert.equal(f.calls.filter(item => item.method === 'layout').length, 0);
   assert.equal(durable.restore({ scope, descriptor: { ...descriptor, tabId: 'ordinary' }, target: 'right' }), false);
   assert.equal(durable.restore({ scope, descriptor: { ...descriptor, payloadVersion: 2 }, target: 'right' }), false);
   assert.equal(durable.restore({ scope, descriptor: { ...descriptor, params: { page: '../../file' } }, target: 'right' }), false);
   assert.equal(durable.restore({ scope, descriptor, target: 'bottom' }), false);
   assert.equal(durable.restore({ scope, descriptor, target: 'right', isDisconnected: () => true }), false);
+  assert.equal(durable.restore({ scope, descriptor: { ...descriptor, tabId: 'fast-workspace:canvas', params: { page: 'canvas' } }, target: 'right' }), false, 'startup does not restore an unscoped canvas tab');
+  assert.equal(scope.tabs.has('fast-workspace:canvas'), false);
+  assert.equal(durable.restore({ scope, descriptor: { ...descriptor, tabId: 'fast-workspace:skills', params: { page: 'skills' } }, target: 'right' }), false, 'removed built-in skills page is not restored');
 });
 
 test('rejects foreign windows, arbitrary pages and actions, invalid modes and native ID collisions', () => {

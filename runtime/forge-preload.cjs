@@ -78,6 +78,17 @@
         button.style.cssText=surface==='sidebar'?'display:flex;align-items:center;gap:8px;color:inherit;background:transparent;border:0;border-radius:6px;padding:6px 10px;cursor:pointer;-webkit-app-region:no-drag':'display:inline-flex;align-items:center;gap:6px;color:inherit;background:transparent;border:0;border-radius:6px;padding:6px 10px;cursor:pointer;-webkit-app-region:no-drag';
         button.dataset.forgeContent=contentKey;
       }
+      // Share the built-in entry's layout and hover class in both rail widths.
+      // Its hidden state belongs to the canvas plugin, not to other plugins.
+      if(surface==='sidebar'&&canvasEntry){
+        let style=canvasEntry.style.cssText.replace(/visibility:\s*hidden;?/g,'');
+        if(canvasEntry.style.position==='fixed'){
+          const bottom=Math.max(...[canvasEntry,...target.querySelectorAll('.fast-workspace-entry')].map(entry=>parseFloat(entry.style.top)||54));
+          const index=[...target.querySelectorAll('[data-forge-contribution*=":sidebar:"]')].indexOf(button)+1;
+          style=style.replace(/top:\s*[^;]+;/,`top: ${bottom+43*index}px;`);
+        }
+        if(button.style.cssText!==style)button.style.cssText=style;
+      }
       const title=snapshot.plugins.find(p=>p.id===pluginId)?.name;if(button.title!==title)button.title=title;
       if(button.getAttribute('aria-label')!==item.title)button.setAttribute('aria-label',item.title);
       button.onclick=()=>run(pluginId,item).catch(error=>{button.title=error.message;console.error('[Forge]',error);});
@@ -230,7 +241,8 @@
   window.addEventListener('keydown',event=>{
     if(event.isComposing||event.repeat||event.defaultPrevented)return;
     const key=[event.ctrlKey?'Ctrl':null,event.altKey?'Alt':null,event.shiftKey?'Shift':null,event.metaKey?'Meta':null,String(event.key).length===1?String(event.key).toUpperCase():event.key].filter(Boolean).join('+');
-    const shortcut=snapshot?.api5?.shortcuts?.find(item=>item.key.toUpperCase()===key.toUpperCase());if(!shortcut||!active(shortcut.pluginId))return;event.preventDefault();run(shortcut.pluginId,{command:shortcut.command}).catch(error=>console.error('[Forge shortcut]',error.message));
+    // Host registrations use this same Ctrl/Alt/Shift/Meta order and upper-case key.
+    const shortcut=snapshot?.api5?.shortcuts?.find(item=>item.key===key&&active(item.pluginId));if(!shortcut)return;event.preventDefault();run(shortcut.pluginId,{command:shortcut.command}).catch(error=>console.error('[Forge shortcut]',error.message));
   });
   ipcRenderer.on('fast-ext:changed',(_event,payload)=>{
     if(payload?.type==='forge-prediction') return;

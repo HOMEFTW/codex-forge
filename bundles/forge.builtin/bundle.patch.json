@@ -22,10 +22,6 @@
       "enabled": true
     },
     {
-      "id": "forge.skills",
-      "enabled": true
-    },
-    {
       "id": "forge.todos",
       "enabled": true
     },

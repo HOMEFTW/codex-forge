@@ -232,6 +232,7 @@ class CollaborationService {
     return { ...codegReport(job, 'running'), agent_type: args.agent_type, working_dir: job.cwd };
   }
   async dispatch(method, args = {}, context = {}) {
+    if (method.startsWith('access_')) { this.hostOnly(context); check(this.bridge, '外部会话连接器尚未就绪'); return this.bridge.manage(method, args, context); }
     switch (method) {
       case 'delegate_to_agent': return this.delegateToAgent(args, context);
       case 'get_delegation_status': return this.codegStatus(args, context);

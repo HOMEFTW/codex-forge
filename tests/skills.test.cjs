@@ -39,7 +39,7 @@ function fixture(t) {
 
 test('all four Codeg packs preserve all 37 skills and every committed resource', t => {
   const { root } = fixture(t);
-  const store = new SkillsStore({ root });
+  const store = new SkillsStore({ root, bundleRoot: path.join(__dirname, '../extensions/codeg-skills/bundled-skills') });
   const snapshot = store.list();
   assert.equal(snapshot.inventory.skills, 37);
   assert.deepEqual(Object.fromEntries(snapshot.packs.map(pack => [pack.id, pack.count])), { experts: 14, science: 13, office: 9, ui: 1 });

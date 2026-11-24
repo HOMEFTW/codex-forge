@@ -12,8 +12,8 @@ const read = relative => JSON.parse(fs.readFileSync(path.join(root, relative), '
 const config = read('forge.config.json');
 const versions = { codex: config.codexVersion, forge: config.version, apiVersion: config.apiVersion };
 
-test('0.7.4 release metadata, API 5 SDK, adapters, bundle and builtins agree', t => {
-  assert.equal(config.version, '0.7.4'); assert.equal(config.apiVersion, 5);
+test('0.7.5 release metadata, API 5 SDK, adapters, bundle and builtins agree', t => {
+  assert.equal(config.version, '0.7.5'); assert.equal(config.apiVersion, 5);
   assert.equal(read('package.json').version, config.version);
   const lock = read('package-lock.json');
   assert.equal(lock.version, config.version); assert.equal(lock.packages[''].version, config.version);
@@ -28,8 +28,8 @@ test('0.7.4 release metadata, API 5 SDK, adapters, bundle and builtins agree', t
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'forge-api4-'));
   t.after(() => fs.rmSync(home, { recursive: true, force: true }));
   const registry = new ForgeRegistry({ root: home, bundledRoot: path.join(root, 'plugins'), versions });
-  const state = registry.list(); assert.deepEqual(state.errors, []); assert.equal(state.plugins.length, 10);
-  assert(!state.plugins.some(plugin => plugin.id === 'forge.nexus' || plugin.id === 'homeftw.nexus'));
+  const state = registry.list(); assert.deepEqual(state.errors, []); assert.equal(state.plugins.length, 9);
+  assert(!state.plugins.some(plugin => ['forge.nexus','homeftw.nexus','forge.skills','homeftw.codeg-skills'].includes(plugin.id)));
   for (const plugin of state.plugins) {
     assert.equal(plugin.apiVersion, config.apiVersion); assert.equal(plugin.version, config.version);
     assert.equal(plugin.enabled, true, plugin.id + ': ' + plugin.reasons.join(';'));

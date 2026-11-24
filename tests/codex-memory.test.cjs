@@ -127,19 +127,35 @@ test('default catalog reads both Codex memory roots and keeps generated Markdown
   assert.throws(() => service.write('memories/raw_memories.md', 'overwrite', service.read('memories/raw_memories.md').hash), /只读/);
 });
 
-test('catalog includes files after hidden entries, counts categories and sees external edits', t => {
+test('catalog includes dot-prefixed notes, counts categories and sees external edits', t => {
   const { memories, service } = fixture(t);
   const first = service.create('Alpha', 'first');
   service.create('Beta', 'second');
   const directory = path.join(memories, 'extensions', 'ad_hoc', 'notes');
   fs.writeFileSync(path.join(directory, '.hidden.md'), 'skip');
-  assert.equal(service.catalog().counts.notes, 2);
-  assert.equal(service.catalog({ category: 'history' }).counts.notes, 2);
+  assert.equal(service.catalog().counts.notes, 3);
+  assert.equal(service.catalog({ category: 'history' }).counts.notes, 3);
   assert.equal(service.catalog({ query: 'second' }).items[0].name, 'Beta');
   fs.writeFileSync(path.join(directory, 'Alpha.md'), 'external update');
   assert.equal(service.catalog({ query: 'external update' }).items[0].id, first.id);
   assert.equal(service.catalog({ root: 'memories' }).roots[0].exists, true);
   assert.throws(() => service.catalog({ root: '../' }), /来源无效/);
+});
+
+test('dot-prefixed names stay discoverable after create and rename, including existing notes', t => {
+  const { memories, service }=fixture(t);
+  const created=service.create('.project','project content');
+  assert.equal(service.list({query:'.project'})[0]?.id,created.id);
+  const renamed=service.rename(created.id,'.renamed',created.hash);
+  assert.equal(service.catalog({query:'project content'}).items[0]?.id,renamed.id);
+  assert.equal(service.list({query:'.project'}).length,0);
+  const directory=path.join(memories,'extensions/ad_hoc/notes');
+  fs.writeFileSync(path.join(directory,'.legacy.md'),'recover existing note');
+  fs.mkdirSync(path.join(directory,'.git'));fs.writeFileSync(path.join(directory,'.git','internal.md'),'skip internal directory');
+  const reopened=new CodexMemory({root:memories});
+  assert.equal(reopened.list({query:'recover existing'})[0]?.name,'.legacy');
+  assert.equal(reopened.list({query:'skip internal'}).length,0);
+  assert.throws(()=>service.create('.'),/标题/);assert.throws(()=>service.rename(renamed.id,'..',renamed.hash),/标题/);
 });
 
 test('renames notes with conflict detection and preserves content without replacing another file', t => {

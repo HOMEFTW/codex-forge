@@ -19,7 +19,28 @@ internal static class UpdaterTests {
     static void Reject(Action action,string name){try{action();}catch{passed++;return;}throw new Exception("Expected failure: "+name);}
     static Dictionary<string,object> Dict(string text){return BootstrapCore.Json.Deserialize<Dictionary<string,object>>(text);}
     static string Hash(byte[] bytes,string directory){string file=Path.Combine(directory,"hash");File.WriteAllBytes(file,bytes);return BootstrapCore.Hash(file);}
+    static async Task BootstrapDownloads(string root) {
+        byte[] good=Encoding.UTF8.GetBytes("abcdefghij"),bad=Encoding.UTF8.GetBytes("XXXXXXXXXX");
+        var adapter=new Dictionary<string,object>{{"packageBytes",10L},{"packageSHA256",Hash(good,root)},{"downloadUrl","https://fixture.invalid/client.msix"}};
+        string file=Path.Combine(root,"bootstrap.msix");int calls=0;
+        var handler=new FixtureHTTP{Response=request=>{calls++;Check(request.Headers.Range==null,"corrupt partial restarts without Range");return new HttpResponseMessage(HttpStatusCode.OK){Content=new ByteArrayContent(good)};}};
+        File.WriteAllBytes(file+".partial",bad);
+        using(var client=new HttpClient(handler))await BootstrapCore.Download(client,adapter,file,(s,p)=>{},CancellationToken.None);
+        Check(calls==1&&BootstrapCore.Hash(file)==(string)adapter["packageSHA256"],"bootstrap replaces completed corrupt partial");
+        File.Delete(file);calls=0;
+        handler=new FixtureHTTP{Response=request=>{calls++;return new HttpResponseMessage(HttpStatusCode.OK){Content=new ByteArrayContent(calls==1?bad:good)};}};
+        using(var client=new HttpClient(handler))await BootstrapCore.Download(client,adapter,file,(s,p)=>{},CancellationToken.None);
+        Check(calls==2&&BootstrapCore.Hash(file)==(string)adapter["packageSHA256"],"bootstrap second attempt downloads after hash failure");
+        File.Delete(file);File.WriteAllText(file+".partial","abcde");calls=0;
+        handler=new FixtureHTTP{Response=request=>{calls++;Check(System.Linq.Enumerable.First(request.Headers.Range.Ranges).From==5,"bootstrap retains resume offset");var response=new HttpResponseMessage(HttpStatusCode.PartialContent){Content=new ByteArrayContent(Encoding.UTF8.GetBytes("fghij"))};response.Content.Headers.ContentRange=new ContentRangeHeaderValue(5,9,10);return response;}};
+        using(var client=new HttpClient(handler))await BootstrapCore.Download(client,adapter,file,(s,p)=>{},CancellationToken.None);
+        Check(calls==1&&BootstrapCore.Hash(file)==(string)adapter["packageSHA256"],"bootstrap valid partial resumes");
+        File.Delete(file);File.WriteAllBytes(file+".partial",good);calls=0;
+        using(var client=new HttpClient(new FixtureHTTP{Response=request=>{calls++;throw new Exception("unexpected network");}}))await BootstrapCore.Download(client,adapter,file,(s,p)=>{},CancellationToken.None);
+        Check(calls==0&&File.Exists(file),"bootstrap verified complete partial needs no download");
+    }
     static async Task Run(string root){
+        await BootstrapDownloads(root);
         var apiRelease=new Dictionary<string,object>{{"schemaVersion",3},{"platform","win32-x64"},{"repository","A/B"},{"distribution","msi-portable"},{"containsOfficialClient",false},{"apiVersion",5},{"forgeVersion","0.7.0"},{"codexVersion","26.1103.7773.0"},{"url","https://github.com/A/B/releases/download/v0.6.0/Forge.msi"},{"sha256",new string('a',64)},{"bytes",100},{"portableUrl","https://github.com/A/B/releases/download/v0.6.0/Forge.zip"},{"portableSha256",new string('b',64)},{"portableBytes",100}};
         ForgeUpdateCore.Validate(apiRelease,"A/B");Check(true,"API 5 release accepted");
         foreach(int api in new[]{1,2,3,4,6}){apiRelease["apiVersion"]=api;Reject(()=>ForgeUpdateCore.Validate(apiRelease,"A/B"),"non API 5 release rejected");}

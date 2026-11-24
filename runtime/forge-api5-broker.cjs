@@ -4,7 +4,7 @@ const {atomic,json}=require('./collaboration-store.cjs');
 const {ForgeError}=require('./forge-errors.cjs');
 function alias(name){return 'forge_'+name.replace(/[^A-Za-z0-9_-]/g,'_').slice(0,42)+'_'+crypto.createHash('sha256').update(name).digest('hex').slice(0,10);}
 class ForgePluginBroker {
-  constructor({root,tools,callTool,contextFor=context=>context}={}){Object.assign(this,{root,tools,callTool,contextFor});this.file=path.join(root,'plugin-broker.json');this.token=crypto.randomBytes(32).toString('hex');this.server=null;this.revision=0;this.controllers=new Set();this.closed=false;this.startPromise=null;this.disposing=null;}
+  constructor({root,tools,callTool,contextFor=context=>context,fileName='plugin-broker.json',nameFor=alias}={}){Object.assign(this,{root,tools,callTool,contextFor,nameFor});this.file=path.join(root,fileName);this.token=crypto.randomBytes(32).toString('hex');this.server=null;this.revision=0;this.controllers=new Set();this.closed=false;this.startPromise=null;this.disposing=null;}
   start(){
     if(this.closed)return Promise.reject(new ForgeError('CAPABILITY_UNAVAILABLE','插件工具宿主已关闭'));
     if(this.startPromise)return this.startPromise;
@@ -14,9 +14,9 @@ class ForgePluginBroker {
       try{
         const chunks=[];let size=0;for await(const chunk of request){size+=chunk.length;if(size>1024*1024)throw new ForgeError('RESOURCE_EXHAUSTED','插件工具参数超过限制');chunks.push(chunk);}
         const input=JSON.parse(Buffer.concat(chunks).toString('utf8')||'{}');let value;
-        if(request.url==='/tools/list')value=this.tools().map(item=>({name:alias(item.name),description:item.description,inputSchema:item.inputSchema,...(item.annotations?{annotations:item.annotations}:{})}));
+        if(request.url==='/tools/list')value=this.tools().map(item=>({name:this.nameFor(item.name),description:item.description,inputSchema:item.inputSchema,...(item.annotations?{annotations:item.annotations}:{})}));
         else if(request.url==='/tools/call'){
-          const definition=this.tools().find(item=>alias(item.name)===input.name);if(!definition)throw new ForgeError('METHOD_NOT_FOUND','插件工具已撤销或不存在');
+          const definition=this.tools().find(item=>this.nameFor(item.name)===input.name);if(!definition)throw new ForgeError('METHOD_NOT_FOUND','插件工具已撤销或不存在');
           const context=this.contextFor(input.context||{});value=await this.callTool(definition.name,input.args||{},context,{signal:controller.signal});
         }else throw new ForgeError('METHOD_NOT_FOUND','未知插件工具代理方法');
         const encoded=JSON.stringify({ok:true,value});if(Buffer.byteLength(encoded)>2*1024*1024)throw new ForgeError('RESOURCE_EXHAUSTED','插件工具结果超过限制');response.writeHead(200,{'content-type':'application/json'});response.end(encoded);

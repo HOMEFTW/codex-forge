@@ -2,7 +2,9 @@ import React, {useEffect,useState} from 'react';
 
 export default function FastModelSettings({plugin,call}) {
   const [value,setValue]=useState(null),[models,setModels]=useState(null),[error,setError]=useState(''),[listError,setListError]=useState(''),[notice,setNotice]=useState(''),[saving,setSaving]=useState(false),[revision,setRevision]=useState(0);
-  useEffect(()=>{let live=true;call('settings',{id:plugin.id}).then(result=>live&&setValue(result)).catch(e=>live&&setError(e.message));return()=>{live=false;};},[plugin.id]);
+  const [ultrafastText,setUltrafastText]=useState('');
+  function load(result){setValue(result);setUltrafastText((result.ultrafastModels||[]).join('\n'));}
+  useEffect(()=>{let live=true;call('settings',{id:plugin.id}).then(result=>live&&load(result)).catch(e=>live&&setError(e.message));return()=>{live=false;};},[plugin.id]);
   useEffect(()=>{
     if(!value)return;
     let live=true;setModels(null);setListError('');
@@ -14,7 +16,7 @@ export default function FastModelSettings({plugin,call}) {
   function change(next){setValue(current=>({...current,...next}));setNotice('');setError('');}
   async function save(){
     setSaving(true);setError('');setNotice('');
-    try{const saved=await call('saveSettings',{id:plugin.id,value});setValue(saved);setNotice('已保存，完整退出并重新启动客户端后生效。');}
+    try{const saved=await call('saveSettings',{id:plugin.id,value:{...value,ultrafastModels:ultrafastText.split(/\r?\n/).map(s=>s.trim()).filter(Boolean)}});load(saved);setNotice('已保存，完整退出并重新启动客户端后生效。');}
     catch(e){setError(e.message);}finally{setSaving(false);}
   }
   return <div className="forge-settings-form forge-fast-settings">
@@ -25,7 +27,7 @@ export default function FastModelSettings({plugin,call}) {
       <label className="forge-fast-toggle"><input type="checkbox" checked={value.enableTerra} disabled={saving} onChange={e=>change({enableTerra:e.target.checked})}/><span>启用 GPT-6.1-Terra 模型与 Fast 支持</span></label>
       <p className="forge-muted">补齐 Terra 模型和 Fast 档位。Fast 的实际可用性与计费由模型服务决定。</p>
       <label className="forge-fast-toggle"><input type="checkbox" checked={value.sol62Context500k} disabled={saving} onChange={e=>change({sol62Context500k:e.target.checked})}/><span>启用 GPT-6.2-Sol 的 500K 上下文</span></label>
-      <label>额外启用 Ultrafast 的模型（每行一个模型 ID）<textarea value={(value.ultrafastModels||[]).join('\n')} disabled={saving} onChange={e=>change({ultrafastModels:e.target.value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean)})}/></label>
+      <label>额外启用 Ultrafast 的模型（每行一个模型 ID）<textarea value={ultrafastText} disabled={saving} onChange={e=>{setUltrafastText(e.target.value);setNotice('');setError('');}}/></label>
       <p className="forge-muted">模型目录自带的 Ultrafast 会自动显示。若自定义服务支持该档位，可在此补充模型 ID；发送独立的 ultrafast 参数，服务不支持时可能拒绝请求。</p>
       <div className="forge-model-heading"><h3>对话中可选择的模型</h3><span>{models?`${visible} / ${models.length} 个显示`:''}</span></div>
       <p className="forge-muted">自动补齐 GPT-6.2-Sol / Astra 及 Fast、Ultrafast 档位；已有模型目录中的能力和限制优先保留。实际可用性与计费以模型服务为准。</p>

@@ -7,7 +7,6 @@ import '@xyflow/react/dist/style.css';
 import './style.css';
 import TodosPanel from './todos.jsx';
 import CollaborationPanel from './collaboration.jsx';
-import SkillsPanel from './skills.jsx';
 import InformationStatsPanel from './information-stats.jsx';
 import CodexMemoryPanel from './codex-memory.jsx';
 import { CanvasHistory, canvasContent, canvasHistoryShortcut, isEditingTarget } from './canvas-history.js';
@@ -76,12 +75,13 @@ function EdgeEditor({ edge, revision, save, remove, register, disabled, locked }
   useEffect(() => { const editor = controller.current, unregister = register(editor); return () => { unregister(); editor.dispose(); }; }, [register]);
   return <fieldset className="edge-editor" disabled={locked}><input aria-label="连线标签" value={draft.label} maxLength={500} placeholder="连线说明" onChange={event => controller.current.change('label', event.target.value)} /><span className="muted" role="status">{status}</span>{controller.current.dirty && /未保存|画布已更新/.test(status) && <button onClick={() => controller.current.discard()}>放弃修改</button>}<button onClick={() => controller.current.flush(true).catch(() => {})}>保存</button><button className="danger" onClick={remove} disabled={disabled}>删除连线</button></fieldset>;
 }
-function CanvasMetaEditor({ doc, save, disabled }) {
+function CanvasMetaEditor({ doc, save, disabled, register }) {
   const [draft, setDraft] = useState({ title: doc.title, description: doc.description || '', color: doc.color || 'neutral' });
   const [status, setStatus] = useState('');
   const controller = useRef(null), saveRef = useRef(save); saveRef.current = save;
   if (!controller.current) controller.current = new CanvasDraft({ value: draft, revision: doc.revision, save: (patch, revision) => saveRef.current({ op: 'set_metadata', ...patch }, undefined, revision), onChange: setDraft, onStatus: setStatus, errorText });
   useEffect(() => { controller.current.context({ title: doc.title, description: doc.description || '', color: doc.color || 'neutral' }, doc.revision); }, [doc.title, doc.description, doc.color, doc.revision]);
+  useEffect(() => register(controller.current), [register]);
   useEffect(() => () => controller.current.dispose(), []);
   return <section className="canvas-meta" aria-label="画布信息"><div className="canvas-meta-heading"><span>画布信息</span><span className="muted" role="status">{status}</span></div><input aria-label="画布标题" value={draft.title || ''} maxLength={200} disabled={disabled} onChange={event => controller.current.change('title', event.target.value)} /><textarea aria-label="画布描述" value={draft.description || ''} maxLength={2000} disabled={disabled} onChange={event => controller.current.change('description', event.target.value)} placeholder="描述这张画布的用途…" /><div className="canvas-meta-actions"><select aria-label="画布颜色" value={draft.color || 'neutral'} disabled={disabled} onChange={event => controller.current.change('color', event.target.value)}><option value="neutral">默认颜色</option><option value="yellow">暖黄</option><option value="blue">蓝色</option><option value="green">绿色</option><option value="pink">粉色</option></select>{controller.current.dirty && <button onClick={() => controller.current.flush(true).catch(() => {})} disabled={disabled}>保存信息</button>}</div></section>;
 }
@@ -91,18 +91,22 @@ function CanvasApp() {
   const [error, setError] = useState(''), [busy, setBusy] = useState(false), [notice, setNotice] = useState(null), [threadId, setThreadId] = useState(null);
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false }), [historyNotice, setHistoryNotice] = useState(''), [loading, setLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null), [lastDeleted, setLastDeleted] = useState(null), [changingCanvas, setChangingCanvas] = useState(false);
+  const [changingContext, setChangingContext] = useState(false), activeThread = useRef(null), contextTransition = useRef(false);
   const current = useRef(null), operations = useRef(Promise.resolve()), pendingFocus = useRef(null), flow = useReactFlow();
   const history = useRef(new CanvasHistory()), editorRef = useRef(null), queued = useRef(0), destination = useRef(null), loadSequence = useRef(0), navigationSequence = useRef(0), selectionSequence = useRef(0);
+  const metadataEditorRef = useRef(null);
   const updateHistory = useCallback(() => setHistoryState(history.current.state()), []);
   const historyInvalidated = useCallback(() => setHistoryNotice('检测到模型或其他窗口的新修改，撤销历史已重置。'), []);
   const registerEditor = useCallback(editor => { editorRef.current = editor; return () => { if (editorRef.current === editor) editorRef.current = null; }; }, []);
+  const registerMetadataEditor = useCallback(editor => { metadataEditorRef.current = editor; return () => { if (metadataEditorRef.current === editor) metadataEditorRef.current = null; }; }, []);
   const clearCanvasView = useCallback(() => {
     ++loadSequence.current; ++selectionSequence.current; editorRef.current?.dispose(); editorRef.current = null;
+    metadataEditorRef.current?.dispose(); metadataEditorRef.current = null;
     current.current = null; destination.current = null; pendingFocus.current = null; history.current = new CanvasHistory();
-    setDoc(null); setNodes([]); setEdges([]); setSelected(null); setEdgeId(null); setNotice(null); setHistoryNotice(''); setDeleteConfirm(null); updateHistory();
+    setDoc(null); setNodes([]); setEdges([]); setSelected(null); setEdgeId(null); setNotice(null); setHistoryNotice(''); setDeleteConfirm(null); setLoading(false); updateHistory();
   }, [updateHistory]);
   async function flushEditor() {
-    try { await editorRef.current?.flush(); await operations.current.catch(() => {}); return true; }
+    try { await editorRef.current?.flush(); await metadataEditorRef.current?.flush(); await operations.current.catch(() => {}); return true; }
     catch (failure) { setError(errorText(failure)); return false; }
   }
   const sync = useCallback(value => {
@@ -117,13 +121,13 @@ function CanvasApp() {
     if (value.lastChange?.source === 'model') setNotice(value.lastChange);
   }, [flow, edgeId, historyInvalidated, updateHistory]);
   const syncRef = useRef(sync); syncRef.current = sync;
-  async function load(canvasId, activate = false) {
+  async function load(canvasId, activate = false, select = false) {
     if (activate) destination.current = canvasId;
     if (destination.current !== canvasId) return;
     const sequence = ++loadSequence.current;
     if (activate) setLoading(true);
     try {
-      const value = await api.request('read', { canvasId });
+      const value = await api.request('read', { canvasId, ...(select ? { select: true, threadId: activeThread.current } : {}) });
       if (sequence !== loadSequence.current || destination.current !== canvasId) return;
       syncRef.current(value); setError('');
     } catch (failure) { if (sequence === loadSequence.current) { destination.current = current.current?.id || null; setError(errorText(failure)); } }
@@ -132,26 +136,42 @@ function CanvasApp() {
   async function chooseCanvas(canvasId) {
     const sequence = ++navigationSequence.current;
     if (!await flushEditor() || sequence !== navigationSequence.current) return;
-    await load(canvasId, true);
+    await load(canvasId, true, true);
   }
   async function reconcileRemovedCanvas(canvasId, values) {
     setCanvases(values);
     if (current.current?.id !== canvasId && destination.current !== canvasId) return;
     if (destination.current && destination.current !== canvasId) return;
     clearCanvasView();
-    if (values.length) await load(values[0].id, true);
-    else setLoading(false);
   }
   async function refreshCanvasList(changedId) {
     const canvasId = current.current?.id, navigation = navigationSequence.current;
     const values = await api.request('list');
-    if (navigation !== navigationSequence.current) return;
+    if (navigation !== navigationSequence.current || contextTransition.current) return;
     setCanvases(values);
     if (canvasId && current.current?.id === canvasId && !values.some(value => value.id === canvasId)) {
       await reconcileRemovedCanvas(canvasId, values); return;
     }
     if (canvasId && (!changedId || changedId === canvasId)) await load(canvasId);
-    else if (!current.current && !destination.current && values.length) await load(values[0].id, true);
+  }
+  async function followContext(value, opened = false) {
+    const nextThread = value.threadId || null, changed = nextThread !== activeThread.current;
+    if (!opened && !changed && (value.type !== 'canvas-context' || value.canvasId === destination.current)) return;
+    const sequence = ++navigationSequence.current; ++loadSequence.current;
+    contextTransition.current = true; setChangingContext(changed); setLoading(true);
+    try {
+      const saved = await flushEditor();
+      if (sequence !== navigationSequence.current) return;
+      if (changed) { clearCanvasView(); setLastDeleted(null); activeThread.current = nextThread; setThreadId(nextThread); }
+      else if (!saved) return;
+      if (opened) { setMode(value.mode || 'right'); setPage(value.page || 'canvas'); }
+      const selection = Object.prototype.hasOwnProperty.call(value, 'canvasId') ? value : await api.request('selection', { threadId: nextThread });
+      if (sequence !== navigationSequence.current) return;
+      if (value.nodeIds?.length) pendingFocus.current = value.nodeIds;
+      if (selection.canvasId) await load(selection.canvasId, true);
+      else clearCanvasView();
+    } catch (failure) { if (sequence === navigationSequence.current) setError(errorText(failure)); }
+    finally { if (sequence === navigationSequence.current) { contextTransition.current = false; setChangingContext(false); setLoading(false); } }
   }
   const commit = useCallback((ops, message, expectedRevision, explicitCanvasId, action = 'edit') => {
     const canvasId = explicitCanvasId || current.current?.id;
@@ -185,24 +205,16 @@ function CanvasApp() {
       setCanvases(value.canvases); setNotes(value.notes);
       if (initialNavigation !== navigationSequence.current) return;
       setMode(value.panel?.mode || 'right'); setPage(value.panel?.page || 'canvas');
-      setThreadId(value.threadId || null);
-      const id = value.panel?.canvasId || value.canvases[0]?.id;
+      activeThread.current = value.threadId || null; setThreadId(activeThread.current);
+      const id = Object.prototype.hasOwnProperty.call(value, 'canvasId') ? value.canvasId : value.panel?.canvasId;
       if (id) await load(id, true);
     }).catch(failure => setError(errorText(failure)));
     return api.subscribe(value => {
-      if (value.type === 'open') {
-        const sequence = ++navigationSequence.current;
-        flushEditor().then(async ok => {
-          if (!ok || sequence !== navigationSequence.current) return;
-          setMode(value.mode || 'right'); setPage(value.page || 'canvas'); setThreadId(value.threadId || null);
-          if (value.nodeIds?.length) pendingFocus.current = value.nodeIds;
-          if (value.canvasId) await load(value.canvasId, true);
-        });
-      }
+      if (value.type === 'open') followContext(value, true);
       if (value.type === 'refresh') {
         refreshCanvasList(value.canvasId).catch(failure => setError(errorText(failure)));
       }
-      if (value.type === 'context') setThreadId(value.threadId || null);
+      if (value.type === 'context' || value.type === 'canvas-context') followContext(value);
       if (value.type === 'mode') setMode(value.mode || 'right');
     });
   }, []);
@@ -216,7 +228,7 @@ function CanvasApp() {
     const sequence = ++navigationSequence.current;
     if (!await flushEditor() || sequence !== navigationSequence.current) return;
     try {
-      const value = await api.request('create', { title: `画布 ${canvases.length + 1}` });
+      const value = await api.request('create', { title: `画布 ${canvases.length + 1}`, threadId: activeThread.current });
       if (sequence !== navigationSequence.current) { setCanvases(await api.request('list')); return; }
       ++loadSequence.current; destination.current = value.id; setLoading(false); syncRef.current(value); setCanvases(await api.request('list'));
     }
@@ -289,12 +301,15 @@ function CanvasApp() {
     operations.current = work; await work;
   }
   async function restoreCanvas() {
-    const removed = lastDeleted;
+    const removed = lastDeleted, navigation = navigationSequence.current, threadId = activeThread.current;
     if (!removed?.restoreToken || queued.current || !await flushEditor()) return;
     queued.current++; setBusy(true); setChangingCanvas(true);
     const work = operations.current.catch(() => {}).then(async () => {
       try {
         const result = await api.request('restore', { restoreToken: removed.restoreToken });
+        if (navigation !== navigationSequence.current) return;
+        await api.request('read', { canvasId: result.canvas.id, select: true, threadId });
+        if (navigation !== navigationSequence.current) return;
         ++loadSequence.current; destination.current = result.canvas.id; setDeleteConfirm(null); setCanvases(result.canvases); syncRef.current(result.canvas); setError('');
         setLastDeleted(value => value?.restoreToken === removed.restoreToken ? null : value);
       } catch (failure) { setError(errorText(failure)); await refreshCanvasList().catch(() => {}); }
@@ -320,15 +335,14 @@ function CanvasApp() {
   if (page.startsWith('forge-')) return <ForgePanel api={api} page={page} onClose={close}/>;
   if (page === 'todos') return <TodosPanel key={threadId || 'personal'} {...panelProps}/>;
   if (page === 'collaboration') return <CollaborationPanel key={threadId || 'settings'} {...panelProps}/>;
-  if (page === 'skills') return <SkillsPanel {...panelProps}/>;
   if (page === 'information-stats') return <InformationStatsPanel key={threadId || 'global'} {...panelProps}/>;
   if (page === 'codex-memory') return <CodexMemoryPanel {...panelProps}/>;
   if (page === 'updates' && notes) return <Notes notes={notes} close={close} />;
-  return <main className={`canvas-app ${mode}`}>
+  return <main className={`canvas-app ${mode}`} aria-busy={changingContext} style={changingContext ? { visibility: 'hidden' } : undefined}>
     <header className="topbar"><span className="canvas-symbol">▧</span><strong>无限画布</strong><span className="badge">Forge</span><div className="spacer"/><button onClick={onMode} title={mode === 'right' ? '展开画布' : '在右侧栏打开'} aria-label={mode === 'right' ? '展开画布' : '在右侧栏打开'}>{mode === 'right' ? '⛶' : '◧'}</button><button onClick={close} aria-label="关闭面板">×</button></header>
     <div className="canvas-picker"><select aria-label="选择画布" value={doc?.id || ''} disabled={blocked} onChange={event => chooseCanvas(event.target.value)}><option value="" disabled>选择画布</option>{canvases.map(value => <option key={value.id} value={value.id}>{value.title}</option>)}</select><button onClick={createCanvas} disabled={blocked}>新建画布</button>{doc && <button className="danger" aria-label="删除当前画布" onClick={beginDeleteCanvas} disabled={blocked}>删除画布</button>}</div>
     <div className="canvas-preview-list" aria-label="画布预览">{canvases.map(value => <button key={value.id} className={`canvas-preview ${doc?.id === value.id ? 'active' : ''}`} onClick={() => chooseCanvas(value.id)} disabled={blocked}><span className={`canvas-swatch ${value.color || 'neutral'}`} /><span className="canvas-preview-copy"><strong>{value.title}</strong><small>{value.description || '暂无描述'} · {value.nodes || 0} 个节点{value.groups ? ` · ${value.groups} 个分组` : ''}</small></span><span className="canvas-thumbnail">{(value.preview || []).slice(0, 8).map(rect => <i key={rect.id} className={rect.type} style={{ left: `${Math.max(0, Math.min(86, rect.x / 12))}%`, top: `${Math.max(0, Math.min(72, rect.y / 12))}%`, width: `${Math.max(8, Math.min(44, rect.width / 12))}%`, height: `${Math.max(8, Math.min(30, rect.height / 12))}%` }} />)}</span></button>)}</div>
-    {doc && <CanvasMetaEditor doc={doc} disabled={blocked} save={(ops, message, revision) => commit(ops, message, revision, doc.id)} />}
+    {doc && <CanvasMetaEditor key={doc.id} doc={doc} register={registerMetadataEditor} disabled={blocked} save={(ops, message, revision) => commit(ops, message, revision, doc.id)} />}
     {deleteConfirm && <div className="canvas-delete-confirm" role="alertdialog" aria-label="确认删除画布"><strong>删除“{deleteConfirm.title}”？</strong><p>所有节点和连线将一起移入回收站，可撤销删除。</p>{doc?.revision !== deleteConfirm.revision && <p>画布已有新修改，请取消后重新确认。</p>}<div><button onClick={() => setDeleteConfirm(null)} disabled={busy}>取消</button><button className="danger" aria-label="确认删除画布" onClick={deleteCanvas} disabled={busy || doc?.revision !== deleteConfirm.revision}>确认删除</button></div></div>}
     {lastDeleted && <div className="canvas-delete-notice" role="status"><span>已删除“{lastDeleted.title}”</span><button onClick={restoreCanvas} disabled={blocked}>撤销删除</button><button onClick={() => setLastDeleted(null)} aria-label="关闭画布删除提示">×</button></div>}
     {doc && <div className="tools">{Object.keys(labels).map(type => <button key={type} onClick={() => addNode(type)} disabled={blocked}>＋{labels[type]}</button>)}<div className="spacer"/><button aria-label="撤销画布修改" onClick={() => travelHistory('undo')} disabled={blocked || !historyState.canUndo} title="撤销（Ctrl/Cmd+Z；文字输入框使用文字撤销）">↶ 撤销</button><button aria-label="重做画布修改" onClick={() => travelHistory('redo')} disabled={blocked || !historyState.canRedo} title="重做（Ctrl+Y / Ctrl/Cmd+Shift+Z）">↷ 重做</button><button aria-label="删除所选内容" onClick={() => deleteItems(selectedNodeIds, selectedEdgeIds)} disabled={blocked || (!selectedNodeIds.length && !selectedEdgeIds.length)} title="删除所选节点和连线（Delete）">删除</button><button onClick={() => flow.fitView({ padding: .25, duration: 200, maxZoom: 1 })} title="显示全部节点">适应</button></div>}
@@ -336,7 +350,7 @@ function CanvasApp() {
     {error && <div role="alert" className="error"><span>{error}</span><button onClick={() => setError('')} aria-label="关闭错误">×</button></div>}
     {notice && doc && <div className="model-notice"><span>{notice.message || '模型已更新画布'}</span><button onClick={() => flow.fitView({ nodes: notice.nodeIds.map(id => ({ id })), padding: .35, duration: 250, maxZoom: 1.1 })}>定位修改</button><button onClick={() => setNotice(null)} aria-label="关闭修改提示">×</button></div>}
     <div className="flow-container">
-      {!doc ? <div className="empty"><div className="empty-icon">▧</div><h2>让想法在这里连接</h2><p>添加文字、便签和文件。<br/>对模型说“帮我编辑无限画布”，即可协作。</p><button className="primary" onClick={createCanvas} disabled={blocked}>创建第一张画布</button></div> : <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onNodeClick={(_event, node) => selectItem(node.id, null)} onEdgeClick={(_event, edge) => selectItem(null, edge.id)} onPaneClick={() => selectItem(null, null)} onNodeDragStop={(_event, node, moved) => saveMovement(moved?.length ? moved : [node])} onConnect={connectNodes} nodesDraggable={!blocked} nodesConnectable={!blocked} deleteKeyCode={null} minZoom={.08} maxZoom={2.5} fitView attributionPosition="bottom-right"><Background gap={22} size={1} color="#c5cbd0"/><Controls showInteractive={false}/></ReactFlow>}
+      {!doc ? <div className="empty"><div className="empty-icon">▧</div><h2>当前对话尚未选择画布</h2><p>从上方选择已有画布，或新建一张。<br/>在对话中选择后，下次进入这个对话会恢复。</p><button className="primary" onClick={createCanvas} disabled={blocked}>新建画布</button></div> : <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onNodeClick={(_event, node) => selectItem(node.id, null)} onEdgeClick={(_event, edge) => selectItem(null, edge.id)} onPaneClick={() => selectItem(null, null)} onNodeDragStop={(_event, node, moved) => saveMovement(moved?.length ? moved : [node])} onConnect={connectNodes} nodesDraggable={!blocked} nodesConnectable={!blocked} deleteKeyCode={null} minZoom={.08} maxZoom={2.5} fitView attributionPosition="bottom-right"><Background gap={22} size={1} color="#c5cbd0"/><Controls showInteractive={false}/></ReactFlow>}
     </div>
     {selectedNode && <Editor key={doc.id + selectedNode.id} node={{ ...selectedNode, allItems: doc.nodes }} revision={doc.revision} register={registerEditor} disabled={blocked} locked={loading || changingCanvas || !!deleteConfirm} save={(ops, message, revision) => commit(ops, message, revision, doc.id)} remove={() => deleteItems([selectedNode.id], [])} reveal={() => api.request('reveal', { canvasId: doc.id, nodeId: selectedNode.id }).catch(failure => setError(errorText(failure)))} />}
     {edgeId && doc?.edges.some(edge => edge.id === edgeId) && <EdgeEditor key={doc.id + edgeId} edge={doc.edges.find(edge => edge.id === edgeId)} revision={doc.revision} register={registerEditor} disabled={blocked} locked={loading || changingCanvas || !!deleteConfirm} save={(ops, message, revision) => commit(ops, message, revision, doc.id)} remove={() => deleteItems([], [edgeId])} />}

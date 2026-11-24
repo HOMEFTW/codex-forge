@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "apiVersion": 5,
-  "version": "0.7.4",
+  "version": "0.7.5",
   "compatibility": {
     "codex": [
       "26.1106.6628.0",
@@ -17,7 +17,7 @@
       "26.1117.4957.0"
     ],
     "forge": [
-      "0.7.4"
+      "0.7.5"
     ]
   },
   "permissions": [
@@ -36,6 +36,13 @@
     }
   ],
   "changelog": [
+    {
+      "version": "0.7.5",
+      "date": "2026-11-24",
+      "items": [
+        "修复 Ultrafast 模型列表逐行输入时换行消失。"
+      ]
+    },
     {
       "version": "0.6.3",
       "date": "2026-11-12",

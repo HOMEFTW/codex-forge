@@ -8,7 +8,7 @@ const { ThreadContexts, userSubmission } = require('./context.cjs');
 const { CollaborationService } = require('./collaboration.cjs');
 const { atomic } = require('./collaboration-store.cjs');
 const { NativeDirectHistory } = require('./native-direct-history.cjs');
-const { SkillsStore } = require('./skills.cjs');
+const { InstalledSkills } = require('./skills.cjs');
 const { ApprovalQueue, ApprovalProcessor, settled } = require('./approval-broker.cjs');
 const { runCodexReview } = require('./approval-reviewer.cjs');
 const { NativeApprovals } = require('./native-approvals.cjs');
@@ -36,7 +36,7 @@ function install() {
   app.on('browser-window-created',(_event,win)=>{try{win.setIcon(path.join(__dirname,'codex-forge.ico'));}catch{}});
   const store = new CanvasStore(process.env.CODEX_FAST_CANVAS_DIR), states = new Map();
   const todos = new TodoStore(store.root), contexts = new ThreadContexts(store.root);
-  const skills = new SkillsStore({ root: path.join(store.root, 'skills') });
+  const skills = new InstalledSkills({ root: path.join(store.root, 'skills'), registry: () => forge?.registry });
   const collaboration = new CollaborationService({ root: path.join(store.root, 'collaboration'), nodePath: path.join(process.resourcesPath || '', 'cua_node/bin/node.exe'), promptCatalog: agent => skills.promptCatalog(agent) });
   const directHistory = new NativeDirectHistory(collaboration.store), nativeRequests = new Map(), internalRequests = new Map();
   const statistics = new InformationStats({ root:path.join(store.root,'information-stats'),
@@ -45,7 +45,7 @@ function install() {
   const codexMemory = new CodexMemory();
   const nexus = new NexusService({ root: path.join(store.root, 'nexus') });
   const informationContexts = new Map();
-  const pages = new Set(['canvas', 'updates', 'todos', 'collaboration', 'skills', 'information-stats', 'codex-memory']);
+  const pages = new Set(['canvas', 'updates', 'todos', 'collaboration', 'information-stats', 'codex-memory']);
   let forge;
   const sampleOwners = new Map();
   const predictionSettings = () => {
@@ -90,7 +90,8 @@ function install() {
     if (next !== predictionSettingsKey) { predictionSettingsKey = next; predictions.refresh(); }
   };
   const active = id => !forge || forge.enabled(id);
-  let signalNonce = ''; const contextRequests = new Map();
+  const canvasSessions = new (require('./canvas-sessions.cjs').CanvasSessions)({store,states,context:state=>threadContext({sender:state.win.webContents},state).threadId,open,notify,enabled:()=>active('forge.canvas')});
+  const contextRequests = new Map();
   const report = error => console.error('[FAST extension]', error.message || error);
   const approvalQueue = new ApprovalQueue(collaboration.store), humanApprovals = new NativeApprovals({ states }), promptAuthorizationRequests = new Map();
   function requestPromptAuthorization(state, captured) {
@@ -117,14 +118,14 @@ function install() {
     try { for (const request of approvalQueue.list()) if (!settled.has(request.state)) approvalProcessor.process(request.id).catch(report); } catch (error) { report(error); }
   }, 350);
   approvalTimer.unref?.();
-  function nativeCall(state, method, params, { signal, timeoutMs = 15000, prediction = false } = {}) {
+  function nativeCall(state, method, params, { signal, timeoutMs = 15000, prediction = false, hostConnection = false } = {}) {
     // Normal native chats use the host's app-server connection, and need not
     // establish the legacy renderer RPC bridge exercised by older UI fixtures.
-    const connection = prediction && nativePredictionPolicy.connection;
+    const connection = (prediction || hostConnection) && nativePredictionPolicy.connection;
     if (typeof connection?.sendAppServerRequest === 'function') {
       const check = () => {
         if (signal?.aborted) throw signal.reason || Error('请求已取消');
-        if (state.win.isDestroyed() || connection !== nativePredictionPolicy.connection) throw Error('原生预测连接已变化');
+        if (state.win.isDestroyed() || connection !== nativePredictionPolicy.connection) throw Error('原生会话连接已变化');
       };
       return new Promise((resolve, reject) => {
         const abort = () => reject(signal.reason || Error('请求已取消'));
@@ -247,7 +248,9 @@ function install() {
         if (state.threadId && state.threadId !== nextThreadId) statistics.cancelAutomatic(state.threadId);
         if (state.threadId && !nextThreadId) { state.draftTarget = defaultTarget(); for (const id of state.pendingDraftThreads) state.composerTargets.set(id, defaultTarget()); }
         if(state.threadId!==nextThreadId){forge?.api5.invalidateWindow(state);state.api5Thread=nextThreadId;}
+        const canvasContextChanged = state.threadId !== nextThreadId;
         state.threadId = nextThreadId;
+        if (canvasContextChanged) canvasSessions.changed(state);
         predictions.context(state);
         notify(state, { type: 'refresh' });
       }
@@ -343,7 +346,7 @@ function install() {
   }
   ipcMain.handle('forge:prediction', (event, request) => predictions.request(host(event), request));
   function notify(state, payload) { if (!state.win.isDestroyed()) state.win.webContents.send('fast-ext:changed', payload); }
-  function panelState(state) { return state?.visible ? { mode: state.mode, page: state.page, canvasId: state.canvasId, threadId: threadContext({ sender: state.win.webContents }, state).threadId } : null; }
+  function panelState(state) { return state?.visible ? { mode: state.mode, page: state.page, ...canvasSessions.current(state) } : null; }
   function choose() {
     const focused = BrowserWindow.getFocusedWindow();
     return states.get(focused?.id) || [...states.values()].find(state => !state.win.isDestroyed());
@@ -351,9 +354,9 @@ function install() {
   function open(state, { mode = 'right', page = 'canvas', canvasId, nodeIds = [] } = {}) {
     if (!state) return;
     state.mode = mode === 'expanded' ? 'expanded' : 'right'; state.page = pages.has(page) || forge?.page(page) ? page : 'canvas';
-    const owner={canvas:'forge.canvas',todos:'forge.todos',collaboration:'forge.collaboration',skills:'forge.skills','information-stats':'forge.information-stats','codex-memory':'forge.codex-memory'}[state.page];
+    const owner={canvas:'forge.canvas',todos:'forge.todos',collaboration:'forge.collaboration','information-stats':'forge.information-stats','codex-memory':'forge.codex-memory'}[state.page];
     if(owner && !active(owner)) throw Error('此插件已停用');
-    if (canvasId) state.canvasId = canvasId;
+    if (canvasId) canvasSessions.remember(state, canvasSessions.check(state), canvasId);
     state.visible = true; state.win.webContents.send('fast-ext:panel', panelState(state));
     notify(state, { type: 'open', ...panelState(state), nodeIds });
   }
@@ -398,7 +401,7 @@ function install() {
     const state = host(event), context = threadContext(event, state);
     if (threadId !== undefined && threadId !== context.threadId) throw Error('当前对话已变化，请重新选择智能体');
     if (!active('forge.collaboration')) throw Error('智能体协作插件已停用');
-    if (!['capabilities', 'set_thread', 'direct', 'composer_target'].includes(method)) throw Error('不支持的原生协作操作');
+    if (!['capabilities', 'set_thread', 'direct', 'composer_target', 'access_snapshot', 'access_enabled', 'access_grant', 'access_revoke'].includes(method)) throw Error('不支持的原生协作操作');
     if (method === 'composer_target') {
       if (!['codex', 'claude', 'grok', 'dsh'].includes(args.agent)) throw Error('不支持的智能体');
       for (const field of ['model', 'reasoningEffort']) if (args[field] !== undefined && (typeof args[field] !== 'string' || args[field].length > 200 || /[\r\n\0]/.test(args[field]))) throw Error('模型或思考强度无效');
@@ -411,11 +414,12 @@ function install() {
   });
   ipcMain.handle('fast-ext:canvas', async (event, { method, args = {} } = {}) => {
     const state = host(event);
-    const owner = method?.startsWith('todo_') ? 'forge.todos' : method === 'collaboration' ? 'forge.collaboration' : method?.startsWith('skills_') ? 'forge.skills' : ['list','read','create','apply','delete','restore','asset','attach','reveal'].includes(method) ? 'forge.canvas' : null;
+    const owner = method?.startsWith('todo_') ? 'forge.todos' : method === 'collaboration' ? 'forge.collaboration' : ['selection','list','read','create','apply','delete','restore','asset','attach','reveal'].includes(method) ? 'forge.canvas' : null;
     if(owner && !active(owner)) throw Error('插件已停用：'+owner);
     switch (method) {
       case 'forge': return forge.management(event,args.method,args.args);
-      case 'bootstrap': return { canvases: store.list(), panel: panelState(state), threadId: threadContext(event, state).threadId, notes: JSON.parse(fs.readFileSync(path.join(__dirname, 'release-notes.json'), 'utf8')) };
+      case 'bootstrap': return { canvases: store.list(), panel: panelState(state), ...canvasSessions.current(state), notes: JSON.parse(fs.readFileSync(path.join(__dirname, 'release-notes.json'), 'utf8')) };
+      case 'selection': canvasSessions.check(state, args.threadId); return canvasSessions.current(state);
       case 'todo_read': case 'todo_apply': {
         const context = threadContext(event, state), threadId = args.threadId === 'personal' ? 'personal' : context.threadId;
         if (!threadId || (args.threadId && args.threadId !== threadId)) throw Error('待办不属于当前对话');
@@ -424,16 +428,12 @@ function install() {
       case 'collaboration': {
         const context = threadContext(event, state);
         if (args.threadId && args.threadId !== context.threadId) throw Error('协作面板已切换到其他对话，请刷新');
-        if (['set_thread', 'direct', 'capabilities'].includes(args.method)) throw Error('此操作需通过原生客户端协作入口执行');
+        if (['set_thread', 'direct', 'capabilities'].includes(args.method) || args.method?.startsWith('access_')) throw Error('此操作需通过原生客户端协作入口执行');
         return collaboration.dispatch(args.method, args.args || {}, context);
       }
-      case 'skills_list': return skills.list(args);
-      case 'skills_read': return skills.read(args.id, args);
-      case 'skills_files': return skills.files(args.id, args);
-      case 'skills_set': return skills.setEnabled(args.id, args.enabled, args.agent || 'codex');
       case 'list': return store.list();
-      case 'read': { const doc = store.read(args.canvasId); state.canvasId = doc.id; return doc; }
-      case 'create': { const doc = await store.create(args.title); state.canvasId = doc.id; return doc; }
+      case 'read': { const doc = store.read(args.canvasId); if (args.select === true) canvasSessions.remember(state, canvasSessions.check(state, args.threadId), doc.id); return doc; }
+      case 'create': { const threadId = canvasSessions.check(state, args.threadId), doc = await store.create(args.title); canvasSessions.remember(state, threadId, doc.id); return doc; }
       case 'apply': return store.apply(args.canvasId, args.expectedRevision, args.operations, 'user', args.message);
       case 'delete': {
         const result = await store.delete(args.canvasId, args.expectedRevision);
@@ -465,12 +465,8 @@ function install() {
     if (!file || (!file.endsWith('.json') && !file.endsWith('.jsonl'))) return;
     clearTimeout(refreshTimer); refreshTimer = setTimeout(() => {
       try {
-        const signalFile = path.join(store.root, '.open.json');
         try {
-          if (fs.existsSync(signalFile)) {
-            const signal = JSON.parse(fs.readFileSync(signalFile, 'utf8'));
-            if (signal.nonce !== signalNonce) { signalNonce = signal.nonce; store.read(signal.id); open(choose(), { canvasId: signal.id, nodeIds: signal.nodeIds }); }
-          }
+          canvasSessions.signal();
         } catch (error) { report(error); }
         for (const state of states.values()) {
           notify(state, { type: 'refresh', canvasId: state.canvasId });
@@ -486,6 +482,7 @@ function install() {
   forge = require('./forge-host.cjs').installForge({ipcMain,dialog,host,threadContext,nativeCall,nativeMessage:(state,message)=>{if(!state.bridge) throw Error('原生连接尚未就绪'); return state.bridge.handler(state.bridge.event,message);},open,notify,states,collaboration,nexus,predictions,
     nodePath:path.join(process.resourcesPath||__dirname,'cua_node/bin/node.exe'),executable:path.join(process.resourcesPath||__dirname,'codex.exe'),safeStorage:require('./forge-secrets.cjs').systemCredentials(()=>require('electron').safeStorage),
     services:{canvas:store,todos,skills,memory:codexMemory,statistics,collaboration,
+      agentCall:require('./collaboration-bridge.cjs').createConversationCall({states,contexts,directHistory,nativeCall:(state,method,params,options)=>nativeCall(state,method,params,{...options,hostConnection:true}),available:state=>!!state.bridge||typeof nativePredictionPolicy.connection?.sendAppServerRequest==='function'}),
       toolContext:value=>{if(!value.threadId)throw Error('插件工具缺少原生对话绑定');const binding=contexts.binding(value.threadId);if(!binding.cwd)throw Error('插件工具对话未绑定工作目录');const state=[...states.values()].find(item=>item.threadId===value.threadId);return {threadId:value.threadId,cwd:binding.cwd,...(state?{windowId:state.win.webContents.id,generation:state.api5Generation||0}:{})};},
       statisticsContext:context=>informationContext({sender:context.state.win.webContents},context.state),
       modelContext:async context=>{const value=await informationContext({sender:context.state.win.webContents},context.state);return {...context,model:value.model,provider:value.provider,effort:value.effort};}},

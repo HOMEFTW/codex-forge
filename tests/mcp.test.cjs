@@ -8,7 +8,7 @@ const readline = require('node:readline');
 test('real stdio MCP initializes and edits persistent canvas; conflict is reported', async t => {
   const testOutput = path.resolve(__dirname, '../output/mcp'); fs.mkdirSync(testOutput, { recursive: true });
   const root = fs.mkdtempSync(path.join(testOutput, 'test-'));
-  const child = spawn(process.env.FAST_TEST_NODE || process.execPath, [path.resolve(__dirname, '../runtime/mcp.cjs')], { env: { ...process.env, CODEX_FAST_CANVAS_DIR: root }, windowsHide: true });
+  const child = spawn(process.env.FAST_TEST_NODE || process.execPath, [path.resolve(__dirname, '../runtime/mcp.cjs')], { env: { ...process.env, CODEX_FAST_CANVAS_DIR: root, CODEX_HOME: path.join(root, 'codex'), CODEX_FORGE_HOME: path.join(root, 'forge') }, windowsHide: true });
   let stderr = ''; child.stderr.on('data', data => { stderr += data; });
   t.after(() => { child.kill(); fs.rmSync(root, { recursive: true, force: true }); });
   const pending = new Map(); let next = 0;
@@ -16,7 +16,8 @@ test('real stdio MCP initializes and edits persistent canvas; conflict is report
   const request = (method, params) => new Promise((resolve, reject) => { const id = ++next, timer = setTimeout(() => reject(new Error('MCP timeout: ' + stderr)), 15000); pending.set(id, reply => { clearTimeout(timer); resolve(reply); }); child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n'); });
   const initialized = await request('initialize', { protocolVersion: '2025-03-26' }); assert.equal(initialized.result.serverInfo.name, 'codex-forge');
   const names = (await request('tools/list')).result.tools.map(tool => tool.name);
-  for (const name of ['canvas_read','todo_apply','collaboration_run','collaboration_read','skill_read','workspace_context']) assert(names.includes(name));
+  for (const name of ['canvas_read','todo_apply','collaboration_run','collaboration_read','workspace_context']) assert(names.includes(name));
+  assert.equal(names.includes('skill_read'), false);
   const call = async (name, args) => (await request('tools/call', { name, arguments: args })).result;
   const doc = JSON.parse((await call('canvas_create', { title: '协议测试' })).content[0].text);
   const changed = await call('canvas_apply', { canvasId: doc.id, expectedRevision: 0, operations: [{ op: 'upsert_node', node: { id: 'n', type: 'sticky', x: 0, y: 0, width: 250, height: 180, data: { text: '模型通过实际 MCP 修改' } } }] });

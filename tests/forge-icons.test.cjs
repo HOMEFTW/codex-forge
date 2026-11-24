@@ -6,8 +6,8 @@ test('contribution icon accepts only bounded path data and a fixed viewport',()=
 });
 test('sidebar contributions render SVG safely, track compact mode and remount, and disappear on disable',async()=>{
   const all=[],calls=[];
-  function element(tag){const attrs={};const el={tagName:tag,children:[],dataset:{},style:{},className:'',parentElement:null,getAttribute:n=>attrs[n],setAttribute(n,v){attrs[n]=v;},append(...children){for(const child of children){child.remove();child.parentElement=this;this.children.push(child);}},remove(){if(this.parentElement)this.parentElement.children=this.parentElement.children.filter(x=>x!==this);this.parentElement=null;},querySelector(q){return this.children.find(x=>q==='span'&&x.tagName==='span');}};Object.defineProperty(el,'textContent',{get(){return this.text||this.children.map(x=>x.textContent).join('');},set(v){this.text=v;this.children=[];}});all.push(el);return el;}
-  const left=element('nav'),menu=element('menu'),body=element('body'),canvas=element('button'),label=element('span');canvas.className='native-sidebar';canvas.append(label);left.append(canvas);
+  function element(tag){const attrs={};const el={tagName:tag,children:[],dataset:{},style:{cssText:''},className:'',parentElement:null,getAttribute:n=>attrs[n],setAttribute(n,v){attrs[n]=v;},append(...children){for(const child of children){child.remove();child.parentElement=this;this.children.push(child);}},remove(){if(this.parentElement)this.parentElement.children=this.parentElement.children.filter(x=>x!==this);this.parentElement=null;},querySelector(q){return this.children.find(x=>q==='span'&&x.tagName==='span');}};Object.defineProperty(el,'textContent',{get(){return this.text||this.children.map(x=>x.textContent).join('');},set(v){this.text=v;this.children=[];}});all.push(el);return el;}
+  const left=element('nav'),menu=element('menu'),body=element('body'),canvas=element('button'),label=element('span');canvas.className='native-sidebar fast-canvas-entry';canvas.style.cssText='width: 240px; height: 32px; visibility: hidden;';canvas.append(label);left.append(canvas);
   const icon={viewBox:'0 0 24 24',paths:['M12 2L14 10L22 12L14 14L12 22L10 14L2 12L10 10z']};
   const plugin={id:'test.icon',name:'Icon',enabled:true,builtin:false,permissions:['sidebar'],contributes:{sidebar:[{id:'open',title:'星枢',panel:'main',icon}]}};
   const snapshot={plugins:[plugin],dynamic:[],output:[],context:{},slots:{entries:[]}};
@@ -16,8 +16,9 @@ test('sidebar contributions render SVG safely, track compact mode and remount, a
   const sandbox={document,window:{addEventListener(){}},require:()=>({ipcRenderer:ipc,contextBridge:{exposeInMainWorld(){}}}),console,setTimeout,clearTimeout};
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../runtime/forge-preload.cjs'),'utf8'),sandbox);
   await sandbox.__forgeBridge.refresh();const button=left.children.find(x=>x!==canvas);assert(button);assert.equal(menu.children.length,0);assert.equal(button.children[0].tagName,'svg');assert.equal(button.children[0].children[0].getAttribute('d'),icon.paths[0]);assert.equal(button.getAttribute('aria-label'),'星枢');
+  assert.equal(button.className,canvas.className);assert.equal(button.style.cssText,'width: 240px; height: 32px; ');
   await button.onclick();assert(calls.some(x=>x.method==='openPanel'&&x.args.id==='test.icon'));
-  label.style.display='none';await sandbox.__forgeBridge.refresh();assert.equal(button.querySelector('span').style.display,'none');
+  canvas.style.cssText='width: 36px; height: 36px;';label.style.display='none';await sandbox.__forgeBridge.refresh();assert.equal(button.querySelector('span').style.display,'none');assert.equal(button.style.cssText,canvas.style.cssText);
   const replacement=element('nav');replacement.append(canvas);await sandbox.__forgeBridge.refresh();assert.equal(button.parentElement,replacement);
   plugin.enabled=false;await sandbox.__forgeBridge.refresh();assert.equal(button.parentElement,null);
 });

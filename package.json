@@ -1,9 +1,11 @@
 {
   "name": "codex-forge",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "private": true,
   "type": "module",
   "scripts": {
+    "build:codeg-skills": "node scripts/build-codeg-skills.mjs",
+    "build:agent-connector": "node scripts/build-agent-connector.mjs",
     "build": "node scripts/build-ui.mjs",
     "test": "node --test tests/*.test.cjs",
     "build:client": "node scripts/build-client.mjs",

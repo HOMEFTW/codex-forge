@@ -17,7 +17,7 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
   const updateResults = pluginUpdates.applyPending(registry);
   config.githubRepository = json(path.join(root,'updates.json'),{}).repository || config.githubRepository;
   const dynamic = new Map(), outputFile = path.join(root, 'output.json');
-  let output = json(outputFile, {}), currentUpdate = null, api5;
+  let output = json(outputFile, {}), currentUpdate = null, api5, agentBridge;
   const updateConfig = () => ({ ...config, ...json(path.join(root, 'updates.json'), {}) });
   const publicContext = (event, state) => ({ threadId: threadContext(event, state).threadId, generation:state.api5Generation||0,codexVersion: config.codexVersion, forgeVersion: config.version, apiVersion: config.apiVersion });
   // 提前算好未授予能力的方法，让 SDK 在插件侧就能拿到可读的拒绝原因；
@@ -27,7 +27,7 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
     const reason = granted(manifest, method);
     return reason ? [[method, reason]] : [];
   }));
-  function broadcast() { onRegistryChange(); api5?.sync().catch(error=>api5.logHostError(error)); for (const state of states.values()) notify(state, { type: 'forge-refresh' }); }
+  function broadcast() { onRegistryChange(); api5?.sync().catch(error=>api5.logHostError(error)); agentBridge?.sync().catch(error=>api5.logHostError(error)); for (const state of states.values()) notify(state, { type: 'forge-refresh' }); }
   function broadcastPluginEvent(name, value, metadata = {}, threadId = null, sourceState = null) {
     for (const target of states.values()) {
       if (target.win.isDestroyed()) continue;
@@ -131,7 +131,8 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
         const { stageUpdate, recheckPlan } = require('./forge-updates.cjs');
         const plan=recheckPlan(currentUpdate.plan,{config:updateConfig(),plugins:registry.list().plugins.filter(p=>p.enabled),native:currentUpdate.native});
         const result = await stageUpdate(plan, path.join(root, 'updates'));
-        currentUpdate.staged = result; broadcast(); return result;
+        if (!result.opened) currentUpdate.staged = result;
+        broadcast(); return result;
       }
       case 'applyUpdate': {
         check(currentUpdate?.staged, '请先下载并校验匹配更新');
@@ -148,6 +149,11 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
     }
   }
   api5 = new (require('./forge-api5.cjs').ForgeAPI5)({registry,root,services:{...services,nexus},nativeCall,contextFor:threadContext,notify,changed:broadcast,states,dialog,open,nodePath,executable,safeStorage});
+  if (services.agentCall) {
+    agentBridge = new (require('./collaboration-bridge.cjs').CollaborationBridge)({root,call:services.agentCall,enabled:()=>registry.status('forge.collaboration').enabled,nodePath,changed:broadcast});
+    collaboration.bridge = agentBridge;
+    agentBridge.sync().catch(error=>api5.logHostError(error));
+  }
   ipcMain.handle('forge:frame',(event,args={})=>{host(event);return args.dispose?api5.disposeFrame(event,args.frameToken):api5.registerFrame(event,args);});
   ipcMain.handle('forge:authorizeDevtools',(event,{id,fingerprint}={})=>{
     host(event);const entry=registry.permission(id,'devtools');
@@ -244,6 +250,6 @@ function installForge({ ipcMain, dialog, host, threadContext, nativeCall, native
       default: throw new ForgeError('METHOD_NOT_FOUND', 'Forge API 不支持此操作');
     }
   }));
-  return { registry, api5,dispose:()=>api5.dispose(),management: manageWithFallback, snapshot, page: page => ['forge-settings','forge-updates','forge-features','forge-changelog','forge-plugins','forge-extension-info','forge-output'].includes(page) || [...registry.entries.values()].some(e => registry.status(e.manifest.id).enabled && e.manifest.contributes?.panels?.some(v => pageId(e.manifest.id,v.id) === page)), enabled: id => registry.status(id).enabled };
+  return { registry, api5,agentBridge,dispose:async()=>{await Promise.all([agentBridge?.dispose(),api5.dispose()]);},management: manageWithFallback, snapshot, page: page => ['forge-settings','forge-updates','forge-features','forge-changelog','forge-plugins','forge-extension-info','forge-output'].includes(page) || [...registry.entries.values()].some(e => registry.status(e.manifest.id).enabled && e.manifest.contributes?.panels?.some(v => pageId(e.manifest.id,v.id) === page)), enabled: id => registry.status(id).enabled };
 }
 module.exports = { installForge };

@@ -73,6 +73,19 @@ test('API5 cron supports steps, calendar OR semantics and IANA time zones', () =
   assert.throws(() => nextCron('0 25 * * *', from), { code: 'INVALID_ARGUMENT' });
   assert.throws(() => nextCron('0 1 * * *', from, 'Invalid/Zone'), { code: 'INVALID_ARGUMENT' });
 });
+
+test('leap-day cron runs once when due and stays enabled for the next leap year', async t => {
+  let clock=Date.parse('2028-02-28T00:00:00Z'),calls=0;
+  const f=fixture(t,async()=>++calls,{now:()=>clock});
+  const schedule=f.runtime.createSchedule('test.plugin',{name:'leap day',method:'work',timing:{kind:'cron',expression:'0 0 29 2 *',timeZone:'UTC'}});
+  assert.equal(new Date(schedule.nextAt).toISOString(),'2028-02-29T00:00:00.000Z');
+  clock=Date.parse('2028-02-29T00:00:00Z');f.runtime.tick();await delay(5);f.runtime.tick();
+  assert.equal(calls,1);
+  const next=f.runtime.readSchedule('test.plugin',schedule.id);assert.equal(next.enabled,true);
+  assert.equal(new Date(next.nextAt).toISOString(),'2032-02-29T00:00:00.000Z');
+  assert.equal(new Date(nextCron('0 0 29 2 *',Date.parse('2096-02-29T00:00:00Z'))).toISOString(),'2104-02-29T00:00:00.000Z');
+  assert.throws(()=>nextCron('0 0 30 2 *',clock),/没有运行时间/);
+});
 test('API5 task ownership and input bounds reject executable payloads and unknown options', t => {
   const f = fixture(t, async () => null);
   assert.throws(() => f.runtime.start('test.plugin', { method: 'work', context: { threadId: 'forged' } }), { code: 'INVALID_ARGUMENT' });

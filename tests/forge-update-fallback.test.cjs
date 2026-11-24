@@ -1,7 +1,36 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto');
 const {EventEmitter}=require('node:events');
-const {runUpdateAction,launchUpdate,launchIndependentUpdater}=require('../runtime/forge-updates.cjs');
+const {runUpdateAction,stageUpdate,launchUpdate,launchIndependentUpdater}=require('../runtime/forge-updates.cjs');
+
+test('portable client hands off before download and never launches MSI, including nested clients',async t=>{
+  const {root,staged}=installation(t);
+  fs.writeFileSync(path.join(root,'portable.ini'),'');
+  fs.writeFileSync(path.join(root,'bootstrap.json'),'{}');
+  fs.writeFileSync(path.join(root,'CodexForgeUpdater.exe'),'fixture');
+  const nested=path.join(root,'clients','current');fs.mkdirSync(nested,{recursive:true});
+  fs.writeFileSync(path.join(nested,'forge-install.json'),'{}');
+  const calls=[];const spawnProcess=(file,args)=>{calls.push({file,args});const child=new EventEmitter();child.unref=()=>{};queueMicrotask(()=>child.emit('spawn'));return child;};
+  const plan=releasePlan();let downloads=0;
+  const result=await stageUpdate(plan,path.join(root,'downloads'),async()=>{downloads++;throw Error('must not download MSI');},{installRoot:nested,spawnProcess});
+  assert.equal(result.opened,true);assert.equal(result.portable,true);assert.equal(downloads,0);
+  assert.equal(fs.existsSync(path.join(root,'downloads')),false);
+  const applied=await launchUpdate({...staged,repository:plan.repository},nested,null,spawnProcess);
+  assert.equal(applied.portable,true);
+  assert(calls.every(call=>call.file===path.join(root,'CodexForgeUpdater.exe')));
+  assert(calls.every(call=>call.args.includes(root)));
+});
+
+function releasePlan(){const hash=crypto.createHash('sha256').update('fixture').digest('hex');return {schemaVersion:3,platform:'win32-x64',apiVersion:5,forgeVersion:'0.7.5',codexVersion:'26.1117.4957.0',repository:'test/forge',distribution:'msi-portable',containsOfficialClient:false,sha256:hash,bytes:7,portableSha256:hash,portableBytes:7,url:'https://github.com/test/forge/releases/download/v0.7.5/setup.msi',portableUrl:'https://github.com/test/forge/releases/download/v0.7.5/portable.zip',compatible:true};}
+
+test('installed client still downloads, verifies and launches MSI',async t=>{
+  const {root}=installation(t);const plan=releasePlan();const urls=[];
+  const staged=await stageUpdate(plan,path.join(root,'downloads'),async url=>{urls.push(url);return {ok:true,body:[Buffer.from('fixture')]};},{installRoot:root});
+  assert.deepEqual(urls,[plan.url]);assert.equal(path.extname(staged.file),'.msi');
+  let invocation;const child=new EventEmitter();child.unref=()=>{};
+  const result=launchUpdate(staged,root,null,(file,args)=>{invocation={file,args};return child;});child.emit('spawn');
+  assert.equal((await result).scheduled,true);assert.deepEqual(invocation,{file:'msiexec.exe',args:['/i',staged.file,'/passive','/norestart']});
+});
 test('normal update flow stays primary and no compatible release does not open fallback',async()=>{
   let fallback=0;const open=()=>{fallback++;return {message:'opened'};};
   for(const method of ['checkUpdates','stageUpdate','applyUpdate']) {

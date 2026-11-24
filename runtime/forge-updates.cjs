@@ -79,8 +79,25 @@ async function checkUpdates({config,plugins,readJSON=fetchJSON}) {
   if (!native && match.plan && (match.plan.codexVersion !== config.codexVersion || releaseBuildVersion(match.plan) !== (config.codexBuildVersion || config.codexVersion))) { match.plan=null; }
   return {...match,checkedAt:new Date().toISOString(),repository,native:native?{status:blockedVersions.has(native.buildVersion)?'blocked':compare(native.buildVersion,config.codexBuildVersion||config.codexVersion)>0?'available':'up_to_date',version:native.buildVersion,feed:nativeFeed}:{status:'unavailable',error:results[0].reason.message},forge:results[1].status==='fulfilled'?{status:releases.length?'checked':'no_release',releases:releases.length,source:forgeResult?.source,warning:forgeResult?.warning}:{status:'unavailable',error:results[1].reason.message}};
 }
-async function stageUpdate(plan, directory, fetcher=fetch) {
-  validateRelease(plan,plan.repository); check(plan.compatible,'版本或插件不匹配'); fs.mkdirSync(directory,{recursive:true});
+function portableRoot(installRoot) {
+  if (!installRoot) return null;
+  let root=path.resolve(installRoot);
+  for(let depth=0;depth<4;depth++) {
+    if(fs.existsSync(path.join(root,'portable.ini')))return root;
+    if(fs.existsSync(path.join(root,'bootstrap.json')))return null;
+    const parent=path.dirname(root);if(parent===root)break;root=parent;
+  }
+  return null;
+}
+async function openPortableUpdater(root, repository, spawnProcess) {
+  const result=await launchIndependentUpdater(root,repository,spawnProcess);
+  return {...result,portable:true,message:'已打开便携版 ZIP 更新流程。请在更新器中下载并校验，完整退出此客户端后安装。'};
+}
+async function stageUpdate(plan, directory, fetcher=fetch, {installRoot=process.env.CODEX_FORGE_INSTALL_ROOT,spawnProcess=spawn}={}) {
+  validateRelease(plan,plan.repository); check(plan.compatible,'版本或插件不匹配');
+  const portable=portableRoot(installRoot);
+  if(portable)return openPortableUpdater(portable,plan.repository,spawnProcess);
+  fs.mkdirSync(directory,{recursive:true});
   const file=path.join(directory,`codex-forge-${plan.forgeVersion}-${plan.codexVersion}.msi`), temporary=file+'.partial';
   const response=await fetcher(plan.url,{signal:AbortSignal.timeout(30*60*1000)});check(response.ok,'下载失败');
   const fd=fs.openSync(temporary,'wx'), hash=crypto.createHash('sha256');let bytes=0;
@@ -105,6 +122,8 @@ function launchDetached(file, args, spawnProcess, onFailure) {
   });
 }
 function launchUpdate(staged, installRoot, executable, spawnProcess=spawn, onFailure) {
+  const portable=portableRoot(installRoot);
+  if(portable)return openPortableUpdater(portable,staged.repository,spawnProcess);
   check(installRoot&&(fs.existsSync(path.join(installRoot,'forge-payload.json'))||fs.existsSync(path.join(installRoot,'forge-install.json'))),'请从已安装的 Codex Forge 启动');
   const receipt=json(staged.file+'.json');check(receipt.sha256===staged.sha256&&receipt.file===staged.file,'下载记录不匹配');
   // Windows Installer is handed the file directly, so re-hash the staged bytes

@@ -2,19 +2,21 @@
 
 Codex Forge 是面向 Windows Codex 客户端的第三方插件宿主，将模型配置、信息统计、记忆管理、画布、待办和智能体协作集中到原生界面中。它为内置及独立插件提供统一的安装管理、设置入口、会话输出和版本兼容检查。
 
-已发布版本 **0.7.4 / Forge API 5**，适配官方客户端 **26.1117.4957.0（Windows x64，MSIX 身份版本）**。[适配与验证说明](docs/CLIENT-26.1117.4957.0.md)。本项目不是 OpenAI 官方插件 API。
+已发布版本 **0.7.5 / Forge API 5**，适配官方客户端 **26.1117.4957.0（Windows x64，MSIX 身份版本）**。[适配与验证说明](docs/CLIENT-26.1117.4957.0.md)。本项目不是 OpenAI 官方插件 API。
 
 [下载安装包](https://github.com/HOMEFTW/codex-forge/releases/latest) · [更新日志与版本索引](docs/CHANGELOG.md) · [从零开发插件](docs/PLUGIN-DEVELOPMENT-ZERO-TO-ONE.md) · [API 参考](docs/PLUGIN-API.md)
 
-| 下载 0.7.4 | 用途 |
+| 下载 0.7.5 | 用途 |
 | --- | --- |
-| [Windows MSI](https://github.com/HOMEFTW/codex-forge/releases/download/v0.7.4/Codex-Forge-0.7.4-Windows.msi) | 推荐用于首次安装及已有安装版升级。 |
-| [便携 ZIP](https://github.com/HOMEFTW/codex-forge/releases/download/v0.7.4/Codex-Forge-0.7.4-Windows-Portable.zip) | 解压后运行，无需 MSI 安装。 |
-| [独立更新器](https://github.com/HOMEFTW/codex-forge/releases/download/v0.7.4/Codex-Forge-0.7.4-Updater.exe) | 可选备用工具，选择已有 Forge 安装目录后检查、下载或修复。 |
+| [Windows MSI](https://github.com/HOMEFTW/codex-forge/releases/download/v0.7.5/Codex-Forge-0.7.5-Windows.msi) | 推荐用于首次安装及已有安装版升级。 |
+| [便携 ZIP](https://github.com/HOMEFTW/codex-forge/releases/download/v0.7.5/Codex-Forge-0.7.5-Windows-Portable.zip) | 解压后运行，无需 MSI 安装。 |
+| [独立更新器](https://github.com/HOMEFTW/codex-forge/releases/download/v0.7.5/Codex-Forge-0.7.5-Updater.exe) | 可选备用工具，选择已有 Forge 安装目录后检查、下载或修复。 |
+| [Codeg 技能包 0.1.0](https://github.com/HOMEFTW/codex-forge/releases/download/v0.7.5/Codeg-Skills-0.1.0.zip) | 可选独立插件，在插件管理中导入并启用。 |
+| [智能体 MCP 连接器 1.0.0](https://github.com/HOMEFTW/codex-forge/releases/download/v0.7.5/codex-forge-agent-connector-1.0.0.tgz) | 可选 npm 本地安装包，供其他智能体连接共享会话。 |
 
-[SHA-256 校验文件](https://github.com/HOMEFTW/codex-forge/releases/download/v0.7.4/SHA256SUMS.txt) · [完整发布说明](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.7.4)
+[SHA-256 校验文件](https://github.com/HOMEFTW/codex-forge/releases/download/v0.7.5/SHA256SUMS.txt) · [完整发布说明](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.7.5)
 
-Forge API 5 提供插件市场、多来源目录、公共业务服务、会话与模型接口、可信 Node 后端、工具、钩子、流式取消、后台任务、界面插槽、主题及快捷键。详见 [API 5 迁移](docs/API-5-MIGRATION.md)、[SDK](docs/API-5-SDK.md) 与 [实现和验收](docs/API-5-IMPLEMENTATION.md)。API 1–4 的既有协议继续兼容，插件作者仍需声明覆盖 0.7.4 的 Forge 版本范围。
+Forge API 5 提供插件市场、多来源目录、公共业务服务、会话与模型接口、可信 Node 后端、工具、钩子、流式取消、后台任务、界面插槽、主题及快捷键。详见 [API 5 迁移](docs/API-5-MIGRATION.md)、[SDK](docs/API-5-SDK.md) 与 [实现和验收](docs/API-5-IMPLEMENTATION.md)。API 1–4 的既有协议继续兼容，插件作者仍需声明覆盖 0.7.5 的 Forge 版本范围。
 
 ## 主要功能
 
@@ -30,11 +32,10 @@ Forge API 5 提供插件市场、多来源目录、公共业务服务、会话�
 | 中文界面 | 启用原生语言设置，沿用官方中文资源并补充新版桌面文本；可切换其他语言。 |
 | 插件、浏览器与电脑操作 | 原生插件、内置/外部浏览器和 Windows 电脑操作分别配置，保留账号策略和操作授权；Windows 电脑操作使用官方运行时。 |
 | 独立更新器 | 作为可选备用入口，常规升级失败时切换；支持 HTTP 代理、续传、SHA-256 校验、增量回退以及 MSI / 便携升级。 |
-| 无限画布 | 管理节点、连线、图片和分组，支持缩放、撤销、重做与恢复；模型可读取和编辑画布。 |
+| 无限画布 | 管理节点、连线、图片和分组，支持缩放、撤销、重做与恢复；按对话记住所选画布，启动首页和新对话保持空白，模型更新只打开所属对话的画布。 |
 | 待办清单 | 管理个人及会话待办，支持状态、排序、计划、延后、重试和删除恢复。 |
-| 智能体协作 | 对接 Claude Code、Grok Build 和 DSH，管理模型、思考档位、消息与结果回读；协作默认关闭，按对话授权启用。 |
+| 智能体协作 | 对接 Claude Code、Grok Build 和 DSH；提供[外部智能体 MCP 连接器](docs/AGENT-CONNECTOR.md)，按会话授权读取内容、发送消息和追加指令，默认关闭。 |
 | 分级审批 | 沿用 CLI 原生审批，并支持在协作面板配置 Codex 审核及人工处理流程。 |
-| Codeg 技能包 | 提供四组 37 项技能及参考资源，按智能体独立启用；第三方工具和服务需自行配置。 |
 
 原生工具栏提供 **帮助 → 升级 → 插件管理**。插件面板使用原生右侧标签页，设置集中在 **客户端设置 → Codex Forge 插件设置**。
 
@@ -44,7 +45,11 @@ Forge API 5 提供插件市场、多来源目录、公共业务服务、会话�
 
 插件管理支持启停、卸载以及 GitHub / 私有 HTTPS 服务器更新；安装和更新时检查 Forge、API 与依赖兼容性；Codex 版本限制可选，显式声明时仍校验。兼容版本在插件卡片中默认折叠。新增权限需要重新启用，内置插件随 Forge 更新。“升级”入口会检查官方客户端与 Forge 的发布，并匹配经过验证的版本组合。
 
-**[星枢 Nexus](https://github.com/HOMEFTW/codex-forge-nexus) 是独立插件，需另行安装。** 从[独立插件发布页](https://github.com/HOMEFTW/codex-forge-nexus/releases/latest)选择兼容 Forge 0.7.4 的 ZIP 后导入并启用。旧包若未声明支持 0.7.4，需作者验证并更新兼容范围；宿主不会自动放宽。它提供 Obsidian 笔记阅读与编辑、双链、搜索、关系图谱、数据库等知识库功能；支持范围和 DataviewJS 限制见 [Nexus 使用说明](docs/NEXUS.md)。插件开发参考 [开发教程](docs/PLUGIN-DEVELOPMENT-ZERO-TO-ONE.md)、[API 参考](docs/PLUGIN-API.md)、[API 5 迁移](docs/API-5-MIGRATION.md) 与 [更新协议](docs/UPDATES.md)。
+**[Codeg 技能包](extensions/codeg-skills/README.md) 为可选独立插件**，客户端安装包不再携带技能资源和面板。单独导入 ZIP 并启用后，可使用四组 37 项技能与 237 个参考资源，分别为各智能体勾选；旧版选择保留。停用或卸载后，左栏入口、模型技能工具及协作技能提示一起关闭。开发者执行 `npm run build:codeg-skills` 生成独立安装包。[下载独立技能包 ZIP](https://github.com/HOMEFTW/codex-forge/releases/download/v0.7.5/Codeg-Skills-0.1.0.zip)，需要 Forge 0.7.5 或更新版。
+
+独立插件的左栏按钮沿用内置按钮的悬停过渡、展开与折叠布局，并遵循系统减少动态效果的设置。
+
+**[星枢 Nexus](https://github.com/HOMEFTW/codex-forge-nexus) 是独立插件，需另行安装。** 从[独立插件发布页](https://github.com/HOMEFTW/codex-forge-nexus/releases/latest)选择兼容 Forge 0.7.5 的 ZIP 后导入并启用。旧包若未声明支持 0.7.5，需作者验证并更新兼容范围；宿主不会自动放宽。它提供 Obsidian 笔记阅读与编辑、双链、搜索、关系图谱、数据库等知识库功能；支持范围和 DataviewJS 限制见 [Nexus 使用说明](docs/NEXUS.md)。插件开发参考 [开发教程](docs/PLUGIN-DEVELOPMENT-ZERO-TO-ONE.md)、[API 参考](docs/PLUGIN-API.md)、[API 5 迁移](docs/API-5-MIGRATION.md) 与 [更新协议](docs/UPDATES.md)。
 
 ## 安装与启动
 
@@ -55,11 +60,11 @@ Forge API 5 提供插件市场、多来源目录、公共业务服务、会话�
 
 **MSI 和便携 ZIP 只包含 Forge，不包含官方客户端、Node、MSIX 或用户凭据。** 首次准备需要网络和约 7 GB 临时可用空间。下载支持续传；准备失败后再次启动 Forge 可重试，日志位于安装目录的 `forge-prepare.log`。安装阶段不下载官方客户端，启动 `CodexForge.exe` 后才开始准备。
 
-从 0.6.x 或更早版本首次升级到 **0.7.4 / API 5**，请手动运行上方新版 MSI，或退出便携版后将新版 ZIP 解压到原便携目录，也可使用上方 0.7.4 独立更新器。已发布的旧更新器不接受 API 5 目标清单。
+从 0.6.x 或更早版本首次升级到 **0.7.5 / API 5**，请手动运行上方新版 MSI，或退出便携版后将新版 ZIP 解压到原便携目录，也可使用上方 0.7.5 独立更新器。已发布的旧更新器不接受 API 5 目标清单。
 
 **默认升级流程保持不变：检查 Codex 与 Forge 更新 → 下载并校验 → 安装已验证版本。** 检查、下载或安装失败时，显示原因并切换独立更新器；也可从“升级 → 备用方式”手动打开。没有匹配版本、安装成功或用户取消安装时不会自动切换。独立更新器安装前需要完整退出客户端。
 
-0.7.4 使用 API 5，并兼容 API 1–4 插件的既有公共操作。旧插件可保留 API 声明，由作者验证并将 Forge 范围包含 0.7.4；使用新增接口时需升级到 API 5 并声明相应权限。仅使用公共 API 时可省略 `compatibility.codex`，由宿主承担官方客户端适配。显式的 Codex 范围、权限、能力和依赖仍严格校验，宿主不会改写第三方插件清单。[迁移指南](docs/API-5-MIGRATION.md)。
+0.7.5 使用 API 5，并兼容 API 1–4 插件的既有公共操作。旧插件可保留 API 声明，由作者验证并将 Forge 范围包含 0.7.5；使用新增接口时需升级到 API 5 并声明相应权限。仅使用公共 API 时可省略 `compatibility.codex`，由宿主承担官方客户端适配。显式的 Codex 范围、权限、能力和依赖仍严格校验，宿主不会改写第三方插件清单。[迁移指南](docs/API-5-MIGRATION.md)。
 
 独立更新器为安装目录内的 `CodexForgeUpdater.exe`，开始菜单也有入口；单独下载的更新器可选择现有 Forge 安装目录。[使用与恢复说明](docs/UPDATER.md)。Ultrafast 在模型目录已支持时自动显示；自定义服务可在 Fast 插件中填写支持该档位的模型 ID。
 

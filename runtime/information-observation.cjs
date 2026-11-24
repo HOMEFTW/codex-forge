@@ -4,7 +4,7 @@ const EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ul
 class SessionObservation {
   constructor() {
     this.model = ''; this.effort = ''; this.window = null; this.used = null;
-    this.applied = {}; this.events = []; this.turns = new Set(); this.models = new Map();
+    this.applied = {}; this.events = []; this.turns = new Set(); this.models = new Map(); this.turnModels = new Map();
   }
   add(kind, severity, detail, at, turnId) {
     this.events.push({ kind, severity, detail, at, turnId: turnId || null });
@@ -13,7 +13,7 @@ class SessionObservation {
   observe(record, at) {
     const p = record.payload;
     if (record.type === 'turn_context') {
-      if (p.turn_id) { this.turns.add(p.turn_id); if (this.turns.size > 10000) this.turns.delete(this.turns.values().next().value); }
+      if (p.turn_id) this.turns.add(p.turn_id);
       const model = p.model;
       const effort = p.collaboration_mode?.settings?.reasoning_effort || p.reasoning_effort || p.effort;
       if (typeof model === 'string' && model) {
@@ -22,7 +22,13 @@ class SessionObservation {
           if (/^(gpt-reserve|codex-auto-review)(?:$|-)/i.test(model)) this.add('internal_model', 'warning', `日志记录了内部模型 ${model}`, at, p.turn_id);
           this.window = null; this.used = null;
         }
-        this.models.set(model, (this.models.get(model) || 0) + 1);
+        const key=p.turn_id || `context:${at}`;
+        const previous=this.turnModels.get(key);
+        if(previous!==model) {
+          if(previous) { const count=this.models.get(previous)-1;if(count)this.models.set(previous,count);else this.models.delete(previous); }
+          this.turnModels.set(key,model);
+          this.models.set(model, (this.models.get(model) || 0) + 1);
+        }
         this.model = model;
         if (this.applied.model === model) delete this.applied.model;
       }

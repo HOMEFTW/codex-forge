@@ -22,11 +22,31 @@ test('API5 public canvas/todo services perform real revisioned edits and reject 
  const base=fs.mkdtempSync(path.join(os.tmpdir(),'forge-api5-business-'));t.after(()=>fs.rmSync(base,{recursive:true,force:true}));
  const canvas=new CanvasStore(base),todos=new TodoStore(base),f=fixture(t,['canvas.read','canvas.write','todos.read','todos.write'],{canvas,todos});
  const created=await f.call('canvas.request',{method:'create',args:{title:'Owned'}});assert.equal(created.title,'Owned');assert.equal((await f.call('canvas.request',{method:'read',args:{canvasId:created.id}})).revision,0);
+ assert.equal(canvas.forThread('thread-a'),created.id);
  const todo=await f.call('todos.request',{method:'read'});const changed=await f.call('todos.request',{method:'apply',args:{expectedRevision:todo.revision,operations:[{op:'add',title:'real task'}]}});assert.equal(changed.items[0].title,'real task');
  await assert.rejects(f.call('todos.request',{method:'apply',args:{expectedRevision:todo.revision,operations:[{op:'add',title:'stale'}]}}));
  await assert.rejects(f.call('todos.request',{method:'read',args:{threadId:'other-thread'}}),{code:'PERMISSION_DENIED'});
  const ro=fixture(t,['canvas.read'],{canvas});await assert.rejects(ro.call('canvas.request',{method:'create',args:{title:'denied'}}),{code:'PERMISSION_DENIED'});
 });
+test('API5 skill managers preview disabled resources while read-only consumers cannot',async t=>{
+ const {SkillsStore}=require('../runtime/skills.cjs');
+ const manager=fixture(t,['skills.read','skills.manage']);
+ const skills=new SkillsStore({root:path.join(manager.root,'skills'),bundleRoot:path.join(__dirname,'../extensions/codeg-skills/bundled-skills')});
+ manager.api.services.skills=skills;manager.context.threadId=null;
+ const id=skills.list().skills[0].id;
+ const request=(method,args={})=>manager.call('skills.request',{method,args:{id,...args}});
+ assert.equal((await request('list')).inventory.skills,37);
+ await assert.rejects(request('read'),/disabled/);
+ assert.equal((await request('read',{requireEnabled:false})).id,id);
+ assert.ok((await request('files',{requireEnabled:false})).files.length);
+ const reader=fixture(t,['skills.read'],{skills});reader.context.threadId=null;
+ await assert.rejects(reader.call('skills.request',{method:'read',args:{id,requireEnabled:false}}),{code:'PERMISSION_DENIED'});
+ await request('setEnabled',{enabled:true});
+ assert.equal((await reader.call('skills.request',{method:'read',args:{id}})).id,id);
+ await request('setEnabled',{enabled:false});
+ await assert.rejects(reader.call('skills.request',{method:'read',args:{id}}),/disabled/);
+});
+
 test('API5 frame, thread and generation identities cannot be rebound by a stale caller',async t=>{
  const f=fixture(t,['shell.execute','files.read','jobs.manage']);let executed=0;f.api.io.shell=async()=>{executed++;return {};};
  f.context.threadId='thread-b';await assert.rejects(f.call('shell.execute',{executable:'node'},{threadId:'thread-a'}),{code:'STALE_CONTEXT'});assert.equal(executed,0);

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "homeftw.codeg-skills",
+  "name": "Codeg 技能包",
+  "version": "0.1.0",
+  "apiVersion": 5,
+  "description": "四组 37 项技能及完整参考资源，按 Codex、Claude Code、Grok Build、DSH 分别启用。",
+  "compatibility": { "forge": [">=0.7.5"] },
+  "permissions": ["panels", "sidebar", "skills.read", "skills.manage"],
+  "capabilities": [
+    { "name": "panels", "version": 1 },
+    { "name": "ui", "version": 1 },
+    { "name": "skills", "version": 1 }
+  ],
+  "contributes": {
+    "panels": [{ "id": "main", "title": "Codeg 技能包", "entry": "panel.html", "placement": "right" }],
+    "sidebar": [{
+      "id": "open",
+      "title": "Codeg 技能包",
+      "panel": "main",
+      "icon": { "viewBox": "0 0 24 24", "paths": ["m12 3 9 5-9 5-9-5 9-5Z", "M3 12l9 5 9-5", "M3 16l9 5 9-5"] }
+    }]
+  }
+}

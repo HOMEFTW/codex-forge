@@ -6,6 +6,31 @@ const os = require('node:os');
 const { CanvasStore } = require('../runtime/store.cjs');
 function fixture(t) { const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fast-canvas-test-')); t.after(() => fs.rmSync(root, { recursive: true, force: true })); return new CanvasStore(root); }
 const item = (id = 'n1', type = 'text') => ({ id, type, x: 0, y: 0, width: 260, height: 180, data: { title: '标题', text: '你好', color: 'neutral' } });
+
+test('near-limit canvas round trips and legacy indented files recover all content', async t => {
+  const store=fixture(t),created=await store.create('large','large');
+  const nodes=Array.from({length:126},(_,i)=>({...item('n'+i),data:{text:'x'.repeat(99700)}}));
+  const saved=await store.apply(created.id,0,nodes.map(node=>({op:'upsert_node',node})));
+  const compact=JSON.stringify(saved),legacy=JSON.stringify(saved,null,2)+'\n',limit=12*1024*1024;
+  assert(Buffer.byteLength(compact)<=limit);assert(Buffer.byteLength(legacy)>limit);
+  assert.deepEqual(store.read(saved.id),saved);
+  assert.equal(store.list()[0].nodes,126);
+  assert.equal(fs.readFileSync(store.file(saved.id),'utf8'),compact);
+  fs.writeFileSync(store.file(saved.id),legacy);
+  const recovered=new CanvasStore(store.root);
+  assert.deepEqual(recovered.read(saved.id),saved);
+  assert.equal(recovered.list()[0].nodes,126);
+  const edited=await recovered.apply(saved.id,1,[{op:'set_title',title:'recovered'}]);
+  assert.deepEqual(edited.nodes,nodes);assert.deepEqual(recovered.read(saved.id),edited);
+  const tooLarge={...edited,nodes:[...nodes,{...item('extra'),data:{text:'x'.repeat(100000)}}]};
+  assert.throws(()=>store.save(tooLarge),/Canvas too large/);
+  assert.deepEqual(recovered.read(saved.id),edited,'failed save preserves the recovered document');
+  fs.writeFileSync(store.file(saved.id),JSON.stringify(edited,null,2)+'\n');
+  const removed=await recovered.delete(saved.id,edited.revision);
+  const restored=await recovered.restore(removed.restoreToken);
+  assert.deepEqual(restored.canvas.nodes,nodes);
+  assert.deepEqual(recovered.read(saved.id),restored.canvas);
+});
 test('model/user round trip preserves node IDs, edges and persistent revisions', async t => {
   const store = fixture(t), doc = await store.create('画布', 'test');
   const first = await store.apply(doc.id, 0, [{ op: 'upsert_node', node: item() }, { op: 'upsert_node', node: item('n2', 'sticky') }, { op: 'upsert_edge', edge: { id: 'edge', source: 'n1', target: 'n2', label: '关系' } }], 'model', '模型创建');

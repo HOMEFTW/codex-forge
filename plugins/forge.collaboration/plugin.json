@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "apiVersion": 5,
-  "version": "0.7.4",
+  "version": "0.7.5",
   "compatibility": {
     "codex": [
       "26.1106.6628.0",
@@ -17,7 +17,7 @@
       "26.1117.4957.0"
     ],
     "forge": [
-      "0.7.4"
+      "0.7.5"
     ]
   },
   "permissions": [
@@ -41,6 +41,13 @@
     }
   ],
   "changelog": [
+    {
+      "version": "0.7.5",
+      "date": "2026-11-24",
+      "items": [
+        "新增逐会话授权的本机 MCP 接入，支持读取内容、发送消息和追加指令。"
+      ]
+    },
     {
       "version": "0.6.3",
       "date": "2026-11-12",
@@ -171,7 +178,7 @@
   ],
   "id": "forge.collaboration",
   "name": "智能体协作",
-  "description": "按用户要求启用 Claude Code、Grok Build、DSH，模型与思考档位、直发、结果读取和三级审批。",
+  "description": "按用户要求启用 Claude Code、Grok Build、DSH；提供同机 MCP 连接器，按会话授权外部智能体读取内容、发送消息和追加指令。",
   "contributes": {
     "panels": [
       {

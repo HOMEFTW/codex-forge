@@ -1,6 +1,5 @@
 import React, {useEffect,useState} from 'react';
 import CollaborationPanel from './collaboration.jsx';
-import SkillsPanel from './skills.jsx';
 import FastModelSettings from './fast-settings.jsx';
 import ForgeMarket from './forge-market.jsx';
 import './forge.css';
@@ -16,7 +15,7 @@ function GenericSettings({plugin,call,api,threadId,onClose,prediction}) {
     {Object.entries(fields).map(([key,field])=><label key={key}>{field.title}{field.type==='boolean'?<input type="checkbox" checked={!!value?.[key]} onChange={e=>setValue({...value,[key]:e.target.checked})}/>:plugin.id==='forge.prompt-prediction'&&key==='prompt'?<textarea rows={4} maxLength={field.maxLength} value={value?.[key]??''} onChange={e=>setValue({...value,[key]:e.target.value})}/>:field.type==='array'?<textarea value={(value?.[key]||[]).join('\n')} onChange={e=>setValue({...value,[key]:e.target.value.split(/\r?\n/).filter(Boolean)})}/>:field.enum?<select value={value?.[key]??''} onChange={e=>setValue({...value,[key]:field.type==='number'?Number(e.target.value):e.target.value})}>{field.enum.map(v=><option key={String(v)} value={v}>{String(v)}</option>)}</select>:<input type={field.type==='number'?'number':'text'} min={field.minimum} max={field.maximum} value={value?.[key]??''} onChange={e=>setValue({...value,[key]:field.type==='number'?Number(e.target.value):e.target.value})}/>}</label>)}
     {Object.keys(fields).length>0&&<button disabled={!value} onClick={async()=>{try{await call('saveSettings',{id:plugin.id,value});setNotice(plugin.restartRequired?'已保存，下次启动生效':'已保存');setError('');}catch(e){setError(e.message);}}}>保存设置</button>}
     {notice&&<p role="status">{notice}</p>}
-    {plugin.id==='forge.collaboration'&&plugin.enabled?<CollaborationPanel api={api} threadId={threadId} settingsOnly onClose={onClose}/>:plugin.id==='forge.skills'&&plugin.enabled?<SkillsPanel api={api} onClose={onClose}/>:!Object.keys(fields).length&&<p className="forge-muted">{plugin.enabled?'此插件没有额外的全局设置。':'插件已停用；启用后可使用其功能。'}</p>}
+    {plugin.id==='forge.collaboration'&&plugin.enabled?<CollaborationPanel api={api} threadId={threadId} settingsOnly onClose={onClose}/>:!Object.keys(fields).length&&<p className="forge-muted">{plugin.enabled?'此插件没有额外的全局设置。':'插件已停用；启用后可使用其功能。'}</p>}
   </div>;
 }
 export default function ForgePanel({api,page,onClose}) {
@@ -26,7 +25,7 @@ export default function ForgePanel({api,page,onClose}) {
   const refresh=async()=>{const value=await call('snapshot');setData(value);setRepository(current=>current||value.config.githubRepository||'');if(page==='forge-settings'&&value.settingsPlugin)setSelected(value.settingsPlugin);};
   useEffect(()=>{refresh().catch(e=>setError(e.message));return api.subscribe(event=>{if(['forge-refresh','refresh','context','forge-settings-focus','forge-prediction'].includes(event.type))refresh().catch(e=>setError(e.message));});},[page]);
   useEffect(()=>{if(page==='forge-settings'&&selected&&data){const target=document.getElementById('forge-settings-'+selected);target?.scrollIntoView({block:'start',behavior:'smooth'});target?.focus({preventScroll:true});}},[selected,data?.plugins.length,page]);
-  async function action(name,args={}){setBusy(name);setError('');setNotice('');try{const result=await call(name,args);await refresh();if(['install','installPackage','importDsh','importDshMarket'].includes(name)&&result)setNotice(result.message||('已'+(name==='install'?'安装 ':'导入 ')+(result.packageName||result.id)+'，请在下方审阅权限后启用。'));if((['stagePluginUpdate','applyUpdate','openUpdater'].includes(name)||result?.fallback)&&result)setNotice(result.message);if(name==='uninstall'){setRemove('');setNotice('插件已卸载，设置已保留。');}return result;}catch(e){setError(e.message);}finally{setBusy('');}}
+  async function action(name,args={}){setBusy(name);setError('');setNotice('');try{const result=await call(name,args);await refresh();if(['install','installPackage','importDsh','importDshMarket'].includes(name)&&result)setNotice(result.message||('已'+(name==='install'?'安装 ':'导入 ')+(result.packageName||result.id)+'，请在下方审阅权限后启用。'));if((['stagePluginUpdate','applyUpdate','openUpdater'].includes(name)||result?.fallback||result?.opened)&&result)setNotice(result.message);if(name==='uninstall'){setRemove('');setNotice('插件已卸载，设置已保留。');}return result;}catch(e){setError(e.message);}finally{setBusy('');}}
   const open=page=>action('openPage',{page});
   const plugins=data?.plugins||[];
   return <main className="forge-page"><header><div><small>CODEX FORGE · {data?.versions.forge||'0.7.4'}</small><h1>{titles[page]}</h1></div>{page!=='forge-settings'&&<button aria-label="关闭 Forge 面板" onClick={onClose}>×</button>}</header>

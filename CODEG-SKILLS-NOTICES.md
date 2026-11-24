@@ -1,6 +1,8 @@
 # Codeg 技能包来源与适配说明
 
-本发行版随包保存 Codeg 四组技能的完整文档与参考资源，默认全部停用。
+自 Forge 0.7.5 起，这些资源仅随可选 Codeg 独立插件分发，客户端安装包不携带技能资源。
+
+独立插件包保存 Codeg 四组技能的完整文档与参考资源，默认全部停用。
 专家 14 项、科学研究 13 项、Office 9 项、会话可视化 1 项，共 37 项。
 用户的 Custom 技能属于用户数据，不是 Codeg 内置内容，未被读取或重新分发。
 
@@ -30,7 +32,7 @@ Codeg 来源：https://github.com/spacering-net/codeg ，固定提交
   新版 OfficeCLI 另有 `officecli-word-form`，不属于固定 Codeg 的九项，未计入本包。
 - 会话可视化来自 Codeg `src-tauri/genui/ui-render`，Apache-2.0。
 
-完整机器可读清单位于 `bundled-skills/catalog.json`：每项保留来源仓库、提交、
+完整机器可读清单位于 `extensions/codeg-skills/bundled-skills/catalog.json`：每项保留来源仓库、提交、
 原目录、许可证、全部文件路径、字节数、SHA256。通过 Git 的固定提交 blob 复制，
 不包含源工作区的未追踪、忽略文件或本地配置；原技能与资源未作文字替换。
 `runtime/skills.cjs` 的 `SkillsStore.verify()` 会按固定清单核对随包资源摘要；相关检查包含在 `node scripts/run-tests.mjs` 中。

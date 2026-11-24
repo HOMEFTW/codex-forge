@@ -19,7 +19,7 @@ using System.Reflection;
 
 [assembly: AssemblyTitle("Codex Forge Bootstrap")]
 [assembly: AssemblyProduct("Codex Forge")]
-[assembly: AssemblyVersion("0.7.4.0")]
+[assembly: AssemblyVersion("0.7.5.0")]
 
 internal static class BootstrapCore {
     static BootstrapCore() {
@@ -85,16 +85,20 @@ internal static class BootstrapCore {
     }
     internal static string Quote(string value) { return "\""+value.Replace("\"","\\\"")+"\""; }
     static async Task Download(Dictionary<string,object> adapter,string file,Action<string,int> progress,CancellationToken token) {
+        ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
+        using(var handler=new HttpClientHandler { AllowAutoRedirect=false })using(var http=new HttpClient(handler) { Timeout=TimeSpan.FromHours(2) })
+            await Download(http,adapter,file,progress,token);
+    }
+    internal static async Task Download(HttpClient http,Dictionary<string,object> adapter,string file,Action<string,int> progress,CancellationToken token) {
+        token.ThrowIfCancellationRequested();
         long expected=Convert.ToInt64(adapter["packageBytes"]);string partial=file+".partial";
         if(File.Exists(file)) { if(new FileInfo(file).Length==expected&&Hash(file)==Text(adapter,"packageSHA256"))return;File.Delete(file); }
-        ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
-        using(var handler=new HttpClientHandler { AllowAutoRedirect=false })using(var http=new HttpClient(handler) { Timeout=TimeSpan.FromHours(2) }) {
             for(int attempt=0;;attempt++){try {
+                token.ThrowIfCancellationRequested();
                 long offset=File.Exists(partial)?new FileInfo(partial).Length:0;
                 if(offset>expected){File.Delete(partial);offset=0;}
-                if(offset==expected)break;
-                using(var request=new HttpRequestMessage(HttpMethod.Get,Text(adapter,"downloadUrl"))) {
-                request.Headers.UserAgent.ParseAdd("Codex-Forge/0.7.4");if(offset>0)request.Headers.Range=new System.Net.Http.Headers.RangeHeaderValue(offset,null);
+                if(offset<expected)using(var request=new HttpRequestMessage(HttpMethod.Get,Text(adapter,"downloadUrl"))) {
+                request.Headers.UserAgent.ParseAdd("Codex-Forge/0.7.5");if(offset>0)request.Headers.Range=new System.Net.Http.Headers.RangeHeaderValue(offset,null);
                     using(var response=await http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,token)) {
                         Need(response.StatusCode==HttpStatusCode.OK||response.StatusCode==HttpStatusCode.PartialContent,"官方客户端下载失败：HTTP "+(int)response.StatusCode);
                         if(response.StatusCode==HttpStatusCode.OK)offset=0;
@@ -106,11 +110,13 @@ internal static class BootstrapCore {
                         }
                     }
                 }
-                break;
+                if(new FileInfo(partial).Length!=expected||Hash(partial)!=Text(adapter,"packageSHA256")) {
+                    File.Delete(partial);
+                    throw new InvalidDataException("官方客户端 SHA-256 不匹配");
+                }
+                File.Move(partial,file);return;
             }catch(Exception error){if(error is OperationCanceledException||attempt>=2)throw;progress("下载中断，正在重试…",0);}
             await Task.Delay(1500,token);}
-        }
-        Need(new FileInfo(partial).Length==expected&&Hash(partial)==Text(adapter,"packageSHA256"),"官方客户端 SHA-256 不匹配");File.Move(partial,file);
     }
     internal static bool RunningFrom(string directory) {
         try {

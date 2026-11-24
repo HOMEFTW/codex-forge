@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const root = path.resolve(import.meta.dirname, '..');
+const destination = path.join(root, 'dist', 'agent-connector');
+fs.mkdirSync(destination, { recursive: true });
+fs.copyFileSync(path.join(root, 'runtime', 'collaboration-mcp.cjs'), path.join(destination, 'index.cjs'));
+fs.copyFileSync(path.join(root, 'docs', 'AGENT-CONNECTOR.md'), path.join(destination, 'README.md'));
+fs.writeFileSync(path.join(destination, 'package.json'), JSON.stringify({ name: 'codex-forge-agent-connector', version: '1.0.0', description: 'Local MCP access to user-shared Codex Forge conversations', bin: { 'codex-forge-agent': 'index.cjs' }, files: ['index.cjs', 'README.md'], engines: { node: '>=22' }, license: 'MIT' }, null, 2) + '\n');
+fs.copyFileSync(path.join(root, 'LICENSE'), path.join(destination, 'LICENSE'));
+console.log(destination);

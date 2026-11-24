@@ -81,7 +81,7 @@ test('oct29 native factory registration stays lazy and cold chat captures scope 
   for(const id of ['cold-thread','next-thread']){
     active={node:{},value:{conversationId:id},tabs:new Map(),full:false,get(signal,key){return signal===full?this.full:signal===unavailable?false:signal===tabById?this.tabs.get(key):undefined;}};
     assert.equal(workspace({workspaceWidth:1200}).value,'hook-value');
-    for(const page of ['canvas','todos','collaboration','skills','information-stats','codex-memory','forge-plugins','forge-updates','forge-plugin:homeftw.nexus:main']){
+    for(const page of ['canvas','todos','collaboration','forge-plugin:homeftw.codeg-skills:main','information-stats','codex-memory','forge-plugins','forge-updates','forge-plugin:homeftw.nexus:main']){
       assert.equal(request({action:'open',page,threadId:id}).error,undefined);
       assert.equal(request({action:'mode',page,threadId:id,mode:'expanded'}).result.mode,'expanded');
       const node=exports.Br('fast-workspace').Component({page});

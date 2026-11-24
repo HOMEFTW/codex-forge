@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import './collaboration.css';
+import CollaborationAccess from './collaboration-access.jsx';
 
 const names = { claude: 'Claude Code', grok: 'Grok Build', dsh: 'DeepSeek Harness' };
 const states = { queued: '排队中', running: '运行中', awaiting_approval: '等待审批', completed: '已完成', failed: '失败', cancelled: '已取消', interrupted: '已中断' };
@@ -107,6 +108,7 @@ export default function CollaborationPanel({ api, threadId, mode = 'right', onMo
       <p>{thread?.authorizationPending ? '你已在提示词中明确请求启动协作；当前对话的 Codex 审批通过后会自动开启。' : !threadId ? '先打开一个对话，即可设置协作。也可以在输入框选择智能体直接发送。' : '默认关闭。可在这里开启，或在提示词中明确要求协作；每个对话独立设置。'}</p>
       <div className="fast-collab-participants" aria-label="参与协作的智能体">{Object.entries(names).map(([agent, name]) => <label key={agent}><input type="checkbox" aria-label={`允许 ${name} 协作`} checked={selectedAgents.includes(agent)} disabled={!!busy} onChange={event => selectAgent(agent, event.target.checked)} />{name}</label>)}</div>
     </div>
+    <CollaborationAccess key={threadId || 'global'} request={request} threadId={threadId} expanded={settingsOnly} />
     <nav className="fast-collab-tabs" aria-label="协作面板页签">{!settingsOnly && <button onClick={() => api.request('forge',{method:'openSettings',args:{id:'forge.collaboration'}})}>连接配置</button>}<button aria-selected={tab === 'jobs'} onClick={() => setTab('jobs')}>协作任务<span>{jobs.length}</span></button></nav>
     {error && <p role="alert" className="fast-collab-error">{error}</p>}{notice && <p role="status" className="fast-collab-notice">{notice}</p>}
     {tab === 'settings' ? <section className="fast-collab-settings"><p className="fast-collab-muted">直接使用各智能体已有的本地配置和登录。留空路径自动检测，留空模型沿用默认模型。</p>

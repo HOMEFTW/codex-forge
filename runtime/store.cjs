@@ -3,9 +3,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
+const { atomic, json, identifier } = require('./collaboration-store.cjs');
 const idPattern = /^[A-Za-z0-9_-]{1,80}$/;
 const nodeTypes = new Set(['text', 'sticky', 'image', 'file', 'group']);
 const maxDocumentBytes = 12 * 1024 * 1024;
+// Legacy saves used indentation after validating compact JSON. Allow bounded
+// formatting overhead when reading, then enforce the same logical size limit.
+const maxStoredDocumentBytes = maxDocumentBytes * 2;
 const copy = value => JSON.parse(JSON.stringify(value));
 function check(ok, message) { if (!ok) throw new Error(message); }
 function id(value) { check(typeof value === 'string' && idPattern.test(value), 'Invalid ID'); return value; }
@@ -57,9 +61,22 @@ class CanvasStore {
     this.assetsRoot = path.join(this.root, 'assets'); fs.mkdirSync(this.assetsRoot, { recursive: true });
   }
   file(canvasId) { return path.join(this.root, `${id(canvasId)}.json`); }
+  bindThread(threadId, canvasId) {
+    if (!threadId) return;
+    identifier(threadId); this.read(canvasId);
+    const directory = path.join(this.root, 'canvas-threads'); fs.mkdirSync(directory, { recursive: true });
+    atomic(path.join(directory, threadId + '.json'), { threadId, canvasId });
+  }
+  forThread(threadId) {
+    if (!threadId) return null;
+    identifier(threadId);
+    const binding = json(path.join(this.root, 'canvas-threads', threadId + '.json'), null);
+    if (!binding || binding.threadId !== threadId) return null;
+    try { return this.read(binding.canvasId).id; } catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+  }
   read(canvasId) {
     const file = this.file(canvasId);
-    check(fs.statSync(file).size <= maxDocumentBytes, 'Canvas too large');
+    check(fs.statSync(file).size <= maxStoredDocumentBytes, 'Canvas too large');
     return validateDocument(JSON.parse(fs.readFileSync(file, 'utf8')));
   }
   list() {
@@ -92,7 +109,7 @@ class CanvasStore {
     const target = this.file(doc.id), temporary = `${target}.${crypto.randomUUID()}.tmp`;
     try {
       const handle = fs.openSync(temporary, 'wx');
-      try { fs.writeFileSync(handle, JSON.stringify(doc, null, 2) + '\n'); fs.fsyncSync(handle); } finally { fs.closeSync(handle); }
+      try { fs.writeFileSync(handle, JSON.stringify(doc)); fs.fsyncSync(handle); } finally { fs.closeSync(handle); }
       fs.renameSync(temporary, target);
     } finally { if (fs.existsSync(temporary)) fs.unlinkSync(temporary); }
   }
@@ -196,7 +213,7 @@ class CanvasStore {
   }
   async restore(restoreToken) {
     const file = path.join(this.root, '.trash', `${id(restoreToken)}.json`);
-    check(fs.statSync(file).size <= maxDocumentBytes, 'Canvas too large');
+    check(fs.statSync(file).size <= maxStoredDocumentBytes, 'Canvas too large');
     const original = validateDocument(JSON.parse(fs.readFileSync(file, 'utf8')));
     return this.lock(original.id, () => {
       check(!fs.existsSync(this.file(original.id)), 'A canvas with this ID already exists; the deleted canvas was not overwritten.');
@@ -209,10 +226,11 @@ class CanvasStore {
       return { restored: true, canvas: doc, canvases: this.list() };
     });
   }
-  signal(canvasId, nodeIds = []) {
+  signal(canvasId, nodeIds = [], threadId = null) {
     id(canvasId); check(Array.isArray(nodeIds) && nodeIds.length <= 300, 'Too many focus nodes'); nodeIds.forEach(id);
+    this.bindThread(threadId, canvasId);
     const target = path.join(this.root, '.open.json'), temporary = `${target}.${crypto.randomUUID()}.tmp`;
-    fs.writeFileSync(temporary, JSON.stringify({ id: canvasId, nodeIds, nonce: crypto.randomUUID() })); fs.renameSync(temporary, target);
+    fs.writeFileSync(temporary, JSON.stringify({ id: canvasId, nodeIds, threadId, nonce: crypto.randomUUID() })); fs.renameSync(temporary, target);
   }
   importImage(source) {
     check(path.isAbsolute(source), 'Image path must be absolute');

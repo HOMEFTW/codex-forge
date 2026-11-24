@@ -2,7 +2,6 @@
 ;(() => {
   const { ipcRenderer } = require('electron');
   const collabIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m7.5 7.5 4.5-3 4.5 3M6 10v6l6 4 6-4v-6M8.5 8.8l3.5 2.7 3.5-2.7M12 12v5"/><circle cx="6" cy="8" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="12" cy="20" r="2.2"/></svg>';
-  const skillsIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5"/></svg>';
   const todoIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m3 6 2 2 4-4M12 6h9M12 12h9M12 18h9"/><rect x="3" y="11" width="5" height="5" rx="1"/></svg>';
   const statsIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>';
   const memoryIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 4.5h10a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3z"/><path d="M5 16.5a3 3 0 0 1 3-3h10M9 8h5M9 10.5h6"/></svg>';
@@ -125,7 +124,7 @@
   function controls() {
     let previous = document.getElementById('fast-canvas-entry'); if (!previous?.parentElement) return;
     const compact = previous.querySelector('span')?.style.display === 'none';
-    for (const [page, label, icon] of [['collaboration', '智能体协作', collabIcon], ['skills', '技能包', skillsIcon], ['todos', '待办清单', todoIcon], ['information-stats', '信息统计', statsIcon], ['codex-memory', '记忆管理', memoryIcon]]) {
+    for (const [page, label, icon] of [['collaboration', '智能体协作', collabIcon], ['todos', '待办清单', todoIcon], ['information-stats', '信息统计', statsIcon], ['codex-memory', '记忆管理', memoryIcon]]) {
       let button = document.getElementById(`fast-${page}-entry`);
       if(overview.forgePlugins?.some(p=>p.id==='forge.'+page&&!p.enabled)){button?.remove();continue;}
       if (!button) {
@@ -133,7 +132,7 @@
         button.setAttribute('aria-label', label); button.title = label; button.innerHTML = icon + `<span>${label}</span>`; button.addEventListener('click', () => open(page));
       }
       button.className = previous.className + ' fast-workspace-entry'; button.style.cssText = previous.style.cssText;
-      if (button.style.position === 'fixed') button.style.top = `${54 + 43 * (page === 'collaboration' ? 1 : page === 'skills' ? 2 : page === 'todos' ? 3 : page === 'information-stats' ? 4 : page === 'codex-memory' ? 5 : 6)}px`;
+      if (button.style.position === 'fixed') button.style.top = `${54 + 43 * (page === 'collaboration' ? 1 : page === 'todos' ? 2 : page === 'information-stats' ? 3 : page === 'codex-memory' ? 4 : 5)}px`;
       button.querySelector('span').style.display = compact ? 'none' : '';
       if (previous.nextElementSibling !== button) previous.after(button);
       previous = button;

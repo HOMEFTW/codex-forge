@@ -79,6 +79,7 @@ class CodexMetrics {
     this.effort = '';
     this.agentPath = '/root';
     this.createdAt = null;
+    this.lastAt = 0;
     this.pendingAt = null;
     this.streaming = false;
     this.modernUsage = false;
@@ -111,12 +112,14 @@ class CodexMetrics {
     if (record.type === 'session_meta') {
       if (this.createdAt !== null) return;
       this.createdAt = at;
+      this.lastAt = at;
       this.threadId = typeof payload.id === 'string' ? payload.id : '';
       this.provider = typeof payload.model_provider === 'string' ? payload.model_provider : '';
       this.agentPath = typeof payload.agent_path === 'string' ? payload.agent_path : '/root';
       return;
     }
     if (this.createdAt !== null && at < this.createdAt - 2_000) return;
+    this.lastAt = Math.max(this.lastAt, at);
     this.observation.observe(record, at);
 
     if (record.type === 'turn_context') {
@@ -192,8 +195,6 @@ class CodexMetrics {
 
     key = String(key);
     if (this.seen.has(key)) return;
-    this.seen.add(key);
-    if (this.seen.size > 65_536) this.seen.delete(this.seen.values().next().value);
 
     const duration = this.pendingAt !== null && at >= this.pendingAt && at - this.pendingAt <= 900_000
       ? Math.max(500, at - this.pendingAt)
@@ -209,10 +210,19 @@ class CodexMetrics {
       reasoning: tokens.reasoning_output_tokens,
       tps: duration ? tokens.output_tokens * 1_000 / duration : null,
     };
-    this.records.push(response);
-    if (this.records.length > 120) this.records.shift();
+    this.addResponse(response);
+    this.pendingAt = at;
+    this.streaming = false;
+    this.phase = 'tools';
+  }
 
-    const model = normalizeModel(this.model);
+  addResponse(response) {
+    if (this.seen.has(response.id)) return;
+    this.seen.add(response.id);
+    // Keep usage identities for merging overlapping files; reader eviction
+    // releases these together, while snapshots expose only the last 30 samples.
+    this.records.push(response);
+    const model = normalizeModel(response.model);
     const total = this.totals.get(model) || {
       input: 0, cachedInput: 0, output: 0, reasoning: 0, responses: 0, measuredOutput: 0, measuredMs: 0,
     };
@@ -221,14 +231,11 @@ class CodexMetrics {
     total.output += response.output;
     total.reasoning += response.reasoning;
     total.responses += 1;
-    if (duration) {
+    if (response.durationMs) {
       total.measuredOutput += response.output;
-      total.measuredMs += duration;
+      total.measuredMs += response.durationMs;
     }
     this.totals.set(model, total);
-    this.pendingAt = at;
-    this.streaming = false;
-    this.phase = 'tools';
   }
 
   snapshot(modelName) {
@@ -254,6 +261,29 @@ class CodexMetrics {
       timing: 'end-to-end',
     };
   }
+}
+
+function mergeMetrics(candidates, model) {
+  candidates.sort((a,b)=>a.reader.metrics.lastAt-b.reader.metrics.lastAt);
+  const latest=candidates.at(-1).reader.metrics;
+  const merged=new CodexMetrics();
+  const turnModels=new Map(),turns=new Set(),events=new Map();
+  for(const {reader} of candidates) {
+    const metrics=reader.metrics;
+    for(const response of metrics.records)merged.addResponse(response);
+    merged.malformed+=metrics.malformed;
+    for(const id of metrics.observation.turns)turns.add(id);
+    for(const [id,value] of metrics.observation.turnModels)turnModels.set(id,value);
+    for(const event of metrics.observation.events)events.set(JSON.stringify(event),event);
+  }
+  merged.records.sort((a,b)=>a.endMs-b.endMs);
+  merged.model=latest.model;merged.phase=latest.phase;
+  const observation=latest.observation.snapshot(),models=new Map();
+  for(const model of turnModels.values())models.set(model,(models.get(model)||0)+1);
+  const history=[...events.values()].sort((a,b)=>b.at-a.at).slice(0,80);
+  return {...merged.snapshot(model),provider:latest.provider,effort:latest.effort,
+    observation:{...observation,turns:turns.size,models:[...models].map(([model,turns])=>({model,turns})),events:history,warnings:history.filter(e=>e.severity==='warning').length},
+    reading:candidates.some(({reader,stat})=>reader.offset<stat.size),found:true};
 }
 
 function assess(expected, analysis) {
@@ -471,20 +501,12 @@ class InformationStats {
       if (reader.metrics.threadId === threadId) candidates.push({ reader, stat });
     }
 
-    candidates.sort((left, right) => right.stat.mtimeMs - left.stat.mtimeMs);
-    const selected = candidates[0];
     while (this.readers.size > MAX_OPEN_READERS) this.readers.delete(this.readers.keys().next().value);
     while (this.fileCache.size > MAX_THREAD_CACHES) this.fileCache.delete(this.fileCache.keys().next().value);
-    if (!selected) {
+    if (!candidates.length) {
       return { model: context.model || '', phase: 'idle', latest: null, samples: [], responses: 0, found: false };
     }
-    return {
-      ...selected.reader.metrics.snapshot(context.model),
-      provider: selected.reader.metrics.provider,
-      effort: selected.reader.metrics.effort,
-      reading: selected.reader.offset < selected.stat.size,
-      found: true,
-    };
+    return mergeMetrics(candidates,context.model);
   }
 
   exclusive(key, work) {

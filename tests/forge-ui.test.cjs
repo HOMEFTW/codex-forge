@@ -25,9 +25,9 @@ test('Forge collaboration and management pages retain the 0.1.0 visual contract'
 test('embedded Forge settings panels do not invoke missing close or mode callbacks', () => {
   const forge = fs.readFileSync(path.join(__dirname, '..', 'ui', 'forge.jsx'), 'utf8');
   const collaboration = fs.readFileSync(path.join(__dirname, '..', 'ui', 'collaboration.jsx'), 'utf8');
-  const skills = fs.readFileSync(path.join(__dirname, '..', 'ui', 'skills.jsx'), 'utf8');
+  const skills = fs.readFileSync(path.join(__dirname, '..', 'extensions/codeg-skills/skills.jsx'), 'utf8');
   assert.match(forge, /settingsOnly onClose=\{onClose\}/);
-  assert.match(forge, /<SkillsPanel api=\{api\} onClose=\{onClose\}\/>/);
+  assert.doesNotMatch(forge, /SkillsPanel/);
   assert.match(collaboration, /\{onClose && <button onClick=\{onClose\}/);
   assert.match(skills, /\{onClose && <button onClick=\{onClose\}/);
   assert.match(skills, /\{onMode && <button onClick=\{\(\) => onMode/);
