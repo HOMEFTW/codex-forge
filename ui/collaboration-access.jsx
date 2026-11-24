@@ -1,7 +1,28 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { connectorSetup } from './collaboration-setup.js';
+
+function CopyField({ label, text, rows = 4, disabled = false }) {
+  const field = useRef(null), [status, setStatus] = useState('');
+  useEffect(() => setStatus(''), [text]);
+  async function copy() {
+    try { await navigator.clipboard.writeText(text); setStatus('已复制'); }
+    catch {
+      field.current.focus(); field.current.select();
+      try { setStatus(document.execCommand('copy') ? '已复制' : '请按 Ctrl+C 复制已选中的内容'); }
+      catch { setStatus('请按 Ctrl+C 复制已选中的内容'); }
+    }
+  }
+  return <div className="fast-collab-copy">
+    <div><strong>{label}</strong><button type="button" disabled={disabled} onClick={copy}>复制{label}</button></div>
+    <textarea ref={field} aria-label={label} readOnly rows={rows} value={text} onFocus={event => event.target.select()} spellCheck="false" />
+    {status && <p className="fast-collab-muted" role="status">{status}</p>}
+  </div>;
+}
 
 export default function CollaborationAccess({ request, threadId, expanded = false }) {
   const [value, setValue] = useState(null), [error, setError] = useState(''), [busy, setBusy] = useState(false);
+  const [targetFile, setTargetFile] = useState('');
+  const setup = value && connectorSetup(value.mcpConfig, targetFile);
   useEffect(() => {
     let disposed = false;
     request('access_snapshot').then(result => { if (!disposed) setValue(result); }).catch(failure => { if (!disposed) setError(failure.message); });
@@ -21,7 +42,19 @@ export default function CollaborationAccess({ request, threadId, expanded = fals
       {!threadId && <p className="fast-collab-muted">打开目标会话后，可在这里授权。</p>}
       <p className="fast-collab-muted">“发送”会让目标会话开始或继续工作，沿用它的模型和审批设置。同一系统用户下的连接器共用这些授权。</p>
       {Object.keys(value.threads).length > 0 && <div className="fast-collab-shared"><strong>已共享的会话</strong>{Object.entries(value.threads).map(([id, grant]) => <div key={id}><code title={id}>{id === threadId ? `当前会话 · ${id}` : id}</code><span>{grant.access === 'send' ? '读写' : '只读'}</span><button onClick={() => change('access_revoke', { threadId: id })}>撤销</button></div>)}</div>}
-      <details><summary>连接其他智能体</summary><p>把以下配置合并到目标智能体的 MCP 设置后，重新连接 MCP。连接器随 Forge 提供，无需另外安装 Node.js。</p><textarea aria-label="外部智能体 MCP 配置" readOnly rows={10} value={JSON.stringify(value.mcpConfig, null, 2)} onFocus={event => event.target.select()} spellCheck="false" /><p className="fast-collab-muted">点击配置框即可全选。连接后先使用 forge_conversations_list 查找获准会话。</p></details>
+      <details open><summary>安装到其他智能体</summary>
+        <p>连接器已内置，直接使用 Forge 自带的 Node.js。复制安装提示词交给其他智能体，即可让它配置接入。</p>
+        <label className="fast-collab-install-path">目标 MCP JSON 配置文件<input aria-label="目标 MCP JSON 配置文件" value={targetFile} onChange={event => setTargetFile(event.target.value)} placeholder="填写目标客户端配置文件的绝对路径" spellCheck="false" /></label>
+        <p className="fast-collab-muted">支持 mcpServers 格式的 JSON，安装时保留其他设置并备份原文件。不清楚路径或格式时，可留空并复制安装提示词。</p>
+        <CopyField label="安装命令" text={setup.installCommand} disabled={!targetFile.trim()} />
+        <CopyField label="安装提示词" text={setup.prompt} rows={7} />
+        <p className="fast-collab-muted">命令在 PowerShell 中运行。安装后重新连接 MCP，并调用 forge_conversations_list 检查共享会话。使用便携版移动目录后，请重新配置接入。</p>
+        <details><summary>手动配置与其他客户端格式</summary>
+          <CopyField label="配置查询命令" text={setup.configCommand} />
+          <CopyField label="外部智能体 MCP 配置" text={JSON.stringify(value.mcpConfig, null, 2)} rows={10} />
+          <p className="fast-collab-muted">TOML、JSONC 等格式请按目标客户端要求填写 command 和 args。</p>
+        </details>
+      </details>
     </fieldset>}
   </details>;
 }

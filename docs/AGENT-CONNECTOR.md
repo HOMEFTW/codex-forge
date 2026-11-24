@@ -6,12 +6,31 @@
 
 1. 打开目标会话 → 智能体协作 → **外部智能体 MCP 接入**。
 2. 开启“允许本机 MCP 访问”。为当前会话选择“只读内容”或“读取内容并发送消息 / 指令”。首次使用默认关闭且没有共享会话。
-3. 展开“连接其他智能体”，把生成的 JSON 合并到目标智能体的 MCP 配置，重新连接 MCP。配置包含本机实际 Node、脚本及数据目录路径；随 Forge 提供的 Node 可直接运行，无需额外安装。
+3. 展开“安装到其他智能体”，复制**安装提示词**交给目标智能体。也可以填写其 MCP JSON 配置文件的绝对路径，复制**安装命令**在 PowerShell 执行。命令使用 Forge 自带的 Node、连接器脚本和实际数据目录；无需另外下载连接器或安装 Node.js。
 4. 告诉外部智能体先调用 `forge_conversations_list`，再选择返回的会话 ID 操作。撤销某会话或关闭总开关后，新请求立即被拒绝，尚未完成的请求取消。已被客户端接受的消息会保留。
 
 “外部 MCP 访问”与原来的向 Claude Code / Grok / DSH 派发任务分别授权。外部消息带来源名称，并沿用目标会话的模型、权限和审批规则。名称由发送方填写，供辨认来源使用。会话内容和其他智能体的输出本身不授予额外操作权限。
 
-## 安装独立连接器
+## 客户端内置安装入口
+
+本节命令和页面引导包含在 2026-11-24 重新发布的 0.7.5 安装包中。已安装早期 0.7.5 的用户需手动下载同名新版 MSI 或便携 ZIP 更新；相同版本号不会触发常规更新提示。
+
+内置脚本 `app/resources/fast-extension/collaboration-mcp.cjs` 与 Forge 一起构建和安装。页面根据正在运行的客户端与数据目录生成完整命令，包括便携版的自定义目录。示例（实际路径以页面为准）：
+
+```powershell
+& 'C:\Codex Forge\client\app\resources\cua_node\bin\node.exe' 'C:\Codex Forge\client\app\resources\fast-extension\collaboration-mcp.cjs' --home 'C:\Users\you\.codex\forge' --install 'C:\Users\you\.cursor\mcp.json'
+```
+
+`--install <配置文件>` 适用于顶层 `mcpServers` 格式的 JSON：
+
+- 合并或更新 `mcpServers.codex_forge`，保留其他服务器和其他设置。
+- 修改已有文件前保存同目录 `.bak` 原始副本；配置相同时重复执行不改写文件。
+- JSON 损坏或格式不支持时退出并保留原文件。TOML、JSONC 等格式可用 `--config` 输出连接参数，再按目标客户端要求合并。
+- 安装后在目标智能体中重新连接 MCP，然后调用 `forge_conversations_list` 检查。安装仅配置接入，会话访问仍由 Forge 页面授权。
+
+安装提示词包含同一条本机命令、其他配置格式的处理方法以及连接检查步骤。它只要求配置接入和检查列表，后续会话读写按用户明确授权操作。便携目录移动后，或客户端升级导致脚本路径改变时，请从页面重新生成并执行安装命令。
+
+## 可选独立连接器
 
 [下载发布包](https://github.com/HOMEFTW/codex-forge/releases/download/v0.7.5/codex-forge-agent-connector-1.0.0.tgz)，包名为 `codex-forge-agent-connector-1.0.0.tgz`，只包含脚本、说明及许可证，无运行时 npm 依赖，需要 Node.js 22 或更新版：
 

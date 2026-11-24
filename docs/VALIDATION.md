@@ -1,5 +1,14 @@
 # Forge 验证记录
 
+## 0.7.5 同版本修订 / 内置 MCP 安装引导（2026-11-24）
+
+- `npm run build` 通过，内置连接器与桥接模块已复制到客户端扩展构建目录，逐字节与源码一致。安装命令使用页面返回的实际 Node、脚本和 Forge 数据路径，无需 npm 下载。
+- 连接器安装、会话桥接与协作服务共 34 项针对性测试通过。再用客户端自带 Node.js 运行其中 14 项及真实 app-server 的本地模拟模型测试，共 15 项通过、无跳过；覆盖安装后的 stdio MCP、读取/发送/追加指令、授权撤销，以及中文、空格、单引号和 `$` 路径。日志：`output/mcp-setup-bundled-tests.log`。
+- JSON 配置合并保留其他设置，原文件逐字节备份，相同配置重复安装保持不变；损坏或不支持的配置、缺失参数均拒绝写入。安装不会创建或开启宿主访问授权。
+- Playwright 隔离页面验证 390 / 1024 像素宽度、安装命令和提示词复制、手动配置展开、空路径提示及剪贴板兼容复制；浏览器错误 0。Windows 剪贴板的 CRLF 按换行等价核验，内容完整。记录：`output/mcp-setup-verification.json`，截图：`output/playwright/mcp-setup-narrow.png`、`output/playwright/mcp-setup-wide.png`。
+- 本次同版本修订复用上述通过的功能验证以及初版 0.7.5 的 634 项全量回归、51 项 C# 更新器断言；更新前附件按 GitHub 摘要核验后保留在 `release/archive/v0.7.5-before-mcp-setup-*`。新 MSI / ZIP 逐文件核验与远端回下载记录分别为 `output/release-075-refresh-package-audit.json`、`output/release-075-refresh-github-verification.json`。
+- Forge 版本保持 0.7.5、API 保持 5；正式客户端和其他智能体的真实配置保持原状。真实 MSI 安装/卸载未实测。
+
 ## 0.7.5 / 独立技能包与功能修复（2026-11-24）
 
 - 官方客户端基线保持 `26.1117.4957.0`，API 保持 5。配置、所有适配器、9 个内置插件、组合包和 C# 程序版本同步为 0.7.5；Codeg 独立插件为 0.1.0，要求 Forge >=0.7.5。

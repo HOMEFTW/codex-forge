@@ -15,6 +15,29 @@ const tools = [
 ];
 const failure = (code, message) => Object.assign(Error(message), { code });
 function defaultRoot() { return process.env.CODEX_FORGE_HOME || path.join(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'forge'); }
+function config(root, nodePath = process.execPath, entry = __filename) {
+  return { mcpServers: { codex_forge: { command: nodePath, args: [entry, '--home', path.resolve(root)] } } };
+}
+function installConfig(file, root) {
+  const target = path.resolve(file), server = config(root).mcpServers.codex_forge;
+  let original;
+  try { original = fs.readFileSync(target); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  const value = original ? JSON.parse(original.toString('utf8').replace(/^\uFEFF/, '')) : {};
+  const object = item => item !== null && typeof item === 'object' && !Array.isArray(item);
+  if (!object(value) || (value.mcpServers !== undefined && !object(value.mcpServers))) throw Error('配置必须是包含 mcpServers 对象的 JSON；原文件未修改');
+  if (value.mcp !== undefined || value.mcp_servers !== undefined) throw Error('此客户端使用不同的 MCP 配置格式，请使用 --config 输出并按客户端格式合并；原文件未修改');
+  if (JSON.stringify(value.mcpServers?.codex_forge) === JSON.stringify(server)) return { configFile: target, changed: false, backupFile: null };
+  const updated = { ...value, mcpServers: { ...value.mcpServers, codex_forge: server } };
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  const suffix = require('node:crypto').randomUUID(), temporary = target + '.' + suffix + '.tmp';
+  const backupFile = original ? target + '.' + suffix + '.bak' : null;
+  try {
+    fs.writeFileSync(temporary, JSON.stringify(updated, null, 2) + '\n', { flag: 'wx' });
+    if (backupFile) fs.writeFileSync(backupFile, original, { flag: 'wx' });
+    fs.renameSync(temporary, target);
+  } finally { fs.rmSync(temporary, { force: true }); }
+  return { configFile: target, changed: true, backupFile };
+}
 async function request(root, name, args, signal) {
   let connection;
   try { connection = JSON.parse(fs.readFileSync(path.join(root, 'collaboration-broker.json'), 'utf8')); }
@@ -73,13 +96,22 @@ function serve(root, input = process.stdin, output = process.stdout) {
   return { stop };
 }
 if (require.main === module) {
-  const args = process.argv.slice(2), homeAt = args.indexOf('--home');
-  if (homeAt >= 0 && !args[homeAt + 1]) { console.error('--home 需要 Forge 数据目录'); process.exitCode = 1; }
-  else if (args.includes('--help')) console.log('Codex Forge Agent Connector\n  codex-forge-agent [--home <Forge data directory>]\n  codex-forge-agent --config [--home <Forge data directory>]\n先在 Forge 的智能体协作页面开启外部 MCP 访问，并授权目标会话。');
-  else {
-    const root = homeAt >= 0 ? path.resolve(args[homeAt + 1]) : defaultRoot();
-    if (args.includes('--config')) console.log(JSON.stringify({ mcpServers: { codex_forge: { command: process.execPath, args: [__filename, '--home', root] } } }, null, 2));
+  try {
+    const args = process.argv.slice(2), options = {};
+    for (let i = 0; i < args.length; i++) {
+      const flag = args[i];
+      if (flag === '--home' || flag === '--install') {
+        if (!args[i + 1]?.trim() || args[i + 1].startsWith('--')) throw Error(`${flag} 需要文件或目录路径`);
+        options[flag] = args[++i];
+      } else if (flag === '--config' || flag === '--help') options[flag] = true;
+      else throw Error(`未知参数：${flag}；使用 --help 查看用法`);
+    }
+    if (options['--config'] && options['--install']) throw Error('--config 和 --install 请分别使用');
+    const root = path.resolve(options['--home'] || defaultRoot());
+    if (options['--help']) console.log('Codex Forge Agent Connector\n  codex-forge-agent [--home <Forge data directory>]\n  codex-forge-agent --config [--home <Forge data directory>]\n  codex-forge-agent --install <MCP JSON config file> [--home <Forge data directory>]\n--install 合并 mcpServers.codex_forge，保留其他配置并备份已有文件。\n安装后在目标智能体中重新连接 MCP；在 Forge 的智能体协作页面开启外部 MCP 访问，并授权目标会话。');
+    else if (options['--config']) console.log(JSON.stringify(config(root), null, 2));
+    else if (options['--install']) console.log(JSON.stringify({ ...installConfig(options['--install'], root), nextStep: '在目标智能体中重新连接 MCP，然后调用 forge_conversations_list。需先在 Forge 智能体协作页面开启访问并授权会话。' }, null, 2));
     else serve(root);
-  }
+  } catch (error) { console.error(error.message); process.exitCode = 1; }
 }
-module.exports = { tools, request, serve, defaultRoot };
+module.exports = { tools, request, serve, defaultRoot, config, installConfig };

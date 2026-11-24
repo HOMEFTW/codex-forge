@@ -3,7 +3,7 @@ const path = require('node:path'), crypto = require('node:crypto');
 const { atomic, json, identifier } = require('./collaboration-store.cjs');
 const { ForgePluginBroker } = require('./forge-api5-broker.cjs');
 const { ForgeError } = require('./forge-errors.cjs');
-const { tools } = require('./collaboration-mcp.cjs');
+const { tools, config } = require('./collaboration-mcp.cjs');
 const need = (value, message, code = 'INVALID_ARGUMENT') => { if (!value) throw new ForgeError(code, message); };
 const metadata = thread => ({ id: thread.id, title: thread.name || thread.preview || thread.id, cwd: thread.cwd, status: thread.status, createdAt: thread.createdAt, updatedAt: thread.updatedAt });
 
@@ -17,7 +17,7 @@ class CollaborationBridge {
   }
   settings() { return json(this.file, { enabled: false, threads: {} }); }
   available() { return !this.closed && this.enabled() && this.settings().enabled; }
-  config() { return { mcpServers: { codex_forge: { command: this.nodePath, args: [path.join(__dirname, 'collaboration-mcp.cjs'), '--home', this.root] } } }; }
+  config() { return config(this.root, this.nodePath); }
   snapshot() {
     const settings = this.settings();
     return { ...settings, running: !!this.broker?.server?.listening, mcpConfig: this.config() };

@@ -12,7 +12,7 @@ Codex Forge 是面向 Windows Codex 客户端的第三方插件宿主，将模�
 | [便携 ZIP](https://github.com/HOMEFTW/codex-forge/releases/download/v0.7.5/Codex-Forge-0.7.5-Windows-Portable.zip) | 解压后运行，无需 MSI 安装。 |
 | [独立更新器](https://github.com/HOMEFTW/codex-forge/releases/download/v0.7.5/Codex-Forge-0.7.5-Updater.exe) | 可选备用工具，选择已有 Forge 安装目录后检查、下载或修复。 |
 | [Codeg 技能包 0.1.0](https://github.com/HOMEFTW/codex-forge/releases/download/v0.7.5/Codeg-Skills-0.1.0.zip) | 可选独立插件，在插件管理中导入并启用。 |
-| [智能体 MCP 连接器 1.0.0](https://github.com/HOMEFTW/codex-forge/releases/download/v0.7.5/codex-forge-agent-connector-1.0.0.tgz) | 可选 npm 本地安装包，供其他智能体连接共享会话。 |
+| [智能体 MCP 连接器 1.0.0](https://github.com/HOMEFTW/codex-forge/releases/download/v0.7.5/codex-forge-agent-connector-1.0.0.tgz) | 可选独立包；客户端已内置连接器，可在智能体协作页面配置接入。 |
 
 [SHA-256 校验文件](https://github.com/HOMEFTW/codex-forge/releases/download/v0.7.5/SHA256SUMS.txt) · [完整发布说明](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.7.5)
 

@@ -1,7 +1,7 @@
 'use strict';
 const { test } = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os'), Module = require('node:module'), vm = require('node:vm');
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const { once } = require('node:events');
 const readline = require('node:readline');
 const { CollaborationBridge, createConversationCall } = require('../runtime/collaboration-bridge.cjs');
@@ -121,7 +121,11 @@ test('real Forge host owns connector lifecycle and plugin disable revokes it', a
 });
 
 function mcp(t, root) {
-  const child = spawn(process.execPath, [process.env.FORGE_CONNECTOR_TEST_ENTRY || path.join(__dirname, '../runtime/collaboration-mcp.cjs'), '--home', root], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+  const entry = process.env.FORGE_CONNECTOR_TEST_ENTRY || path.join(__dirname, '../runtime/collaboration-mcp.cjs'), file = path.join(root, 'agent', 'mcp.json');
+  const installed = spawnSync(process.execPath, [entry, '--home', root, '--install', file], { windowsHide: true, encoding: 'utf8', timeout: 10000 });
+  assert.equal(installed.status, 0, installed.stderr);
+  const config = JSON.parse(fs.readFileSync(file)).mcpServers.codex_forge;
+  const child = spawn(config.command, config.args, { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
   const pending = new Map(); let sequence = 0;
   readline.createInterface({ input: child.stdout }).on('line', line => { const msg = JSON.parse(line); const waiter = pending.get(msg.id); if (waiter) { pending.delete(msg.id); clearTimeout(waiter.timer); waiter.resolve(msg); } });
   let stderr = ''; child.stderr.on('data', data => { stderr += data; });
