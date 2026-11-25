@@ -1,5 +1,21 @@
 # Forge 验证记录
 
+## 0.7.6 / Codex 26.1120.5083.0（2026-11-25）
+
+- 官方 x64 MSIX 的 OpenAI 签名有效，包身份、版本、架构、大小及 SHA-256 已核对；原始 ASAR、EXE、31 个前端工厂、预测模块和电脑操作入口分别绑定摘要。新版补丁保持旧适配器独立，加入账号状态、工作区、设置与 Windows CUA 变量变化的回归。
+- 全量 **654 项通过，0 失败、0 跳过**，包括真实 app-server 与本地模拟模型的 MCP 连接器测试；C# 更新器 **51 项断言通过**。UI、启动器、准备程序与独立更新器编译成功。首轮升版检查发现插件更新日志字段和旧版本断言未同步，修正后完整重跑通过。记录：`output/release-076-full-tests-result.json`、`output/release-076-full-tests.tap`、`output/release-076-updater-tests.log`。
+- 新版真实隔离客户端完成 **48 个操作步骤，页面脚本错误 0**：冷启动七个入口、插件设置直达、500K 保存重开、模型显示、设置搜索与悬停、无结果和原生设置、Sol 三档速度、Astra/Terra 切换，以及创建对话时切到新聊天、反复切换旧新聊天、面板展开/退出/关闭/重开。模型按钮会随窗格宽度收起文字，完整视图退出按钮已改名，按新版实际控件完成验收。记录：`output/nov25-ui-verification.json`；截图：`output/playwright/nov25/new-chat-fixed.png`。
+- 新版真实 Codex 引擎对 localhost 模拟模型完成 6 次请求，500K 关闭/开启分别报告 258,400 / 475,000 可用 tokens，各覆盖 Standard、Fast 与 Ultrafast；请求无认证头。原生 MCP 发现 9 个 Forge 工具。记录：`output/nov25-native-258400-gpt-6.2-sol.json`、`output/nov25-native-475000-gpt-6.2-sol.json`、`output/nov25-native-mcp.json`。
+- 隔离构建完整性检查通过：2,972 个文件、15,532 个 ASAR 成员、15,535 个完整性块及 EXE 内嵌摘要，记录：`output/nov25-client-integrity.json`。发行包审计、最终发行载荷构建和 GitHub 回下载记录分别保存为 `output/release-076-package-audit.json`、`output/release-076-client-integrity.json`、`output/release-076-github-verification.json`。
+- Forge API 保持 5，第三方插件兼容范围保持其作者声明。实际远端模型费用、加速效果、Pro 原生预测服务及真实 MSI 安装/卸载未实测；本次发布不替换本机正在使用的客户端。
+
+## 新聊天入口修复（2026-11-24，本地未发布）
+
+- 在真实隔离客户端复现：创建对话后立即进入新聊天，后台旧对话继续渲染，导致全局打开请求落到隐藏页面；请求返回成功，但当前页面没有可见面板。通过 React 布局挂载与清理跟踪实际显示的页面，显式指定作用域的关闭与模式请求仍可定位原面板。
+- 两项新增回归在修复前失败、修复后通过；相关原生标签页、预加载、画布会话及历代适配器共 **89 项通过，0 失败、0 跳过**。旧适配器测试补齐布局生命周期模拟，保留原断言。日志：`output/new-chat-regression.log`。
+- `npm run build` 通过。使用官方 `26.1117.4957.0` 原包构建隔离客户端，验证 **35 个操作步骤**：冷启动、创建对话时进入新聊天、已有对话、再次进入新聊天分别覆盖 7 个侧栏/工具栏入口，另覆盖三轮新旧对话切换、完整视图进入/退出及面板关闭/重开；检查实际可见 iframe 及页面内容，观察期间 `pageerror` 为 0。记录：`output/new-chat-ui-verification.json`。
+- 隔离客户端完整性检查通过：3,156 个文件、15,519 个 ASAR 成员、15,528 个完整性块及 EXE 内嵌摘要；记录：`output/new-chat-client-integrity.json`。Forge 保持 0.7.5 / API 5，本次未发布、未替换正式客户端；旧客户端适配器覆盖自动化夹具，真实界面验收使用上述官方版本。
+
 ## 0.7.5 同版本修订 / 内置 MCP 安装引导（2026-11-24）
 
 - `npm run build` 通过，内置连接器与桥接模块已复制到客户端扩展构建目录，逐字节与源码一致。安装命令使用页面返回的实际 Node、脚本和 Forge 数据路径，无需 npm 下载。

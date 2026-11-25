@@ -7,7 +7,7 @@ const vm = require('node:vm');
 function fixture() {
   const listeners = new Map(), replies = [], calls = [];
   const cb = Symbol('nativeFullWidth'), nb = Symbol('nativeRouteUnavailable'), By = Symbol('nativeThreadId'), HE = Symbol('nativeMemoryLocation'), tb = Symbol('RouteScope');
-  const native = { location: { pathname: '/thread/a', search: '' }, hookScope: null };
+  const native = { location: { pathname: '/thread/a', search: '' }, hookScope: null, hidden: false }, effects = new Map();
   const window = {
     location: { pathname: '/index.html', protocol: 'app:' },
     addEventListener(type, listener) { listeners.set(type, listener); },
@@ -34,7 +34,13 @@ function fixture() {
     Ol(id) { return id.replace(/^client:/, ''); },
     E() { return native.hookScope; },
     Z(signal) { return native.hookScope.get(signal); },
-    kCi: { createElement(type, props) { return { type, props }; } },
+    kCi: {
+      createElement(type, props) { return { type, props }; },
+      useLayoutEffect(effect, [scope]) {
+        effects.get(scope)?.(); effects.delete(scope);
+        if (!native.hidden) effects.set(scope, effect());
+      },
+    },
   };
   const context = vm.createContext(sandbox);
   const source = fs.readFileSync(path.join(__dirname, '../runtime/native-tabs-renderer.js'), 'utf8');
@@ -56,15 +62,45 @@ function fixture() {
       },
     };
   }
-  function remember(value) { context.fastWorkspaceRememberScope(value); return value; }
+  function remember(value, hidden = false) { native.hidden = hidden; context.fastWorkspaceRememberScope(value); native.hidden = false; return value; }
+  function hide(value) { effects.get(value)?.(); effects.delete(value); }
   function request(body, source = window) {
     const id = body.id || 'request-' + replies.length;
     listeners.get('message')({ source, data: { fastWorkspaceNativeRequest: { id, ...body } } });
     const reply = replies.at(-1)?.fastWorkspaceNativeReply;
     return reply?.id === id ? reply : null;
   }
-  return { context, sandbox, native, window, calls, replies, scope, remember, request, descriptor: sandbox.QL.get('fast-workspace') };
+  return { context, sandbox, native, window, calls, replies, scope, remember, hide, request, descriptor: sandbox.QL.get('fast-workspace') };
 }
+
+test('new chat buttons stay in the visible layout when a retained conversation renders later', () => {
+  const f = fixture();
+  // Modern clients keep inactive routes in React Activity and no longer expose HE.
+  delete f.sandbox.HE;
+  const old = f.remember(f.scope('old'));
+  const previous = f.request({ action: 'open', page: 'canvas', threadId: 'old' });
+  f.hide(old);
+  const home = f.remember(f.scope(null, '/', { conversationId: null, clientThreadId: 'client-new-thread:draft', routeKind: 'home' }));
+  f.remember(old, true);
+  for (const page of ['canvas', 'todos', 'collaboration', 'information-stats', 'codex-memory', 'forge-plugins', 'forge-updates', 'forge-plugin:sample.demo:main']) {
+    const reply = f.request({ action: 'open', page, threadId: null });
+    assert.equal(reply.error, undefined);
+    assert(home.tabs.has('fast-workspace:' + page), page + ' opens in the new chat');
+  }
+  assert.equal(old.tabs.size, 1, 'background renders never receive new tabs');
+  f.request({ action: 'close', page: 'canvas', scopeId: previous.result.scopeId, threadId: 'old' });
+  assert.equal(old.tabs.size, 0, 'an explicitly targeted hidden mount can still close');
+  f.hide(home); f.remember(old); f.remember(home, true);
+  assert.equal(f.request({ action: 'open', page: 'codex-memory', threadId: 'old' }).error, undefined);
+  assert(old.tabs.has('fast-workspace:codex-memory'));
+});
+
+test('an unmounted layout cannot receive untargeted opens before the next layout commits', () => {
+  const f = fixture(), old = f.remember(f.scope('old'));
+  f.hide(old);
+  assert.match(f.request({ action: 'open', page: 'forge-plugins', threadId: null }).error, /尚未就绪/);
+  assert.equal(old.tabs.size, 0);
+});
 
 test('registers once and opens each fixed page as a native tab without replacing ordinary tabs', () => {
   const f = fixture(), scope = f.remember(f.scope('a'));

@@ -69,7 +69,7 @@ test('oct29 native factory registration stays lazy and cold chat captures scope 
   vm.runInNewContext('({'+patchRspackFactory(fixture.registry,'EpL9',extension)+'}).EpL9',{window})({},exports,require);
   assert.equal(listeners.length,1);assert.equal(typeof exports.__forgeRememberScope,'function');
   modules.EpL9=exports;
-  modules.QcW8={kF:full};modules.zd8w={createElement:(type,props)=>({type,props})};
+  modules.QcW8={kF:full};modules.zd8w={createElement:(type,props)=>({type,props}),useLayoutEffect:effect=>effect()};
   modules.ZU27={It:{tabById$:tabById,openTab:(scope,tabType,options)=>scope.tabs.set(options.id,{tabId:options.id,tabType,props:options.props}),closeTab:(scope,id)=>scope.tabs.delete(id)}};
   modules.XXJV={yI:(scope,side)=>opened.push([scope.value.conversationId,side])};
   modules.WwnD={xO:(scope,content,layout)=>(scope.full=layout.mode==='full',true)};

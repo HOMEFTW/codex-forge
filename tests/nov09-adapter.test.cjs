@@ -3,6 +3,7 @@ const versions=[{label:'Nov09',version:'26.1103.4239.0',fixture:require('./fixtu
 versions.push({label:'Nov12',version:'26.1106.6628.0',fixture:require('./fixtures/native-rspack-nov12.json'),digest:'785189c1960a47db3c241b9bb84c4a4979c26b79329af5c0019afb016f1e56a3'});
 versions.push({label:'Nov16',version:'26.1111.2228.0',fixture:require('./fixtures/native-rspack-nov16.json'),digest:'9af8619e929f00369a47326717f9515205a0e25dd409bc4c29af62c74c1ed898'});
 versions.push({label:'Nov23',version:'26.1117.4957.0',fixture:require('./fixtures/native-rspack-nov23.json'),digest:'561f0b0c6edc4dbf5f00f33b86e0786ea59a0ff926759813b26770a0e8c4d963'});
+versions.push({label:'Nov25',version:'26.1120.5083.0',fixture:require('./fixtures/native-rspack-nov25.json'),digest:'98d403d0f8d9d39af4af5e0ee084919cee763309ed6cd255a5a8a390c5c0327c'});
 const normalize=v=>JSON.parse(JSON.stringify(v));
 function execute(source,id,modules={},flags={}) {
   const req=id=>{assert(Object.hasOwn(modules,id),'Unexpected dependency '+id);return modules[id];};
@@ -12,19 +13,20 @@ function execute(source,id,modules={},flags={}) {
 for(const {label,version,fixture,digest} of versions) {
 const adapter=require('../adapters/'+version+'.json');
 const access=execute(fixture.eWgO,'eWgO');
-const patchFactory=async()=>label==='Nov23'?(await import('../scripts/native-nov23-patch.mjs')).patchNov23Factory:label==='Nov16'?(await import('../scripts/native-nov16-patch.mjs')).patchNov16Factory:(await import('../scripts/native-nov09-patch.mjs')).patchNov09Factory;
-const accountModule=['Nov16','Nov23'].includes(label)?'UOa8':'EOo5';
+const patchFactory=async()=>label==='Nov25'?(await import('../scripts/native-nov25-patch.mjs')).patchNov25Factory:label==='Nov23'?(await import('../scripts/native-nov23-patch.mjs')).patchNov23Factory:label==='Nov16'?(await import('../scripts/native-nov16-patch.mjs')).patchNov16Factory:(await import('../scripts/native-nov09-patch.mjs')).patchNov09Factory;
+const signalModule=label==='Nov25'?'Q840':label==='Nov23'?'qmMi':'zTeN';
+const accountModule=label==='Nov25'?'h6fL':['Nov16','Nov23'].includes(label)?'UOa8':'EOo5';
 test(label+': adapter retains its signed package and all duplicated speed modules',()=>{
   assert.equal(adapter.codexVersion,version);
   assert.equal(adapter.packageSHA256,digest);
-  assert.equal(adapter.rspackModules.filter(m=>m.id==='ipV4').length,label==='Nov23'?12:label==='Nov16'?8:7);
-  assert.equal(adapter.rspackModules.filter(m=>m.id==='PAzX').length,label==='Nov23'?13:label==='Nov16'?6:label==='Nov12'?8:7);
+  assert.equal(adapter.rspackModules.filter(m=>m.id==='ipV4').length,['Nov23','Nov25'].includes(label)?12:label==='Nov16'?8:7);
+  assert.equal(adapter.rspackModules.filter(m=>m.id==='PAzX').length,label==='Nov25'?7:label==='Nov23'?13:label==='Nov16'?6:label==='Nov12'?8:7);
 });
 test(label+': all selectors retain native and managed restrictions and expose independent Ultrafast',async()=>{
   const patchNov09Factory=await patchFactory();
   for(const original of fixture.fast)for(const enabled of [true,false])for(const method of ['apikey','chatgpt','personalAccessToken','amazonBedrock'])for(const pending of [true,false])for(const requirements of [{},{fast_mode:false},{ultrafast_mode:false}]) {
     const data={requirements:{featureRequirements:requirements},supportsIndependentSpeedModes:true};
-    const modules={QosV:{c:()=>[]},[label==='Nov23'?'qmMi':'zTeN']:{Ul:()=> 'local',_U:()=>({data,isPending:pending})},eWgO:access,tl5a:{Dc:{}},[accountModule]:{tn:()=>({authMethod:method})},B81s:{b9:{}}};
+    const modules={QosV:{c:()=>[]},[signalModule]:{Ul:()=> 'local',_U:()=>({data,isPending:pending})},eWgO:access,tl5a:{Dc:{}},[accountModule]:{tn:()=>({authMethod:method})},B81s:{b9:{}}};
     const flags={fastEnabled:enabled},actual=normalize(execute(patchNov09Factory(original,'ipV4'),'ipV4',modules,flags).U());
     if(method!=='apikey'||!enabled)assert.deepEqual(actual,normalize(execute(original,'ipV4',modules,flags).U()));
     else assert.deepEqual(actual,{serviceTierAccess:pending?null:normalize(access.W6(data)),isLoading:pending});
@@ -44,7 +46,7 @@ test(label+': all request factories send the real ultrafast value and honor poli
 test(label+': browser availability only changes rollout gate and retains WSL, requirements, loading and config',async()=>{
   const patchNov09Factory=await patchFactory();
   for(const enabled of [false,true])for(const wsl of [false,true])for(const allowed of [false,true])for(const loading of [false,true])for(const configured of [false,true]){
-    const token={},modules={QosV:{c:()=>[]},[label==='Nov23'?'qmMi':'zTeN']:{_U:query=>query===token?{isCapable:true}:{allowed,isPending:loading}},DBCl:{Szl:{},PAg:'wsl'},ChYf:{G:token},[accountModule]:{tn:()=>({authMethod:'apikey'})},RxZZ:{iK:()=>wsl},kfGJ:{Qz:()=>({kind:'local'})},hZax:{Zj:()=>false},GGpr:{$:{}},mMIg:{V:()=>({enabled:configured,isLoading:false})}};
+    const token={},modules={QosV:{c:()=>[]},[signalModule]:{_U:query=>query===token?{isCapable:true}:{allowed,isPending:loading}},DBCl:{Szl:{},PAg:'wsl'},ChYf:{G:token},[accountModule]:{tn:()=>({authMethod:'apikey'})},RxZZ:{iK:()=>wsl},kfGJ:{Qz:()=>({kind:'local'})},hZax:{Zj:()=>false},GGpr:{$:{}},mMIg:{V:()=>({enabled:configured,isLoading:false})}};
     const result=execute(patchNov09Factory(fixture.yrds,'yrds'),'yrds',modules,{browserEnabled:enabled}).I({hostId:'local'});
     assert.equal(result.available,enabled&&!wsl&&allowed&&!loading&&configured);
     if(!enabled)assert.deepEqual(normalize(result),normalize(execute(fixture.yrds,'yrds',modules).I({hostId:'local'})));
@@ -55,10 +57,11 @@ test(label+': layout receives the tab directly and startup registry remains lazy
   const extension=fs.readFileSync(require('node:path').join(__dirname,'../runtime/native-tabs-renderer.js'),'utf8');
   const patched=patchNov09Factory(fixture.registry,'EpL9',extension);
   const unavailable=Symbol(),full=Symbol(),tabById=Symbol(),listeners=[],replies=[];const win={addEventListener:(_t,fn)=>listeners.push(fn),postMessage:r=>replies.push(r)};
-  const modules={[label==='Nov23'?'qmMi':'zTeN']:{A4:()=>({})},OWtl:{u:{}},nnol:{},[label==='Nov23'?'tSEg':'Oj9r']:{Rj:unavailable,GD:{}}};
+  const modules={[signalModule]:{A4:()=>({})},OWtl:{u:{}},nnol:{},[['Nov23','Nov25'].includes(label)?'tSEg':'Oj9r']:{Rj:unavailable,GD:{}}};
   const req=id=>{assert(Object.hasOwn(modules,id),'Eager dependency '+id);return modules[id];};req.d=(out,gets,values={})=>{for(const [k,get] of Object.entries(gets))Object.defineProperty(out,k,{get});Object.assign(out,values);};
   const out={};vm.runInNewContext('({'+patched+'}).EpL9',{window:win})({},out,req);
   let active={node:{},value:{},tabs:new Map(),get(signal,key){return signal===tabById?this.tabs.get(key):false;}};
+  modules.zd8w={useLayoutEffect:effect=>effect()};
   modules.QcW8={kF:full};modules.ZU27={It:{tabById$:tabById,openTab:(scope,type,opts)=>scope.tabs.set(opts.id,{tabId:opts.id,tabType:type,props:opts.props})}};
   modules.XXJV={yI(){}};modules.WwnD={xO:(_scope,tab)=>{assert.equal(tab.tabId,'fast-workspace:canvas');return true;}};
   out.__forgeRememberScope(active);listeners[0]({source:win,data:{fastWorkspaceNativeRequest:{id:'one',action:'open',page:'canvas'}}});assert.equal(replies[0].fastWorkspaceNativeReply.error,undefined);

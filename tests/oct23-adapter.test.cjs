@@ -96,7 +96,7 @@ test('oct23 workspace registration, model-statistics tab and full-width mode use
   assert(patched.includes('fastWorkspaceRememberScope(a)'));
   const full=Symbol('full'),unavailable=Symbol('unavailable'),tabById=Symbol('tabById');
   const route={value:{conversationId:'thread_1'},tabs:new Map(),full:false,get(signal,id){return signal===full?this.full:signal===unavailable?false:signal===tabById?this.tabs.get(id):undefined;}};
-  const scope={JH:new Map(),CS:unavailable,DS:full,SS:{},Or:()=>route,Yri:{createElement:(type,props)=>({type,props})},yK:()=>true,c2:(r,content,mode)=>{r.full=mode.mode==='full';return true;}};
+  const scope={JH:new Map(),CS:unavailable,DS:full,SS:{},Or:()=>route,Yri:{createElement:(type,props)=>({type,props}),useLayoutEffect:effect=>effect()},yK:()=>true,c2:(r,content,mode)=>{r.full=mode.mode==='full';return true;}};
   scope.KH=(kind,Component,options)=>{const value={kind,Component,...options};scope.JH.set(kind,value);return value;};
   scope.iU={tabById$:tabById,openTab:(r,tabType,options)=>r.tabs.set(options.id,{tabId:options.id,tabType,props:options.props})};
   vm.runInNewContext(patched.split('/* FAST_NATIVE_WORKSPACE_TABS */')[1],scope);
@@ -121,7 +121,7 @@ test('cold chat layout opens sidebar and toolbar pages before visiting settings 
   const full=Symbol('full'),unavailable=Symbol('unavailable'),tabById=Symbol('tabById'),listeners=new Map(),replies=[];
   let active;
   const window={addEventListener:(name,fn)=>listeners.set(name,fn),postMessage:reply=>replies.push(reply)};
-  const scope={window,JH:new Map(),CS:unavailable,DS:full,ND:{},Fi:()=>active,me:()=> 'native hook value',yK:()=>true,c2:(r,content,mode)=>{r.full=mode.mode==='full';return true;}};
+  const scope={window,JH:new Map(),CS:unavailable,DS:full,ND:{},Yri:{useLayoutEffect:effect=>effect()},Fi:()=>active,me:()=> 'native hook value',yK:()=>true,c2:(r,content,mode)=>{r.full=mode.mode==='full';return true;}};
   scope.KH=(kind,Component,options)=>{const value={kind,Component,...options};scope.JH.set(kind,value);return value;};
   scope.iU={tabById$:tabById,openTab:(r,tabType,options)=>r.tabs.set(options.id,{tabId:options.id,tabType,props:options.props})};
   vm.runInNewContext(patched.split('/* FAST_NATIVE_WORKSPACE_TABS */')[1].replace('export { fastWorkspaceRememberScope };','')+'\n'+chat,scope);

@@ -5,7 +5,7 @@ var fastWorkspaceNativeState;
 function fastWorkspaceNativeGetState() {
   if (!fastWorkspaceNativeState) fastWorkspaceNativeState = {
     pages: { canvas: '无限画布', todos: '待办清单', collaboration: '智能体协作', 'information-stats': '信息统计', 'codex-memory': '记忆管理', updates: '版本更新', 'forge-updates':'版本更新', 'forge-plugins':'插件管理', 'forge-settings':'Codex Forge 插件设置', 'forge-features':'功能介绍', 'forge-changelog':'升级日志', 'forge-extension-info':'扩展插件介绍与日志', 'forge-output':'插件输出' },
-    scopes: [], scopeIds: new WeakMap(), nextScopeId: 0, listener: null,
+    scopes: [], mountedScopes: new Map(), scopeIds: new WeakMap(), nextScopeId: 0, listener: null,
   };
   return fastWorkspaceNativeState;
 }
@@ -31,6 +31,13 @@ function fastWorkspaceRememberScope(scope) {
   const state = fastWorkspaceNativeGetState(), key = fastWorkspaceNativeScopeKey(scope);
   state.scopes = [...state.scopes.filter(item => fastWorkspaceNativeScopeKey(item) !== key), scope].slice(-24);
   fastWorkspaceNativeScopeId(scope);
+  // React Activity keeps hidden routes rendering but disconnects layout effects.
+  // Register after commit so background renders cannot take over global buttons.
+  kCi.useLayoutEffect(() => {
+    const mount = {};
+    state.mountedScopes.set(mount, scope);
+    return () => state.mountedScopes.delete(mount);
+  }, [scope]);
 }
 
 function fastWorkspaceNativeThreadMatches(scope, threadId) {
@@ -44,7 +51,9 @@ function fastWorkspaceNativeThreadMatches(scope, threadId) {
 function fastWorkspaceNativePickScope(request) {
   const state = fastWorkspaceNativeGetState();
   if (request.threadId != null && (typeof request.threadId !== 'string' || request.threadId.length > 256)) throw Error('无效的对话标识');
-  let scopes = state.scopes.filter(scope => {
+  // A frame's explicit scope ID still addresses its retained route for closing.
+  const candidates = request.scopeId != null ? [...state.scopes, ...state.mountedScopes.values()] : [...state.mountedScopes.values()];
+  let scopes = candidates.filter(scope => {
     try { return !scope.get(nb) && fastWorkspaceNativeThreadMatches(scope, request.threadId); } catch { return false; }
   });
   if (request.scopeId != null) scopes = scopes.filter(scope => fastWorkspaceNativeScopeId(scope) === request.scopeId);
