@@ -1,9 +1,9 @@
 import type { ForgeAPI, ForgeStream, SettingsSnapshot, FileDocument, JsonObject, ForgeSlotName } from '../../sdk/index.js';
-declare const forge:ForgeAPI;
+declare const forge:ForgeAPI<5>;
 const version:5 = forge.apiVersion;
 declare const legacy:ForgeAPI<4>;
 const older:4 = legacy.apiVersion;
-const host:5 = legacy.hostApiVersion;
+const host:6 = legacy.hostApiVersion;
 const controller = new AbortController();
 const sampled = forge.llm.sample({ prompt:'Summarize', model:'model' }, { signal:controller.signal, timeoutMs:1000 });
 sampled.then(value => value.text);

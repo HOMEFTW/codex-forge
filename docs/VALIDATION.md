@@ -1,5 +1,40 @@
 # Forge 验证记录
 
+## 0.8.0 / API 6 正式发布验证（2026-11-27）
+
+- 设置 `FORGE_NATIVE_CODEX` 指向已核验的 `26.1120.5083.0` CLI，执行 `node --test --test-concurrency=4 --test-reporter=tap tests/*.test.cjs`：**676 项通过，0 失败、0 跳过**。记录：`output/release-080-tests.tap`。原生用例连接本地模拟模型，未发送付费模型请求。
+- 启动器、准备程序、独立更新器编译成功；PowerShell 7 执行 `scripts/test-updater.ps1`：**59 项断言通过**。旧 Windows PowerShell 解析该 UTF-8 脚本失败，本次用 PowerShell 7 完成验证。
+- 本次发布包含下列面板、后台生命周期和附件引用修复；源码与网页项目分别发布，主页提供通用自部署教程。旧的本地验收及热更新记录按当时状态保留。
+- 公开发布前仅将插件地址示例改为 `https://chat.example.com`，权限清单逐字不变；UI 重建后内置网页聊天 **4/4** 回归通过。最终 backend SHA-256 为 `36b785712e907cb09837c8238d3d1e15de86b7aa8af7597a1af192275d25b880`，panel 为 `bfecb1db2d13d8303deaa3b017e6c41adb739cc25194b2a9910b2b59cb2b0487`；其余两文件与热更新记录相同。
+- 发布包以 Forge-only MSI / Portable ZIP 分发，按 payload 清单解包逐项核对；真实隔离 Electron 与正式连接验收沿用下方已完成证据。本轮打包发布保持正在运行的客户端、配对文件及云端部署不变。
+
+## 0.8.0 网页附件引用及正式热更新（2026-11-27，本地未发布）
+
+- 接入网页项目冻结 backend `84e49156a6e39df8dd059bd3660d8fff76485b170528862ebd9e42a9eda078e0`，扩展逐条原生消息引用核对：visualize HTML、imageGeneration.savedPath 与 code-comment 文件；fileId 不作为本机路径。panel、manifest、许可证及权限保持逐字一致。
+- `npm run build` 成功，源码与构建输出 backend 摘要一致。本轮 34 项相关用例取得通过结果：API 5 后端 15 项、API 6 远程聊天 15 项、内置网页聊天 4 项；新增隔离重载用例的夹具修正后，内置插件套件 4/4 重跑通过。覆盖真实 worker、configure/reconnect 的后台上下文、配对重读、权限及消息代理。
+- 新增重载回归验证：内容指纹变化撤销旧审阅并停止旧 worker，按原清单重新审阅启用后新 worker 启动；配对文件逐字不变，陪测插件 PID 不变。测试首次发现宿主既有的不同后端注册同名方法会触发 `CONTRIBUTION_CONFLICT`，本轮未修改该独立问题，陪测使用唯一方法名。
+- 用户授权后只热更新已安装网页聊天 backend，同时更新安装 payload 中的同一文件及对应摘要/收据；旧文件已备份。通过真实插件管理界面执行重新加载、启用。主进程保持 PID 31532，目标 worker 从 15596 更换为 32596；其他插件启用/审阅状态与配对配置保持不变，未退出或重启客户端。
+- 273 个 payload 文件摘要通过；完整安装校验通过 2,979 个文件、15,532 个 ASAR 成员和 15,535 个完整性块。记录和恢复文件：`output/installed-web-attachments-20261127/result.json`、同目录 `integrity.json` 与四份原文件备份。源码验证与生产更新均保持 Forge 0.8.0 / API 6。
+- 公网连接验收由网页项目统一执行，本会话未重复请求公网或模型。本轮未生成整包、提交、推送或发布；此前 MSI/便携 ZIP 尚未包含此附件扩展。
+
+## 0.8.0 网页聊天面板修订（2026-11-27，本地未发布）
+
+- 在独立用户目录运行与安装版相同的 Electron/ASAR，复现保存无响应：Chromium 报 `Blocked form submission ... 'allow-forms' permission is not set`，合法输入也未落盘。面板改为普通按钮直接保存，保留字段校验和输入框 Enter 操作；宿主 iframe 仍仅 `allow-scripts`，CSP 不变。
+- 修复启动后外部写入配对配置时，重连仍沿用旧配置的问题；损坏文件会明确报错并清除内存中的旧配置。另以真实 `ForgeBackendManager`/worker 和 loopback WebSocket 复现 `STALE_CONTEXT`：保存调用返回后，后台事件仍继承已结束的调用身份。连接入口现绑定激活时的生命周期，宿主过期上下文检查保持严格。
+- 内置 HTML 面板恢复清单声明的左侧入口；旧 `builtinPage` 保留现有原生按钮，避免重复注册。图标、折叠布局、重新挂载及停用移除均覆盖回归。
+- **29 项针对性测试通过，0 失败、0 跳过**，含真实 worker 配置重读、configure/reconnect 后持续接收事件及网页请求、API 6 权限/审批/原生适配、旧 API 预加载及菜单隔离。记录：`output/api6-panel-targeted-tests.txt`。网页项目独立报告完整 13 项通过，包含原生链路及新增面板/异步上下文回归。
+- 真实隔离客户端验证点击保存、回车保存、断开清除、外部落盘后重连，以及左栏入口复用面板；脚本和消息桥正常，未发生 CSP 表单拦截。测试仅用隔离配置、localhost 和模拟模型；没有使用正式配对令牌或付费模型。
+- 保持 **Forge 0.8.0 / API 6 / Codex 26.1120.5083.0**。原本地安装包保存在 `release/archives/v0.8.0-before-panel-fix`；修订包仅本地构建，未提交、推送或发布，未替换或重启正式客户端。插件文件更新后需重新审阅启用，随后点“重新连接”读取已有配对配置。
+
+## 0.8.0 / API 6 远程聊天（2026-11-27，本地未发布）
+
+- 官方客户端基线保持 `26.1120.5083.0`。宿主复用现有连接与注入点；原生方法夹具的来源摘要已与本地官方模块核对。覆盖真实 Node worker → API 6 → 原生连接方法、后台未选中聊天的事件、分页/延后输出、权限撤销、取消、连接更换和审批竞争。
+- `node --test --test-concurrency=4 tests/*.test.cjs`：**673 项，672 通过、0 失败、1 跳过**。跳过项为需要环境开关的原有 MCP 连接器真实模型测试。首轮默认并发出现采样超时与启动器子进程退出，两项独立复测通过；最终全量以并发 4 通过。记录：`output/api6-final-tests.txt`、`output/api6-targeted-recheck.txt`。
+- C# 更新器 **59 项断言通过**，含 API 6 目标清单及 API 1–6 插件兼容。回归发现并修复更新器遗留的 API 5 上限；记录：`output/api6-updater-tests.txt`。UI、启动器、准备程序与独立更新器构建通过；API 5/6 TypeScript 夹具通过严格类型检查。
+- `forge.web-chat` 四个交接文件逐项核对 SHA-256，纳入第十个内置插件及默认组合；首次停用、审阅启用、真实 worker 无配置时不联网、停用退出、实际 `pluginResponse` 与原 CSP 加载均通过。插件包含 ws MIT 许可证。
+- 网页协作项目独立报告 **8/8** 端到端测试通过，源码用例已核对：真实 Codex app-server 配合本地模拟模型、原生连接方法夹具、插件和中转，覆盖历史、模型/思考强度/Fast→标准、追加、停止、问答和按需读取。浏览器验证与公网部署由网页项目负责；该测试未连接正式用户会话，未验证付费模型实际加速。
+- 本轮只生成本地构建。正式客户端保持运行，未执行真实 MSI 安装/卸载或正式数据目录切换。安装包内容与摘要验收记录为 `output/api6-package-audit.json`；API 契约、人工请求支持范围与升级步骤见 [API 6 文档](API-6-REMOTE-CHAT.md)。
+
 ## 0.7.6 / Codex 26.1120.5083.0（2026-11-25）
 
 - 官方 x64 MSIX 的 OpenAI 签名有效，包身份、版本、架构、大小及 SHA-256 已核对；原始 ASAR、EXE、31 个前端工厂、预测模块和电脑操作入口分别绑定摘要。新版补丁保持旧适配器独立，加入账号状态、工作区、设置与 Windows CUA 变量变化的回归。

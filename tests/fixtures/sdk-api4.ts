@@ -30,5 +30,5 @@ forge.sidebar.register({id:'notes',title:'Notes',icon:{viewBox:'0 0 1 1',paths:[
 
 declare const legacy:ForgeAPI<1>;
 const legacyVersion:1 = legacy.apiVersion;
-const hostVersion:5 = legacy.hostApiVersion;
+const hostVersion:6 = legacy.hostApiVersion;
 legacy.context.get().then(context => { const api:1=context.apiVersion; });

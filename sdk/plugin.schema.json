@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Codex Forge Plugin (API 1-5)",
+  "title": "Codex Forge Plugin (API 1-6)",
   "type": "object",
   "required": [
     "schemaVersion",
@@ -22,9 +22,10 @@
         2,
         3,
         4,
-        5
+        5,
+        6
       ],
-      "default": 5
+      "default": 6
     },
     "id": {
       "type": "string",
@@ -122,7 +123,8 @@
           "theme.write",
           "theme.register",
           "shortcuts",
-          "settings.write"
+          "settings.write",
+          "remote.control"
         ]
       }
     },
@@ -191,7 +193,8 @@
                       "settings",
                       "events",
                       "panels",
-                      "ui"
+                      "ui",
+                      "remote-chat"
                     ]
                   }
                 }
@@ -327,11 +330,15 @@
                   }
                 },
                 "then": {
-                  "required": ["key"]
+                  "required": [
+                    "key"
+                  ]
                 },
                 "else": {
                   "not": {
-                    "required": ["key"]
+                    "required": [
+                      "key"
+                    ]
                   }
                 }
               }
@@ -872,7 +879,10 @@
       "then": {
         "properties": {
           "apiVersion": {
-            "const": 5
+            "enum": [
+              5,
+              6
+            ]
           }
         }
       }
@@ -886,11 +896,53 @@
       "then": {
         "properties": {
           "apiVersion": {
-            "const": 5
+            "enum": [
+              5,
+              6
+            ]
           },
           "permissions": {
             "contains": {
               "const": "backend.node"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "permissions": {
+            "contains": {
+              "const": "remote.control"
+            }
+          }
+        },
+        "required": [
+          "permissions"
+        ]
+      },
+      "then": {
+        "required": [
+          "backend"
+        ],
+        "properties": {
+          "apiVersion": {
+            "const": 6
+          },
+          "permissions": {
+            "contains": {
+              "const": "backend.node"
+            }
+          },
+          "backend": {
+            "required": [
+              "scope"
+            ],
+            "properties": {
+              "scope": {
+                "const": "global"
+              }
             }
           }
         }

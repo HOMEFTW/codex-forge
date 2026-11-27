@@ -92,8 +92,8 @@
     }
   });
   const api = {
-    apiVersion: 5,
-    hostApiVersion: 5,
+    apiVersion: 6,
+    hostApiVersion: 6,
     rpc: { stream },
     context: { async get() { return context = await request('context.get'); } },
     events: { on, emit: (name, value) => request('events.emit', { name, value }) },

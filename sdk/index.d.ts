@@ -2,18 +2,19 @@ import type { NexusAPI } from './nexus.js';
 import type { API5Extensions, API5ConversationMethods, API5SettingsMethods, ForgeSlotName, JsonObject } from './api5.js';
 export * from './nexus.js';
 export * from './api5.js';
+export * from './api6.js';
 export interface ForgeError extends Error {code:string}
 export interface CapabilityState {name:string;version:number;optional:boolean;supported:boolean;enabled:boolean;granted:boolean}
-export type ForgeApiVersion = 1|2|3|4|5;
-export interface Context<V extends ForgeApiVersion = 5> {threadId:string|null;generation?:number;codexVersion:string;forgeVersion:string;apiVersion:V;hostApiVersion:5}
+export type ForgeApiVersion = 1|2|3|4|5|6;
+export interface Context<V extends ForgeApiVersion = 6> {threadId:string|null;generation?:number;codexVersion:string;forgeVersion:string;apiVersion:V;hostApiVersion:6}
 export interface ContributionIcon {viewBox:'0 0 24 24';paths:string[]}
 export interface Contribution {id:string;title:string;command?:string;panel?:string;icon?:ContributionIcon}
 export interface ForgeEventMetadata {sourcePluginId?:string;threadId?:string|null}
-export interface ForgeCapabilities<V extends ForgeApiVersion = 5> {apiVersion:V;hostApiVersion:5;supportedApiVersions:ForgeApiVersion[];codexVersion:string;forgeVersion:string;permissions:string[];capabilities:{name:string;version:number;optional:boolean}[];available:Record<string,number>;negotiated:CapabilityState[];denied:Record<string,string>;slots:{id:ForgeSlotName;kind:string;scope:string;label:string}[];events:string[];surfaces:string[]}
+export interface ForgeCapabilities<V extends ForgeApiVersion = 6> {apiVersion:V;hostApiVersion:6;supportedApiVersions:ForgeApiVersion[];codexVersion:string;forgeVersion:string;permissions:string[];capabilities:{name:string;version:number;optional:boolean}[];available:Record<string,number>;negotiated:CapabilityState[];denied:Record<string,string>;slots:{id:ForgeSlotName;kind:string;scope:string;label:string}[];events:string[];surfaces:string[]}
 export interface ForgeDiagnostics {at:string;href:string;title:string;nodes:number;slots:{id:ForgeSlotName;kind:string;label:string;anchor:string|null;verified:boolean;matches:number;samples:unknown[]}[];probes:{name:string;selector:string;matches:number;samples:unknown[]}[]}
-export interface ForgeAPI<V extends ForgeApiVersion = 5> extends API5Extensions {
+export interface ForgeAPI<V extends ForgeApiVersion = 6> extends API5Extensions {
   readonly apiVersion:V;
-  readonly hostApiVersion:5;
+  readonly hostApiVersion:6;
   context:{get():Promise<Context<V>>};
   events:{on(name:'slot.changed',listener:(value:JsonObject,metadata?:ForgeEventMetadata)=>void):()=>void;on(name:'ready'|'context.changed'|'settings.changed'|'theme.changed'|'dispose'|'output.changed'|`plugin.${string}`|`conversation.${string}`,listener:(value:any,metadata?:ForgeEventMetadata)=>void):()=>void;emit(name:string,value?:unknown):Promise<{accepted:boolean;name:string}>};
   commands:{register(id:string,handler:(args:any)=>unknown|Promise<unknown>):()=>void};

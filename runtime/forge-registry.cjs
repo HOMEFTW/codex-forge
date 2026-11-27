@@ -37,7 +37,7 @@ class ForgeRegistry {
   status(id, visiting = new Set()) {
     const entry = this.entries.get(id); if (!entry) return { enabled: false, requestedEnabled: false, reasons: ['插件不存在'] };
     const { manifest: m, builtin } = entry, saved = this.state().plugins[id];
-    const requestedEnabled = saved?.enabled ?? builtin;
+    const requestedEnabled = saved?.enabled ?? (builtin && !m.permissions.includes('remote.control'));
     const reasons = [...compatibility(m, this.versions).reasons];
     // 能力版本由宿主提供，插件声明不匹配时停用而不是带着错误的假设运行。
     for (const item of m.capabilities || []) {
@@ -46,7 +46,7 @@ class ForgeRegistry {
       if (!spec) { reasons.push('未知能力：' + item.name); continue; }
       if (item.version !== spec.version) reasons.push(`能力 ${item.name} 需要版本 ${item.version}，当前 Forge 提供 ${spec.version}`);
     }
-    if (!builtin && saved?.fingerprint !== entry.fingerprint) reasons.push('插件清单已变化或尚未启用，请审阅权限后启用');
+    if ((!builtin || m.permissions.includes('remote.control')) && saved?.fingerprint !== entry.fingerprint) reasons.push('插件清单已变化或尚未启用，请审阅权限后启用');
     if (visiting.has(id)) return { enabled: false, requestedEnabled, reasons: ['循环依赖：'+id] };
     const next = new Set([...visiting, id]);
     for (const [dependency, version] of Object.entries(m.dependencies || {})) {
@@ -75,7 +75,7 @@ class ForgeRegistry {
     const entry=this.get(id,false),file=path.join(this.root,'plugin-reviews.json'),reviews=json(file,{});
     reviews[id]={fingerprint:entry.fingerprint,at:new Date().toISOString()};atomic(file,reviews);return true;
   }
-  reviewed(id) {const entry=this.get(id,false);return entry.builtin||json(path.join(this.root,'plugin-reviews.json'),{})[id]?.fingerprint===entry.fingerprint;}
+  reviewed(id) {const entry=this.get(id,false);return entry.builtin&&!entry.manifest.permissions.includes('remote.control')||json(path.join(this.root,'plugin-reviews.json'),{})[id]?.fingerprint===entry.fingerprint;}
   settings(id, value) {
     const entry = this.get(id, false), file = path.join(this.root, 'storage', id + '.settings.json');
     if (value !== undefined) {

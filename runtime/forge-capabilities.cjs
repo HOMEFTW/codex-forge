@@ -8,8 +8,10 @@
 //   3. 失败文本必须告诉插件怎么改清单，而不是只报"没有权限"。
 // permission 仍是用户授权面（安装时审阅）；capability 是技术声明，两者都要过。
 const api5 = require('./forge-api5-contract.cjs');
+const api6 = require('./forge-api6-contract.cjs');
 const CAPABILITIES = Object.freeze({
   ...api5.capabilities,
+  ...api6.capabilities,
   'prompt-prediction': { version: 1, permission: 'conversation.predict', description: '由内置插件预测当前会话的下一条草稿；不自动发送' },
   nexus: { version: 1, permission: 'nexus.read', description: '访问用户连接的星枢 Nexus 知识库；写入另需 nexus.write' },
   conversation: { version: 1, permission: 'conversation.title', description: '修改当前会话标题' },
@@ -29,6 +31,7 @@ const ALWAYS_ALLOWED = new Set(['context.get', 'metadata.get', 'capabilities.get
 
 const METHOD_CAPABILITY = Object.freeze({
   ...api5.methods,
+  ...api6.methods,
   'nexus.request': 'nexus',
   'nexus.connect': 'nexus', 'nexus.disconnect': 'nexus',
   'conversation.title': 'conversation',
@@ -47,6 +50,7 @@ const METHOD_CAPABILITY = Object.freeze({
 function inferCapabilities(permissions = []) {
   const set = new Set();
   for (const permission of permissions) {
+    if (permission === 'remote.control') set.add('remote-chat');
     if (api5.permissionCapabilities[permission]) set.add(api5.permissionCapabilities[permission]);
     if (permission === 'nexus.read' || permission === 'nexus.write') set.add('nexus');
     if (permission === 'conversation.title') set.add('conversation');

@@ -1,0 +1,16 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+*{box-sizing:border-box}body{margin:0;padding:24px;background:var(--forge-background,#181818);color:var(--forge-foreground,#eee);font:14px/1.6 system-ui,sans-serif}h1{font-size:22px;margin:0 0 8px}p{color:#999}label{display:block;margin:20px 0 7px}input{width:100%;padding:12px;border:1px solid #555;border-radius:9px;background:transparent;color:inherit}button{padding:10px 14px;border:1px solid #555;border-radius:9px;background:transparent;color:inherit;cursor:pointer}button.primary{background:#eee;color:#111;border-color:#eee}nav{display:flex;gap:8px;margin:20px 0;flex-wrap:wrap}.status{padding:12px 14px;border-radius:10px;background:#ffffff0a}.dot{display:inline-block;width:7px;height:7px;background:#888;border-radius:100%;margin-right:8px}.on{background:#65c99c}small{color:#aaa}#error{color:#eea394;white-space:pre-wrap}a{color:inherit}
+</style></head><body><h1>网页聊天</h1><p>从浏览器继续这台电脑上的 Codex 聊天。</p><div class="status"><span id="dot" class="dot"></span><span id="status">正在连接宿主…</span></div><form id="form"><label for="url">网页地址</label><input id="url" type="url" placeholder="https://chat.example.com" required><label for="token">设备连接令牌</label><input id="token" type="password" autocomplete="off" placeholder="粘贴部署时生成的设备令牌" required><small>令牌保存在本机连接配置中。网页登录使用单独的访问口令。</small><nav><button class="primary" type="button" id="save">保存并连接</button><button type="button" id="open">打开网页</button><button type="button" id="retry">重新连接</button><button type="button" id="disconnect">断开并清除配置</button></nav></form><p id="error" role="alert"></p><small>本机 Forge 需要保持运行。停用此插件即可停止网页访问。</small><script>const $ = id => document.getElementById(id);
+const api = window.CodexForge;
+let current;
+async function refresh() { try { current = await api.backend.call('status'); $('status').textContent = current.connected ? '已连接，网页可用' : current.configured ? '正在连接…' : '尚未配置'; $('dot').classList.toggle('on', current.connected); if (!document.activeElement?.matches('input') && current.url) $('url').value = current.url; $('error').textContent = current.error || ''; } catch (error) { $('error').textContent = error.message; } }
+async function save() { if (!$('form').reportValidity()) return; try { await api.backend.call('configure', { url: $('url').value, token: $('token').value }); $('token').value = ''; await refresh(); } catch (error) { $('error').textContent = error.message; } }
+// The host sandbox blocks form submission before a submit handler can run.
+$('save').onclick = save;
+$('form').onsubmit = event => event.preventDefault();
+$('form').onkeydown = event => { if (event.key === 'Enter' && !event.isComposing && event.target?.matches('input')) { event.preventDefault(); return save(); } };
+$('retry').onclick = async () => { await api.backend.call('reconnect'); await refresh(); };
+$('disconnect').onclick = async () => { await api.backend.call('disconnect'); $('url').value = ''; await refresh(); };
+$('open').onclick = async () => { if (current?.url) await api.browser.open(current.url); };
+const interval = setInterval(refresh, 2500); api.events.on('dispose', () => clearInterval(interval)); refresh();
+</script></body></html>

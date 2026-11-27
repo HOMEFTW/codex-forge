@@ -56,7 +56,12 @@
   function contributions() {
     if(!snapshot) return;
     const wanted=new Map();
-    for(const p of snapshot.plugins.filter(p=>p.enabled&&!p.builtin)) for(const surface of ['sidebar','toolbar','composer']) for(const item of p.contributes?.[surface]||[]) wanted.set(p.id+':'+surface+':'+item.id,{pluginId:p.id,surface,item});
+    for(const p of snapshot.plugins.filter(p=>p.enabled)) for(const surface of ['sidebar','toolbar','composer']) for(const item of p.contributes?.[surface]||[]) {
+      // Legacy built-in pages have native entries. Bundled HTML panels use the
+      // same manifest contributions as installed plugins.
+      if(p.builtin&&p.contributes?.panels?.some(panel=>panel.id===item.panel&&panel.builtinPage))continue;
+      wanted.set(p.id+':'+surface+':'+item.id,{pluginId:p.id,surface,item});
+    }
     for(const value of snapshot.dynamic) wanted.set(value.pluginId+':'+value.surface+':'+value.item.id,value);
     document.querySelectorAll('[data-forge-contribution]').forEach(e=>{if(!wanted.has(e.dataset.forgeContribution)) e.remove();});
     for(const [key,{pluginId,surface,item}] of wanted) {

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1, "apiVersion": 6, "id": "forge.web-chat",
+  "name": "网页聊天", "version": "0.8.0",
+  "description": "通过自己的 HTTPS 网页访问这台电脑上的 Codex，查看历史、继续聊天并处理审批。",
+  "compatibility": {"forge":[">=0.8.0 <0.9.0"]},
+  "permissions": ["backend.node","remote.control","panels","sidebar","settings","storage","browser"],
+  "capabilities": [{"name":"backend","version":1},{"name":"remote-chat","version":1},{"name":"panels","version":1},{"name":"ui","version":1},{"name":"settings","version":1},{"name":"storage","version":1},{"name":"browser","version":1}],
+  "backend": {"entry":"backend.cjs","methods":["status","configure","disconnect","reconnect"],"scope":"global"},
+  "contributes": {
+    "panels":[{"id":"main","title":"网页聊天","entry":"panel.html","placement":"right"}],
+    "sidebar":[{"id":"open","title":"网页聊天","panel":"main","icon":{"viewBox":"0 0 24 24","paths":["M4 4h16v12H9l-5 4V4Z","M8 8h8M8 12h5"]}}]
+  },
+  "changelog":[{"version":"0.8.0","date":"2026-11-27","items":["新增内置网页聊天，通过 HTTPS/WSS 访问本机客户端的历史、消息、模型与审批。"]}]
+}

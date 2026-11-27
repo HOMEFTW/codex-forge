@@ -18,7 +18,7 @@ function loadSdk({ apiVersion = 5, dispatch, document } = {}) {
   } };
   const deliver = (data, source = parent) => listeners.get('message')({ source, data });
   const reply = (id, result, error) => deliver({ forgePluginReply: { id, result, error } });
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../runtime/forge-sdk.js'), 'utf8').replace('apiVersion: 5,', 'apiVersion: ' + apiVersion + ','), { window, parent, document, setTimeout, clearTimeout, console: { error() {} } });
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../runtime/forge-sdk.js'), 'utf8').replace('apiVersion: 6,', 'apiVersion: ' + apiVersion + ','), { window, parent, document, setTimeout, clearTimeout, console: { error() {} } });
   return { api: window.CodexForge, requests, reply, deliver, async ready() { reply(requests[0].id, { denied: {} }); reply(requests[1].id, { apiVersion, hostApiVersion: 5, threadId: 'thread-a' }); await tick(); } };
 }
 
@@ -172,14 +172,14 @@ test('API 5 SDK receives context for new workspace permissions and calls the act
 
 test('API 1–4 SDK adapters retain their declared version and legacy method payloads', async () => {
   for (const version of [1, 2, 3, 4]) {
-    const h = loadSdk({ apiVersion: version }); await h.ready(); assert.equal(h.api.apiVersion, version); assert.equal(h.api.hostApiVersion, 5);
+    const h = loadSdk({ apiVersion: version }); await h.ready(); assert.equal(h.api.apiVersion, version); assert.equal(h.api.hostApiVersion, 6);
     const pending = h.api.composer.setText('new', 'old'); const request = h.requests.at(-1);
     assert.equal(request.method, 'composer.set'); assert.deepEqual(JSON.parse(JSON.stringify(request.args)), { text: 'new', expectedText: 'old' }); h.reply(request.id, { text: 'new' }); assert.equal((await pending).text, 'new');
   }
 });
 
-test('API 5 types infer streams, require revisions and retain explicit old API declarations', () => {
-  execFileSync(process.execPath, [require.resolve('typescript/bin/tsc'), '--noEmit', '--strict', '--module', 'NodeNext', '--target', 'ES2022', 'tests/fixtures/sdk-api5.ts'], { cwd: path.join(__dirname, '..'), windowsHide: true, stdio: 'pipe' });
+test('API 5/6 types retain old declarations and restrict remote chat to the backend contract', () => {
+  execFileSync(process.execPath, [require.resolve('typescript/bin/tsc'), '--noEmit', '--strict', '--module', 'NodeNext', '--target', 'ES2022', 'tests/fixtures/sdk-api5.ts', 'tests/fixtures/sdk-api6.ts'], { cwd: path.join(__dirname, '..'), windowsHide: true, stdio: 'pipe' });
 });
 
 test('developer manifest schema advertises the actual API5 capabilities, hooks and slot names',()=>{

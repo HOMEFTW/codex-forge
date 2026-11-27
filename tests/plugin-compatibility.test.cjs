@@ -6,13 +6,13 @@ const { applyPending } = require('../runtime/forge-plugin-updates.cjs');
 const { matchUpdate } = require('../runtime/forge-updates.cjs');
 const config = require('../forge.config.json');
 const versions = { forge: config.version, codex: config.codexVersion, apiVersion: config.apiVersion };
-const manifest = () => ({ schemaVersion: 1, apiVersion: 4, id: 'test.portable', name: 'Portable API plugin', version: '1.0.0', compatibility: { forge: ['>=0.6.1 <0.8.0'] }, permissions: ['storage'] });
+const manifest = () => ({ schemaVersion: 1, apiVersion: 4, id: 'test.portable', name: 'Portable API plugin', version: '1.0.0', compatibility: { forge: ['>=0.6.1 <0.9.0'] }, permissions: ['storage'] });
 
 test('API plugins can omit Codex ranges; explicit pins, API and Forge ranges remain enforced', () => {
   const plugin = validate(manifest(), __dirname);
   for (const codex of [versions.codex, '99.0.0.0']) assert(compatibility(plugin, { ...versions, codex }).compatible);
   assert(!compatibility(plugin, { ...versions, apiVersion: 3 }).compatible);
-  assert(!compatibility(plugin, { ...versions, forge: '0.8.0' }).compatible);
+  assert(!compatibility(plugin, { ...versions, forge: '0.9.0' }).compatible);
   assert(!compatibility({ ...plugin, compatibility: { ...plugin.compatibility, codex: ['1.0.0.0'] } }, versions).compatible);
   for (const codex of [null, [], '', ['bad']]) assert.throws(() => validate({ ...manifest(), compatibility: { forge: ['>=0.6.1 <0.7.0'], codex } }, __dirname));
   for (const compatibility of [undefined, {}, { codex: [versions.codex] }, { forge: [] }]) assert.throws(() => validate({ ...manifest(), compatibility }, __dirname));
@@ -43,7 +43,7 @@ test('normal updater permits an unpinned plugin and still blocks explicit Codex 
 });
 
 for (const apiVersion of [1,2,3]) test('legacy API '+apiVersion+' is supported by API5 while API4 keeps its 0.6.1 introduction rule', () => {
- const m = {...manifest(), apiVersion, compatibility:{forge:['>=0.6.0 <0.8.0']}};
+ const m = {...manifest(), apiVersion, compatibility:{forge:['>=0.6.0 <0.9.0']}};
  assert(compatibility(m, versions).compatible);
  assert(compatibility(m, {...versions, apiVersion:4, forge:'0.6.1'}).compatible);
  assert(!compatibility(m, {...versions, apiVersion:4, forge:'0.6.0'}).compatible);

@@ -7,6 +7,8 @@ const {ForgeIO}=require('./forge-api5-io.cjs');
 const {ForgeMarketplace}=require('./forge-plugin-market.cjs');
 const {ForgeNativeModels}=require('./forge-model-runtime.cjs');
 const contract=require('./forge-api5-contract.cjs');
+const remoteContract=require('./forge-api6-contract.cjs');
+const backendOrigin=Symbol('trusted backend request');
 const {granted}=require('./forge-capabilities.cjs');
 const need=(value,message,code='INVALID_ARGUMENT')=>{if(!value)throw new ForgeError(code,message);};
 const hash=value=>crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -34,7 +36,10 @@ class ForgeAPI5 {
   logHostError(error){console.error('[Forge API5]',error.code||'INTERNAL_ERROR',String(error.message).slice(0,500));}
   permission(id,...permissions){let entry;for(const permission of permissions)entry=this.registry.permission(id,permission);return entry||this.registry.get(id);}
   backendContext(context){return Object.fromEntries(['threadId','cwd','windowId','generation','pluginId','channelId','backendDepth','backgroundTask'].filter(key=>context[key]!==undefined).map(key=>[key,context[key]]));}
-  backendRequest(id,method,args,context,options){const candidate=[...this.states.values()].find(item=>item.win.webContents.id===context.windowId),current=candidate&&this.contextFor({sender:candidate.win.webContents},candidate),state=current?.threadId===context.threadId&&(candidate?.api5Generation||0)===context.generation?candidate:undefined;if(context.windowId!==undefined&&!context.backgroundTask)need(state,'后端请求上下文已变化或窗口已关闭','STALE_CONTEXT');return this.dispatch(id,method,args,{...context,state},options);}
+  backendRequest(id,method,args,context,options){
+    if(Object.hasOwn(remoteContract.methods,method))return this.dispatch(id,method,args,context,{...options,[backendOrigin]:true});
+    const candidate=[...this.states.values()].find(item=>item.win.webContents.id===context.windowId),current=candidate&&this.contextFor({sender:candidate.win.webContents},candidate),state=current?.threadId===context.threadId&&(candidate?.api5Generation||0)===context.generation?candidate:undefined;if(context.windowId!==undefined&&!context.backgroundTask)need(state,'后端请求上下文已变化或窗口已关闭','STALE_CONTEXT');return this.dispatch(id,method,args,{...context,state},options);
+  }
   available(service){need(this.services[service],'宿主服务不可用：'+service,'CAPABILITY_UNAVAILABLE');return this.services[service];}
   registerFrame(event,{id,frameToken,fingerprint}){
     const entry=this.registry.get(id);need(typeof frameToken==='string'&&/^[\w-]{16,100}$/.test(frameToken)&&entry.fingerprint===fingerprint,'插件 frame 身份无效','PERMISSION_DENIED');
@@ -75,7 +80,7 @@ class ForgeAPI5 {
     return currentMethods.has(method)||method==='files.request'&&!args.args?.root&&!['roots','connect','disconnect'].includes(args.method);
   }
   async handle(event,state,request){
-    const entry=this.registry.get(request.id);need(entry.manifest.apiVersion===5,'此操作需要 API 5 插件','CAPABILITY_UNAVAILABLE');const context=this.context(event,state,request),args=object(request.args||{}),method=request.method;
+    const entry=this.registry.get(request.id);need(entry.manifest.apiVersion>=5,'此操作需要 API 5 插件','CAPABILITY_UNAVAILABLE');const context=this.context(event,state,request),args=object(request.args||{}),method=request.method;
     const bound=this.requiresThread(request.id,method,args);
     if(bound||request.threadId)need(context.threadId&&request.threadId===context.threadId&&(request.generation??0)===context.generation,'当前对话已变化或未就绪','STALE_CONTEXT');
     if(method==='rpc.cancel')return {cancelled:this.rpc.cancel(context.owner,args.requestId)};
@@ -94,10 +99,10 @@ class ForgeAPI5 {
     return this.rpc.run(context.owner,request.requestId,signal=>this.dispatch(request.id,method,args,context,{signal}),request.options||{});
   }
   authorize(id,method){
-    const entry=this.registry.get(id),legacy={'storage.get':'storage','storage.set':'storage','storage.delete':'storage','settings.get':'settings','nexus.request':'nexus'},capability=contract.methods[method]||legacy[method];
+    const entry=this.registry.get(id),legacy={'storage.get':'storage','storage.set':'storage','storage.delete':'storage','settings.get':'settings','nexus.request':'nexus'},capability=remoteContract.methods[method]||contract.methods[method]||legacy[method];
     if(['metadata.get','context.get','capabilities.get'].includes(method))return entry;need(capability,'未知 API 5 方法','METHOD_NOT_FOUND');
     const reason=granted(entry.manifest,method);need(!reason,reason,'CAPABILITY_UNAVAILABLE');
-    if(capability==='settings')this.permission(id,'settings');else{const permission=contract.capabilities[capability]?.permission;if(permission)this.permission(id,permission);}
+    if(capability==='settings')this.permission(id,'settings');else{const permission=(remoteContract.capabilities[capability]||contract.capabilities[capability])?.permission;if(permission)this.permission(id,permission);}
     return entry;
   }
   stream(id,method,args,context,{signal}){
@@ -145,6 +150,10 @@ class ForgeAPI5 {
   }
   async dispatch(id,method,args={},context={},options={}){
     object(args);const entry=this.authorize(id,method);options.signal?.throwIfAborted();
+    if(Object.hasOwn(remoteContract.methods,method)){
+      const check=()=>{const current=this.permission(id,'backend.node','remote.control');need(options[backendOrigin]===true&&current.manifest.apiVersion===6&&current.manifest.backend?.scope==='global'&&this.registry.reviewed(id),'远程聊天仅限已审阅的 API 6 全局 Node 后端','PERMISSION_DENIED');need(current.fingerprint===entry.fingerprint,'插件内容已变化','PLUGIN_CHANGED');};
+      check();const value=await this.available('remoteChat').dispatch(method,args,{signal:options.signal,check});check();return value;
+    }
     if(method.startsWith('storage.'))return this.registry.storage(id,method.split('.')[1],args.key,args.value);
     if(method==='settings.get')return this.registry.settings(id);
     if(method==='metadata.get')return entry.manifest;

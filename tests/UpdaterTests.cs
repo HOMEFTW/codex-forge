@@ -41,9 +41,12 @@ internal static class UpdaterTests {
     }
     static async Task Run(string root){
         await BootstrapDownloads(root);
-        var apiRelease=new Dictionary<string,object>{{"schemaVersion",3},{"platform","win32-x64"},{"repository","A/B"},{"distribution","msi-portable"},{"containsOfficialClient",false},{"apiVersion",5},{"forgeVersion","0.7.0"},{"codexVersion","26.1103.7773.0"},{"url","https://github.com/A/B/releases/download/v0.6.0/Forge.msi"},{"sha256",new string('a',64)},{"bytes",100},{"portableUrl","https://github.com/A/B/releases/download/v0.6.0/Forge.zip"},{"portableSha256",new string('b',64)},{"portableBytes",100}};
-        ForgeUpdateCore.Validate(apiRelease,"A/B");Check(true,"API 5 release accepted");
-        foreach(int api in new[]{1,2,3,4,6}){apiRelease["apiVersion"]=api;Reject(()=>ForgeUpdateCore.Validate(apiRelease,"A/B"),"non API 5 release rejected");}
+        var apiRelease=new Dictionary<string,object>{{"schemaVersion",3},{"platform","win32-x64"},{"repository","A/B"},{"distribution","msi-portable"},{"containsOfficialClient",false},{"apiVersion",6},{"forgeVersion","0.8.0"},{"codexVersion","26.1120.5083.0"},{"url","https://github.com/A/B/releases/download/v0.8.0/Forge.msi"},{"sha256",new string('a',64)},{"bytes",100},{"portableUrl","https://github.com/A/B/releases/download/v0.8.0/Forge.zip"},{"portableSha256",new string('b',64)},{"portableBytes",100}};
+        ForgeUpdateCore.Validate(apiRelease,"A/B");Check(true,"API 6 release accepted");
+        foreach(int api in new[]{1,2,3,4,5,7}){apiRelease["apiVersion"]=api;Reject(()=>ForgeUpdateCore.Validate(apiRelease,"A/B"),"non API 6 release rejected");}
+        apiRelease["apiVersion"]=6;
+        foreach(int api in new[]{1,2,3,4,5,6})Check(ForgeUpdateCore.SupportsApi(api,apiRelease),"API 6 host supports plugin API "+api);
+        Check(!ForgeUpdateCore.SupportsApi(7,apiRelease),"unknown future plugin API rejected");
         var data=Encoding.UTF8.GetBytes("abcdefghij");string sha=Hash(data,root),file=Path.Combine(root,"download.msi");
         var handler=new FixtureHTTP();int calls=0;
         handler.Response=request=>{calls++;Check(request.Headers.Range.Ranges.ToString()!=null,"range request");var response=new HttpResponseMessage(HttpStatusCode.PartialContent){Content=new ByteArrayContent(Encoding.UTF8.GetBytes("fghij"))};response.Content.Headers.ContentRange=new ContentRangeHeaderValue(5,9,10);return response;};

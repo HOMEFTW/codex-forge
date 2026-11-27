@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "apiVersion": 5,
-  "version": "0.7.6",
+  "apiVersion": 6,
+  "version": "0.8.0",
   "compatibility": {
     "codex": [
       "26.1106.6628.0",
@@ -18,7 +18,7 @@
       "26.1120.5083.0"
     ],
     "forge": [
-      "0.7.6"
+      "0.8.0"
     ]
   },
   "permissions": [
@@ -37,6 +37,13 @@
     }
   ],
   "changelog": [
+    {
+      "version": "0.8.0",
+      "date": "2026-11-27",
+      "items": [
+        "随 Forge 0.8.0 升级至 API 6，保留现有功能与设置。"
+      ]
+    },
     {
       "version": "0.7.6",
       "date": "2026-11-25",

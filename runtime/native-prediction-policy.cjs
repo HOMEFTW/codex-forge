@@ -4,7 +4,8 @@ const KEY = 'composer-predictions-enabled';
 // Mirrors native iKxu.k in Codex 26.1103.7773.0 (individual Pro plan family).
 const PRO_PLANS = new Set(['prolite', 'pro', 'promax']);
 class NativePredictionPolicy {
-  constructor(onChange = () => {}, onNotification = () => {}) {
+  constructor(onChange = () => {}, onNotification = () => {}, onConnection = () => {}) {
+    this.onConnection = onConnection;
     this.onChange = onChange; this.onNotification = onNotification; this.epoch = 0; this.ready = false; this.nativeEnabled = null;
     this.pro = false; this.attached = false; this.disposers = []; this.connectionDisposers = [];
   }
@@ -33,7 +34,7 @@ class NativePredictionPolicy {
   bind(connection) {
     if (connection && connection === this.connection) return;
     for (const dispose of this.connectionDisposers.splice(0)) dispose();
-    this.connection = connection; this.epoch++; this.ready = false; this.pro = false; this.changed();
+    this.connection = connection; this.onConnection(connection); this.epoch++; this.ready = false; this.pro = false; this.changed();
     if (!connection) return;
     this.connectionDisposers.push(connection.registerInternalNotificationHandler(event => {
       this.onNotification(event);
@@ -63,7 +64,7 @@ class NativePredictionPolicy {
   dispose() {
     this.attached = false; this.epoch++; this.ready = false; this.pro = false; this.nativeEnabled = null;
     for (const dispose of [...this.disposers.splice(0), ...this.connectionDisposers.splice(0)]) dispose();
-    this.connection = null; this.changed();
+    this.connection = null; this.onConnection(null); this.changed();
   }
 }
 module.exports = { NativePredictionPolicy, KEY };

@@ -56,11 +56,15 @@ function install() {
     if (!Number.isSafeInteger(settings.maxChars) || !Number.isSafeInteger(settings.timeoutSeconds)) return null;
     return settings;
   };
+  const remoteChat = new (require('./remote-chat.cjs').RemoteChat)({enabled: () => !!forge && [...forge.registry.entries.values()].some(entry => entry.manifest.permissions.includes('remote.control') && forge.registry.status(entry.manifest.id).enabled && forge.registry.reviewed(entry.manifest.id)), defaultCwd: () => {
+    const state = [...states.values()].find(item => item.threadId && !item.win.isDestroyed());
+    return state ? contexts.binding(state.threadId).cwd || null : null;
+  }});
   const nativePredictionPolicy = new NativePredictionPolicy(() => predictions.nativeChanged(), event => {
     predictions.observeNotification(event.method, event.params);
     statistics.observeNotification(event.method, event.params);
     for(const state of states.values())if(state.threadId===event.params?.threadId)forge?.api5.observe(state,event.method,event.params);
-  });
+  }, connection => remoteChat.bind(connection));
   activePredictionPolicy = nativePredictionPolicy;
   const predictions = new PromptPredictionHost({ states, settings: predictionSettings, call: nativeCall,
     sample: options => runLowPrediction({ ...options, executable: path.join(process.resourcesPath, 'codex.exe') }),
@@ -481,7 +485,7 @@ function install() {
   }, 10000);
   forge = require('./forge-host.cjs').installForge({ipcMain,dialog,host,threadContext,nativeCall,nativeMessage:(state,message)=>{if(!state.bridge) throw Error('原生连接尚未就绪'); return state.bridge.handler(state.bridge.event,message);},open,notify,states,collaboration,nexus,predictions,
     nodePath:path.join(process.resourcesPath||__dirname,'cua_node/bin/node.exe'),executable:path.join(process.resourcesPath||__dirname,'codex.exe'),safeStorage:require('./forge-secrets.cjs').systemCredentials(()=>require('electron').safeStorage),
-    services:{canvas:store,todos,skills,memory:codexMemory,statistics,collaboration,
+    services:{canvas:store,todos,skills,memory:codexMemory,statistics,collaboration,remoteChat,
       agentCall:require('./collaboration-bridge.cjs').createConversationCall({states,contexts,directHistory,nativeCall:(state,method,params,options)=>nativeCall(state,method,params,{...options,hostConnection:true}),available:state=>!!state.bridge||typeof nativePredictionPolicy.connection?.sendAppServerRequest==='function'}),
       toolContext:value=>{if(!value.threadId)throw Error('插件工具缺少原生对话绑定');const binding=contexts.binding(value.threadId);if(!binding.cwd)throw Error('插件工具对话未绑定工作目录');const state=[...states.values()].find(item=>item.threadId===value.threadId);return {threadId:value.threadId,cwd:binding.cwd,...(state?{windowId:state.win.webContents.id,generation:state.api5Generation||0}:{})};},
       statisticsContext:context=>informationContext({sender:context.state.win.webContents},context.state),
