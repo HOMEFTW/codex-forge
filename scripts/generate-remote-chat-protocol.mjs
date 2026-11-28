@@ -25,6 +25,7 @@ const definitions = {
 const approvals = {
   'item/commandExecution/requestApproval': 'CommandExecutionRequestApprovalResponse',
   'item/fileChange/requestApproval': 'FileChangeRequestApprovalResponse',
+  'item/permissions/requestApproval': 'PermissionsRequestApprovalResponse',
   'item/tool/requestUserInput': 'ToolRequestUserInputResponse',
   'mcpServer/elicitation/request': 'McpServerElicitationRequestResponse',
 };

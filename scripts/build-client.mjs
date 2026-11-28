@@ -9,6 +9,7 @@ import { patchFastAccess, patchModelCatalogArgs, patchOct27Network } from './nat
 import { patchNov09Main, patchNov09Metadata, patchNativePredictionPolicy } from './native-nov09-main.mjs';
 import { patchNov23Network, patchNov23Metadata } from './native-nov23-main.mjs';
 import { patchNov25Network } from './native-nov25-main.mjs';
+import { patchRemoteApprovalHost, patchRemoteApprovalMain } from './native-remote-approvals.mjs';
 import { patchRspackMember, patchRspackIndex } from './native-rspack-patch.mjs';
 const root = path.resolve(import.meta.dirname, '..');
 const config=JSON.parse(fs.readFileSync(path.join(root,'forge.config.json'),'utf8'));
@@ -102,6 +103,8 @@ for (const { member, entry, offset } of all) {
   if (!process.env.FAST_NO_PATCH && member === adapter.members.desktopFeatures) changed = Buffer.from(patchNov09Main(original.toString(), member));
   if (!process.env.FAST_NO_PATCH && member === members.metadataGeneration) changed = Buffer.from((['nov23', 'nov25'].includes(nativeVersion) ? patchNov23Metadata : patchNov09Metadata)(original.toString()));
   if (!process.env.FAST_NO_PATCH && member === adapter.nativePredictionPolicy?.member) changed = Buffer.from(patchNativePredictionPolicy(original.toString(), changed.toString(), adapter.nativePredictionPolicy));
+  if (!process.env.FAST_NO_PATCH && nativeVersion === 'nov25' && member === members.networkHost) changed = Buffer.from(patchRemoteApprovalHost(original.toString(), changed.toString()));
+  if (!process.env.FAST_NO_PATCH && nativeVersion === 'nov25' && member === adapter.nativePredictionPolicy?.member) changed = Buffer.from(patchRemoteApprovalMain(original.toString(), changed.toString(), adapter.nativePredictionPolicy));
   if (!changed.equals(original)) {
     assert(entry.integrity?.algorithm === 'SHA256');
     const blockSize = entry.integrity.blockSize;

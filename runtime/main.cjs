@@ -22,6 +22,8 @@ const { runLowPrediction } = require('./prompt-prediction-runner.cjs');
 const { NativePredictionPolicy } = require('./native-prediction-policy.cjs');
 let activePredictionPolicy;
 function attachNativePredictionPolicy(options) { return activePredictionPolicy.attach(options); }
+let activeRemoteChat;
+function attachNativeRemoteApprovals(managers) { return activeRemoteChat.attachManagers(managers); }
 const { applyFastModelSettings } = require('./model-catalog.cjs');
 const defaultTarget = () => ({ agent: 'codex', model: '', reasoningEffort: '' });
 function install() {
@@ -60,6 +62,7 @@ function install() {
     const state = [...states.values()].find(item => item.threadId && !item.win.isDestroyed());
     return state ? contexts.binding(state.threadId).cwd || null : null;
   }});
+  activeRemoteChat = remoteChat;
   const nativePredictionPolicy = new NativePredictionPolicy(() => predictions.nativeChanged(), event => {
     predictions.observeNotification(event.method, event.params);
     statistics.observeNotification(event.method, event.params);
@@ -503,4 +506,4 @@ function install() {
   }
   return { forge, states, store, todos, collaboration, contexts, skills, directHistory, predictions, nativePredictionPolicy, addMenu };
 }
-module.exports = { install, attachNativePredictionPolicy };
+module.exports = { install, attachNativePredictionPolicy, attachNativeRemoteApprovals };

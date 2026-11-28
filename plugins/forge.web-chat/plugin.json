@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1, "apiVersion": 6, "id": "forge.web-chat",
-  "name": "网页聊天", "version": "0.8.0",
+  "name": "网页聊天", "version": "0.8.1",
   "description": "通过自己的 HTTPS 网页访问这台电脑上的 Codex，查看历史、继续聊天并处理审批。",
   "compatibility": {"forge":[">=0.8.0 <0.9.0"]},
   "permissions": ["backend.node","remote.control","panels","sidebar","settings","storage","browser"],

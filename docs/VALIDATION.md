@@ -1,5 +1,19 @@
 # Forge 验证记录
 
+## 0.8.1 / API 6 发布验证（2026-11-28）
+
+- 版本升级为 0.8.1，API 保持 6，官方客户端基线保持 `26.1120.5083.0`。本次包含下方已完成的原生人工审批修复与两个初始化时序回归；完整 680 项、审批专项 33 项和网页隔离联通 1 项的证据按实际测试范围复用。
+- 升版后的版本/适配器/十个内置插件、包导入及网页插件回归 **16/16** 通过，启动器和准备程序重新编译成功，独立更新器 **59 项断言通过**。API/权限保持现有边界。
+- README 下载链接、更新日志、内置更新页和 API 6 文档同步新版；更新内容保存在版本索引中。发行 MSI / Portable ZIP 与新客户端按清单核验，正式客户端安装和 CU 人工审批仍未实测。
+
+## 0.8.0 / API 6 网页人工审批修复（2026-11-28，本地未发布）
+
+- 修复 26.1120 主进程 utility 代理缺少 `dispatchServerRequest` 导致审批通道未连接的问题；新增同一原生 manager/router 的 RPC 桥，保留公共审批方法、执行绑定、账户及最终发送前的授权检查。覆盖 Windows Computer Use 的 MCP 表单与 `item/permissions/requestApproval`，每次响应要求用户明确确认。
+- 真实官方源码按 SHA 固定，隔离执行 manager、router、admission、schema 与官方 RPC；相关 33 项回归通过，0 跳过。覆盖后台请求、逐次确认、错误会话、越权/持久授权拒绝、桌面并发、账户/连接变化、发送失败恢复，以及初始化期间 unavailable → reset → ready 与已有 pending 恢复。未启动生产账户或发送模型请求。
+- 最终完整单元测试使用已核验原生 CLI、并发 4，**680/680 通过，0 失败、0 跳过**；结果保存在 `output/remote-approval-unit-tests-final.log`。网页仓库的 `tests/approval-integration.test.cjs` 通过真实 relay、插件、RemoteChat、官方 RPC 与上述 manager/router 联通回归，1/1 通过。
+- UI 构建、同版 MSI / Portable ZIP 与隔离完整客户端已生成；原发布件保存在 `release/archives/v0.8.0-before-remote-approval-fix`。本轮需同时部署 ASAR 与配套 runtime，再完整重启客户端。配对文件和已审阅插件权限保持原样。
+- 本轮未安装 MSI、未替换或重启正式客户端；生产 CU 人工审批尚无实际待处理请求可验收。包内容、摘要与同版本覆盖元数据的最终核验见 `output/remote-approval-fix-080/package-audit.json`。
+
 ## 0.8.0 / API 6 正式发布验证（2026-11-27）
 
 - 设置 `FORGE_NATIVE_CODEX` 指向已核验的 `26.1120.5083.0` CLI，执行 `node --test --test-concurrency=4 --test-reporter=tap tests/*.test.cjs`：**676 项通过，0 失败、0 跳过**。记录：`output/release-080-tests.tap`。原生用例连接本地模拟模型，未发送付费模型请求。

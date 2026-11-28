@@ -12,8 +12,8 @@ const read = relative => JSON.parse(fs.readFileSync(path.join(root, relative), '
 const config = read('forge.config.json');
 const versions = { codex: config.codexVersion, forge: config.version, apiVersion: config.apiVersion };
 
-test('0.8.0 release metadata, API 6 SDK, adapters, bundle and builtins agree', t => {
-  assert.equal(config.version, '0.8.0'); assert.equal(config.apiVersion, 6);
+test('0.8.1 release metadata, API 6 SDK, adapters, bundle and builtins agree', t => {
+  assert.equal(config.version, '0.8.1'); assert.equal(config.apiVersion, 6);
   assert.equal(read('package.json').version, config.version);
   const lock = read('package-lock.json');
   assert.equal(lock.version, config.version); assert.equal(lock.packages[''].version, config.version);

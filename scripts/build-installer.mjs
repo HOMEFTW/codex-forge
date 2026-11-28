@@ -55,7 +55,7 @@ function preparePayload() {
     'forge.config.json', 'adapters', 'runtime', 'bundles', 'assets/codex-forge.ico', 'dist/fast-extension',
     'dist/CodexForge.exe', 'dist/CodexForge.exe.config', 'scripts/build-client.mjs',
     'scripts/native-tabs-patch.mjs', 'scripts/native-fast-patch.mjs', 'scripts/native-settings-patch.mjs', 'scripts/native-rspack-patch.mjs', 'scripts/native-nov09-patch.mjs', 'scripts/native-nov12-patch.mjs', 'scripts/native-nov16-patch.mjs', 'scripts/native-nov23-patch.mjs', 'scripts/native-nov23-main.mjs', 'scripts/native-nov25-patch.mjs', 'scripts/native-nov25-main.mjs', 'scripts/native-nov09-main.mjs', 'scripts/native-windows-cua.mjs',
-    'scripts/Launch-Codex-Forge.ps1', 'scripts/verify-official.ps1', 'README.md', 'LICENSE', 'docs',
+    'scripts/native-remote-approvals.mjs', 'scripts/Launch-Codex-Forge.ps1', 'scripts/verify-official.ps1', 'README.md', 'LICENSE', 'docs',
     'sdk', 'examples', 'CODEG-SKILLS-NOTICES.md'
   ]) copy(item);
   copy('dist/CodexForgeBootstrap.exe', 'CodexForgeBootstrap.exe');

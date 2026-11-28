@@ -2,19 +2,19 @@
 
 Codex Forge 是面向 Windows Codex 客户端的第三方插件宿主，将模型配置、信息统计、记忆管理、画布、待办和智能体协作集中到原生界面中。它为内置及独立插件提供统一的安装管理、设置入口、会话输出和版本兼容检查。
 
-当前版本 **0.8.0 / Forge API 6**，适配官方客户端 **26.1120.5083.0（Windows x64，MSIX 身份版本）**。[适配与验证说明](docs/CLIENT-26.1120.5083.0.md)。本项目提供第三方插件 API，与 OpenAI 官方客户端独立维护。
+当前版本 **0.8.1 / Forge API 6**，适配官方客户端 **26.1120.5083.0（Windows x64，MSIX 身份版本）**。[适配与验证说明](docs/CLIENT-26.1120.5083.0.md)。本项目提供第三方插件 API，与 OpenAI 官方客户端独立维护。
 
 [下载安装包](https://github.com/HOMEFTW/codex-forge/releases/latest) · [更新日志与版本索引](docs/CHANGELOG.md) · [从零开发插件](docs/PLUGIN-DEVELOPMENT-ZERO-TO-ONE.md) · [API 参考](docs/PLUGIN-API.md)
 
-| 下载 0.8.0 | 用途 |
+| 下载 0.8.1 | 用途 |
 | --- | --- |
-| [Windows MSI](https://github.com/HOMEFTW/codex-forge/releases/download/v0.8.0/Codex-Forge-0.8.0-Windows.msi) | 推荐用于首次安装及已有安装版升级。 |
-| [便携 ZIP](https://github.com/HOMEFTW/codex-forge/releases/download/v0.8.0/Codex-Forge-0.8.0-Windows-Portable.zip) | 解压后运行，无需 MSI 安装。 |
-| [独立更新器](https://github.com/HOMEFTW/codex-forge/releases/download/v0.8.0/Codex-Forge-0.8.0-Updater.exe) | 可选备用工具，选择已有 Forge 安装目录后检查、下载或修复。 |
-| [Codeg 技能包 0.1.0](https://github.com/HOMEFTW/codex-forge/releases/download/v0.8.0/Codeg-Skills-0.1.0.zip) | 可选独立插件，在插件管理中导入并启用。 |
-| [智能体 MCP 连接器 1.0.0](https://github.com/HOMEFTW/codex-forge/releases/download/v0.8.0/codex-forge-agent-connector-1.0.0.tgz) | 可选独立包；客户端已内置连接器，可在智能体协作页面配置接入。 |
+| [Windows MSI](https://github.com/HOMEFTW/codex-forge/releases/download/v0.8.1/Codex-Forge-0.8.1-Windows.msi) | 推荐用于首次安装及已有安装版升级。 |
+| [便携 ZIP](https://github.com/HOMEFTW/codex-forge/releases/download/v0.8.1/Codex-Forge-0.8.1-Windows-Portable.zip) | 解压后运行，无需 MSI 安装。 |
+| [独立更新器](https://github.com/HOMEFTW/codex-forge/releases/download/v0.8.1/Codex-Forge-0.8.1-Updater.exe) | 可选备用工具，选择已有 Forge 安装目录后检查、下载或修复。 |
+| [Codeg 技能包 0.1.0](https://github.com/HOMEFTW/codex-forge/releases/download/v0.8.1/Codeg-Skills-0.1.0.zip) | 可选独立插件，在插件管理中导入并启用。 |
+| [智能体 MCP 连接器 1.0.0](https://github.com/HOMEFTW/codex-forge/releases/download/v0.8.1/codex-forge-agent-connector-1.0.0.tgz) | 可选独立包；客户端已内置连接器，可在智能体协作页面配置接入。 |
 
-[SHA-256 校验文件](https://github.com/HOMEFTW/codex-forge/releases/download/v0.8.0/SHA256SUMS.txt) · [完整发布说明](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.8.0)
+[SHA-256 校验文件](https://github.com/HOMEFTW/codex-forge/releases/download/v0.8.1/SHA256SUMS.txt) · [完整发布说明](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.8.1)
 
 Forge API 6 新增受权限控制的远程聊天接口，内置网页聊天插件复用正在运行的桌面连接。详见 [API 6 契约与升级](docs/API-6-REMOTE-CHAT.md)。已有 API 5 提供插件市场、多来源目录、公共业务服务、会话与模型接口、可信 Node 后端、工具、钩子、流式取消、后台任务、界面插槽、主题及快捷键。详见 [API 5 迁移](docs/API-5-MIGRATION.md)、[SDK](docs/API-5-SDK.md) 与 [实现和验收](docs/API-5-IMPLEMENTATION.md)。API 1–5 的既有协议继续兼容，插件作者仍需声明覆盖目标 Forge 版本的兼容范围。
 
@@ -47,7 +47,7 @@ Forge API 6 新增受权限控制的远程聊天接口，内置网页聊天插�
 
 插件管理支持启停、卸载以及 GitHub / 私有 HTTPS 服务器更新；安装和更新时检查 Forge、API 与依赖兼容性；Codex 版本限制可选，显式声明时仍校验。兼容版本在插件卡片中默认折叠。新增权限需要重新启用，内置插件随 Forge 更新。“升级”入口会检查官方客户端与 Forge 的发布，并匹配经过验证的版本组合。
 
-**[Codeg 技能包](extensions/codeg-skills/README.md) 为可选独立插件**，客户端安装包不再携带技能资源和面板。单独导入 ZIP 并启用后，可使用四组 37 项技能与 237 个参考资源，分别为各智能体勾选；旧版选择保留。停用或卸载后，左栏入口、模型技能工具及协作技能提示一起关闭。开发者执行 `npm run build:codeg-skills` 生成独立安装包。[下载独立技能包 ZIP](https://github.com/HOMEFTW/codex-forge/releases/download/v0.8.0/Codeg-Skills-0.1.0.zip)，需要 Forge 0.7.5 或更新版。
+**[Codeg 技能包](extensions/codeg-skills/README.md) 为可选独立插件**，客户端安装包不再携带技能资源和面板。单独导入 ZIP 并启用后，可使用四组 37 项技能与 237 个参考资源，分别为各智能体勾选；旧版选择保留。停用或卸载后，左栏入口、模型技能工具及协作技能提示一起关闭。开发者执行 `npm run build:codeg-skills` 生成独立安装包。[下载独立技能包 ZIP](https://github.com/HOMEFTW/codex-forge/releases/download/v0.8.1/Codeg-Skills-0.1.0.zip)，需要 Forge 0.7.5 或更新版。
 
 独立插件的左栏按钮沿用内置按钮的悬停过渡、展开与折叠布局，并遵循系统减少动态效果的设置。
 
@@ -75,11 +75,11 @@ Forge API 6 新增受权限控制的远程聊天接口，内置网页聊天插�
 
 **MSI 和便携 ZIP 只包含 Forge，不包含官方客户端、Node、MSIX 或用户凭据。** 首次准备需要网络和约 7 GB 临时可用空间。下载支持续传；准备失败后再次启动 Forge 可重试，日志位于安装目录的 `forge-prepare.log`。安装阶段不下载官方客户端，启动 `CodexForge.exe` 后才开始准备。
 
-从 0.7.x 或更早版本首次升级到 **0.8.0 / API 6**，请手动运行上方新版 MSI，或退出便携版后将新版 ZIP 解压到原便携目录，也可使用上方 0.8.0 独立更新器。0.7.x 的旧更新器不接受 API 6 目标清单。
+从 0.7.x 或更早版本首次升级到 **0.8.1 / API 6**，请手动运行上方新版 MSI，或退出便携版后将新版 ZIP 解压到原便携目录，也可使用上方 0.8.1 独立更新器。0.7.x 的旧更新器不接受 API 6 目标清单。
 
 **默认升级流程保持不变：检查 Codex 与 Forge 更新 → 下载并校验 → 安装已验证版本。** 检查、下载或安装失败时，显示原因并切换独立更新器；也可从“升级 → 备用方式”手动打开。没有匹配版本、安装成功或用户取消安装时不会自动切换。独立更新器安装前需要完整退出客户端。
 
-0.8.0 使用 API 6，并兼容 API 1–5 插件的既有公共操作。旧插件可保留 API 声明，由作者验证并将 Forge 范围包含 0.8.0；远程聊天接口需升级到 API 6 并声明 remote.control。0.7.x 的旧更新器不接受 API 6，首次切换须使用新版安装包。仅使用公共 API 时可省略 `compatibility.codex`，由宿主承担官方客户端适配。显式的 Codex 范围、权限、能力和依赖仍严格校验，宿主不会改写第三方插件清单。[迁移指南](docs/API-5-MIGRATION.md)。
+0.8.1 使用 API 6，并兼容 API 1–5 插件的既有公共操作。旧插件可保留 API 声明，由作者验证并将 Forge 范围包含 0.8.1；远程聊天接口需升级到 API 6 并声明 remote.control。0.7.x 的旧更新器不接受 API 6，首次切换须使用新版安装包。仅使用公共 API 时可省略 `compatibility.codex`，由宿主承担官方客户端适配。显式的 Codex 范围、权限、能力和依赖仍严格校验，宿主不会改写第三方插件清单。[迁移指南](docs/API-5-MIGRATION.md)。
 
 独立更新器为安装目录内的 `CodexForgeUpdater.exe`，开始菜单也有入口；单独下载的更新器可选择现有 Forge 安装目录。[使用与恢复说明](docs/UPDATER.md)。Ultrafast 在模型目录已支持时自动显示；自定义服务可在 Fast 插件中填写支持该档位的模型 ID。
 

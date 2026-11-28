@@ -2,7 +2,7 @@
 
 Forge 0.8.0 / API 6 新增 `remote-chat` v1。官方客户端基线为 `26.1120.5083.0`。
 API 1–5 的既有操作继续兼容；插件自己的 `compatibility.forge` 仍须覆盖宿主版本。
-0.7.x 宿主无法加载 API 6 插件，首次升级须手动安装 0.8.0 构建。
+0.7.x 宿主无法加载 API 6 插件，首次升级须手动安装当前 0.8.1 构建。原生 utility 人工审批通道需要 Forge 0.8.1；0.8.0 的网页可显示明确的审批未连接提示。
 
 ## 授权与调用入口
 
@@ -73,7 +73,8 @@ TypeScript 后端契约见 [`sdk/api6.d.ts`](../sdk/api6.d.ts)。用户停用插
   "connectionEpoch":"opaque-connection-id","cursor":123,
   "defaults":{"model":"gpt-6.2-astra","effort":"medium","serviceTier":null,"cwd":"D:\\Code"},
   "methods":["model/list","thread/read"],
-  "approvalMethods":["item/commandExecution/requestApproval","item/fileChange/requestApproval","item/tool/requestUserInput","mcpServer/elicitation/request"]
+  "approvalMethods":["item/commandExecution/requestApproval","item/fileChange/requestApproval","item/permissions/requestApproval","item/tool/requestUserInput","mcpServer/elicitation/request"],
+  "approvalStatus":{"state":"ready","reason":null}
 }
 ```
 
@@ -88,46 +89,52 @@ TypeScript 后端契约见 [`sdk/api6.d.ts`](../sdk/api6.d.ts)。用户停用插
 }
 ```
 
-after 是宿主事件序号，默认 0；waitMs 为 0–20000。每次回复至多约 480 KiB，cursor 指向本次实际交付的末项。插件应保存 cursor 与 connectionEpoch，并连续轮询。事件缓存上限 2048 项 / 4 MiB；缓存溢出、单事件超限、游标超前、连接或账户切换时返回 `reset:true` 和新的 cursor。此时重读历史及 pending，再继续订阅。启动页面也应先读 pending。
+after 是宿主事件序号，默认 0；waitMs 为 0–20000。每次回复至多约 480 KiB，cursor 指向本次实际交付的末项。插件应保存 cursor 与 connectionEpoch，并连续轮询。事件缓存上限 2048 项 / 4 MiB；缓存溢出、单事件超限、游标超前、连接或账户切换时返回 `reset:true` 和新的 cursor。此时重读 bootstrap、历史及 pending，再继续订阅。启动页面也应先读 pending。审批 manager 初始化完成同样会更新 epoch 并唤醒重同步，随后从原生快照恢复已有请求；页面据新的 bootstrap 清除初始化期间的 unavailable 提示。
 
 通知只从已有本机主连接订阅一次，覆盖后台未选中的聊天；不从多个 renderer 汇总，因此不会重复计入多窗口转发，同样文本的连续 delta 会保留。只转发原生连接实际收到的 thread/turn/item/hook/model/error 通知，不另启 app-server，也不修改初始化时的通知订阅策略。断开或账户变化会清空缓存及 pending；用户消息取消等待不会撤销已经发送的回合，停止回合须显式 `turn/interrupt`。
 
 ## 人工审批与用户输入
 
-宿主从客户端内部/桌面自动处理路由之后的 `dispatchServerRequest` 观察请求，保留本机审批策略。事件：
+26.1120 的主进程使用 utility 代理，原生 manager 在独立进程。宿主从同一个 manager 已登记且具有有效 admission 的人工请求订阅，覆盖未选中的聊天，保留本机自动审查策略。事件：
 
 ```json
-{"sequence":125,"method":"server/request","params":{"id":"opaque-request-token","method":"item/tool/requestUserInput","params":{"threadId":"A","turnId":"T","questions":[{"id":"choice","question":"选择方案"}]}}}
+{"sequence":125,"method":"server/request","params":{"id":"opaque-request-token","method":"item/tool/requestUserInput","params":{"threadId":"A","turnId":"T","questions":[{"id":"choice","question":"选择方案"}]},"remoteApproval":{"supported":true,"reason":null}}}
 ```
 
-`forge.request('remoteChat.pending', {})` 返回 `{requests:[{id,method,params}],cursor,connectionEpoch}`。这里的 id 是宿主不透明 token，不能使用原生 JSON-RPC id 自行构造。刷新可以恢复本次宿主运行期间已观察到的待处理请求。
+`forge.request('remoteChat.pending', {})` 返回 `{requests:[{id,method,params,remoteApproval}],cursor,connectionEpoch}`。id 是宿主不透明 token；刷新、重新启用插件时重新读取 manager 的真实待处理请求。`remoteApproval.supported:false` 表示整条请求须在桌面处理，网页展示 reason 并隐藏所有响应按钮。
 
 ```js
 await forge.request('remoteChat.respond', {
   requestId: pending.id, threadId: pending.params.threadId,
-  result: {answers: {choice: {answers: ['方案一']}}}
+  result: {answers: {choice: {answers: ['方案一']}}}, userConfirmed: true
 }); // {accepted:true}
 ```
 
-- command/file 审批：`{decision:'accept'|'acceptForSession'|'decline'|'cancel'}`，还需符合原生 availableDecisions。永久 execpolicy/network 规则修改不开放。
+- 新的 manager 通道要求 `userConfirmed:true`，仅由用户对当前请求的明确点击/提交触发；重连或失败重试不得自动发送响应。
+- command/file 审批：`{decision:'accept'|'decline'|'cancel'}`，还需符合原生 availableDecisions；不开放会话或永久授权。
+- `item/permissions/requestApproval`：允许为 `{permissions:请求中的permissions,scope:'turn'}`；拒绝/取消为 `{permissions:{},scope:'turn'}`。此类型没有 decision/availableDecisions；不可扩大请求范围、改为 session 或关闭严格审查。
 - requestUserInput：`{answers:{问题ID:{answers:['回答']}}}`，拒绝未知问题 ID。
-- 普通 MCP form/url：`{action:'accept'|'decline'|'cancel',content?:...}`。form 接受前验证 requestedSchema；复杂 schema 若超出现有校验子集，会提示在桌面处理。额外 `_meta` 持久授权不开放。
-- `openai/userVerification` 在本机完成，不进入远端 pending。`codex_apps` 的 accept 需要原生执行绑定安全检查，远端提示回到桌面确认；decline/cancel 仍可处理。
+- 普通 MCP form：`{action:'accept'|'decline'|'cancel',content?:...}`。接受前验证 requestedSchema；`codex_apps` 经原生公共审批方法执行原有绑定检查。额外 `_meta` 持久授权不开放。
+- Windows Computer Use 的 `requestComputerUseApproval` 经可信 `node_repl.createElicitation` 转成 MCP 表单，按上述单次人工响应处理。操作系统权限、`openai/userVerification`、浏览器账户/OTP、URL 授权和复杂专用表单继续在桌面处理；已进入 manager 的此类请求以 supported:false 提示。
 
-响应经现有 `handleClientResponse` / `sendThreadResponse` 发送。桌面和远端同时回复只交付一次；已结束回合、已处理请求、错误 threadId、连接切换、停用或撤销授权会拒绝。未安装适配审批方法的旧客户端连接上，`approvalMethods` 返回空数组。
+响应调用 manager 的公共审批方法，经原有 router、admission、`handleClientResponse` / `sendThreadResponse` 发送；最终发送前再次检查远端授权及原生账户/连接绑定。仅发送成功后应用原生审批界面完成状态；发送失败保留可处理的请求。桌面/远端并发不会重复交付。错误 threadId、过期、连接切换、停用或撤权会拒绝。
+
+`approvalStatus.state:'unavailable'` 时显示 reason；旧构建可能只有 `approvalMethods:[]`，也应提示到桌面处理。缺少 remoteApproval 的旧协议仍保留原有限制，特别是 codex_apps 接受只允许桌面处理。
 
 ## 本地构建与升级
 
-Forge 0.8.0/API6 的正式安装包见 [GitHub Release](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.8.0)。远程宿主接入复用 0.7.6 已存在的 `attachNativePredictionPolicy` 注入点，无需新增官方 ASAR 锚点。
+Forge 0.8.1/API6 的安装包见 [GitHub Release](https://github.com/HOMEFTW/codex-forge/releases/tag/v0.8.1)。审批修复增加了 main/utility 的 ASAR 桥接锚点，`scripts/native-remote-approvals.mjs` 对官方源码摘要和每个替换位置严格校验。
+
+审批修复涉及 `runtime/remote-chat.cjs`、`remote-approvals-native.cjs`、协议、`main.cjs`、SDK，以及构建脚本。ASAR 与 runtime 必须来自同一构建；仅覆盖插件 backend 无法生效。需要在用户准备好后完整退出并重新启动客户端，配对、已审阅权限和聊天数据继续保留。
 
 对当前 26.1120.5083.0 的最小宿主变更为 `runtime/main.cjs`、`native-prediction-policy.cjs`、`remote-chat.cjs`、`remote-chat-protocol.json`、`forge-api6-contract.cjs`、API/权限/兼容/注册表相关文件，以及 Forge 配置、SDK、内置插件清单和网页插件产物。SDK 和打包元数据必须一起更新，建议使用正常本地构建流程而非覆盖正在运行的单个文件：
 
-1. 执行针对性回归、`npm run build` 和项目正常打包流程，生成隔离的 0.8.0 构建。
+1. 执行针对性回归、`npm run build` 和项目正常打包流程，生成隔离的 0.8.1 构建。
 2. 保持现有工作会话运行，先在独立数据目录中验证新构建；不要两个客户端同时写同一正式数据目录。
 3. 用户准备切换时完整退出旧客户端，再安装/覆盖新版并重启。用户聊天数据目录保留。
 4. 在插件管理中审阅并启用“网页聊天”，随后配置中转并配对网页。未配置时插件不联网。
 
-本地安装包输出为 `release/dist/Codex-Forge-0.8.0-Windows.msi` 和 `Codex-Forge-0.8.0-Windows-Portable.zip`，备用更新器为 `Codex-Forge-0.8.0-Updater.exe`。使用 `scripts/build-launcher.ps1`、`npm run build`、`node scripts/build-installer.mjs` 构建；正式安装前请关闭旧客户端。0.7.6 的历史发布件已单独保留，网页插件不会向安装包写入本机连接令牌。
+本地安装包输出为 `release/dist/Codex-Forge-0.8.1-Windows.msi` 和 `Codex-Forge-0.8.1-Windows-Portable.zip`，备用更新器为 `Codex-Forge-0.8.1-Updater.exe`。使用 `scripts/build-launcher.ps1`、`npm run build`、`node scripts/build-installer.mjs` 构建；正式安装前请关闭旧客户端。网页插件不会向安装包写入本机连接令牌。已有配对继续保留；插件内容更新后仍需按提示重新审阅启用。
 
 宿主回归结果见 [验证记录](VALIDATION.md)。内置插件业务源和网页部署教程在 [codex-forge-web](https://github.com/HOMEFTW/codex-forge-web)，发布构建复制到 `plugins/forge.web-chat`；更新产物须同时核对其 SHA-256 与许可证文件。
 
